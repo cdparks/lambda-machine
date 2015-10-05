@@ -1,4 +1,4 @@
-#LambdaMachine
+#lambda-machine
 
 ##What?
 
@@ -8,23 +8,23 @@ It's a machine for evaluating expressions in the untyped lambda calculus. You ge
 
 Yep. Here's a grammar:
 
-    ```plaintext
-    <expression>
-        = \ <name> . <expression>                    -- Lambda
-        | <name>                                     -- Variable
-        | <expression> <expression>                  -- Application
-        | ( <expression> )                           -- Parenthesization
+```plaintext
+<expression>
+    = \ <name> . <expression>                    -- Lambda
+    | <name>                                     -- Variable
+    | <expression> <expression>                  -- Application
+    | ( <expression> )                           -- Parenthesization
 
-    <name> = <lower-case>[<lower-case> <numeric> <hyphen> <underscore>]*
-    ```
+<name> = <lower-case>[<lower-case> <numeric> <hyphen> <underscore>]*
+```
 
 For example, we could apply the constant function to the identity function twice:
 
-    ```plaintext
-    (\x. \y. x) (\a. a) (\b. b)
-    (\y. \a. a) (\b. b)
-    \a. a
-    ```
+```plaintext
+(\x. \y. x) (\a. a) (\b. b)
+(\y. \a. a) (\b. b)
+\a. a
+```
 
 ##Why?
 
@@ -36,11 +36,11 @@ It's written in [PureScript](http://www.purescript.org/) and [React](https://fac
 
 It's not finished yet. I'm not sure how I want the UI to look, and what's there isn't all hooked up. You can run it like this:
 
-    ```bash
-    pulp dep install
-    pulp build -O --to static/js/main.js
-    open static/index.html
-    ```
+```bash
+pulp dep install
+pulp build -O --to static/js/main.js
+open static/index.html
+```
 
 ##Who?
 
