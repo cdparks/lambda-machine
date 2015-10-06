@@ -5,6 +5,7 @@ import Prelude
 import Text.Parsing.Parser
 import Text.Parsing.Parser.Combinators
 import Text.Parsing.Parser.String
+import Text.Parsing.Parser.Pos
 
 import Control.Lazy (fix)
 import Control.Alt ((<|>))
@@ -22,6 +23,10 @@ token p = p <* skipSpaces
 
 parseAll :: forall a. Parser String a -> String -> Either ParseError a
 parseAll p s = runParser s (skipSpaces *> p <* eof)
+
+formatParseError :: ParseError -> String
+formatParseError (ParseError { message: message, position: Position { column: column } }) =
+  "Parse error: " <> message <> " at column " <> show column
 
 parseEither :: Parser String (Either Definition Syntax)
 parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
@@ -46,7 +51,7 @@ parseSyntax = fix parseApply
 
     parseLambda :: Parser String Syntax
     parseLambda = Lambda
-      <$> (token (string "\\") *> parseName)
+      <$> (token (string "\\" <|> string "λ") *> parseName)
       <*> (token (string ".") *> p)
 
 parens :: forall a. Parser String a -> Parser String a

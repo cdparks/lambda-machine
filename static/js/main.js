@@ -1366,8 +1366,8 @@ var PS = { };
       return CompleteText;
   })();
   var handleKeyPress = function (e) {
-      var _94 = Component_Event.getKeyCode(e);
-      if (_94 === 13) {
+      var _7 = Component_Event.getKeyCode(e);
+      if (_7 === 13) {
           return CompleteText.value;
       };
       return DoNothing.value;
@@ -1376,46 +1376,46 @@ var PS = { };
   var appClass = (function () {
       var update = function (props) {
           return function (action) {
-              var step = function (_9) {
-                  if (_9 instanceof DoNothing) {
+              var step = function (_6) {
+                  if (_6 instanceof DoNothing) {
                       return function (s) {
                           return s;
                       };
                   };
-                  if (_9 instanceof NewText) {
+                  if (_6 instanceof NewText) {
                       return function (s) {
-                          var _96 = {};
-                          for (var _97 in s) {
-                              if (s.hasOwnProperty(_97)) {
-                                  _96[_97] = s[_97];
+                          var _9 = {};
+                          for (var _10 in s) {
+                              if (s.hasOwnProperty(_10)) {
+                                  _9[_10] = s[_10];
                               };
                           };
-                          _96.text = _9.value0;
-                          return _96;
+                          _9.text = _6.value0;
+                          return _9;
                       };
                   };
-                  if (_9 instanceof CompleteText) {
+                  if (_6 instanceof CompleteText) {
                       return function (s) {
-                          var _99 = {};
-                          for (var _100 in s) {
-                              if (s.hasOwnProperty(_100)) {
-                                  _99[_100] = s[_100];
+                          var _12 = {};
+                          for (var _13 in s) {
+                              if (s.hasOwnProperty(_13)) {
+                                  _12[_13] = s[_13];
                               };
                           };
-                          _99.text = "";
-                          _99.expressions = [  ];
-                          _99.scrutinee = new Data_Maybe.Just(s.text);
-                          return _99;
+                          _12.text = "";
+                          _12.expressions = [  ];
+                          _12.scrutinee = new Data_Maybe.Just(s.text);
+                          return _12;
                       };
                   };
-                  throw new Error("Failed pattern match at Component.App line 48, column 5 - line 49, column 5: " + [ _9.constructor.name ]);
+                  throw new Error("Failed pattern match at Component.App line 48, column 5 - line 49, column 5: " + [ _6.constructor.name ]);
               };
               return Thermite_Action.modifyState(step(action));
           };
       };
       var input = function (send) {
           return function (value) {
-              return React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("input-group") ])([ React_DOM.input([ React_DOM_Props.className("form-control"), React_DOM_Props.placeholder("<expression>"), React_DOM_Props.value(value), React_DOM_Props.onKeyUp(Prelude[">>>"](Prelude.semigroupoidFn)(handleKeyPress)(send)), React_DOM_Props.onChange(Prelude[">>>"](Prelude.semigroupoidFn)(handleChangeEvent)(send)) ])([  ]), React_DOM.span([ React_DOM_Props.className("input-group-btn") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_7) {
+              return React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("input-group") ])([ React_DOM.input([ React_DOM_Props.className("form-control"), React_DOM_Props.placeholder("<expression>"), React_DOM_Props.value(value), React_DOM_Props.onKeyUp(Prelude[">>>"](Prelude.semigroupoidFn)(handleKeyPress)(send)), React_DOM_Props.onChange(Prelude[">>>"](Prelude.semigroupoidFn)(handleChangeEvent)(send)) ])([  ]), React_DOM.span([ React_DOM_Props.className("input-group-btn") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_4) {
                   return send(CompleteText.value);
               }) ])([ React_DOM.text("Parse") ]) ]) ]) ]);
           };
@@ -1441,7 +1441,7 @@ var PS = { };
       var render = function (send) {
           return function (state) {
               return function (props) {
-                  return function (_8) {
+                  return function (_5) {
                       return React_DOM.div([ React_DOM_Props.className("container") ])([ React_DOM.div([ React_DOM_Props.className("row") ])([ header ]), React_DOM.div([ React_DOM_Props.className("row") ])([ input(send)(state.text) ]), React_DOM.div([ React_DOM_Props.className("row add-margin-large") ])([ evaluator(send)(state.expressions)(state.scrutinee) ]) ]);
                   };
               };
@@ -1580,24 +1580,24 @@ var PS = { };
   var DOM_HTML_Window = PS["DOM.HTML.Window"];
   var DOM_Node_Types = PS["DOM.Node.Types"];     
   var body = function __do() {
-      var _4 = DOM_HTML.window();
-      var _3 = DOM_HTML_Window.document(_4)();
-      var _2 = Prelude["<$>"](Control_Monad_Eff.functorEff)(Data_Nullable.toMaybe)(DOM_HTML_Document.body(_3))();
-      return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude["<$>"](Data_Maybe.functorMaybe)(DOM_HTML_Types.htmlElementToElement)(_2))();
+      var _2 = DOM_HTML.window();
+      var _1 = DOM_HTML_Window.document(_2)();
+      var _0 = Prelude["<$>"](Control_Monad_Eff.functorEff)(Data_Nullable.toMaybe)(DOM_HTML_Document.body(_1))();
+      return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude["<$>"](Data_Maybe.functorMaybe)(DOM_HTML_Types.htmlElementToElement)(_0))();
   };
   var main = function __do() {
-      var _5 = body();
+      var _3 = body();
       return (function () {
-          if (_5 instanceof Data_Maybe.Nothing) {
+          if (_3 instanceof Data_Maybe.Nothing) {
               return Control_Monad_Eff_Console.log("No body element");
           };
-          if (_5 instanceof Data_Maybe.Just) {
+          if (_3 instanceof Data_Maybe.Just) {
               return function __do() {
-                  React.render(React.createFactory(Component_App.appClass)(Prelude.unit))(_5.value0)();
+                  React.render(React.createFactory(Component_App.appClass)(Prelude.unit))(_3.value0)();
                   return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude.unit)();
               };
           };
-          throw new Error("Failed pattern match at Main line 29, column 1 - line 30, column 1: " + [ _5.constructor.name ]);
+          throw new Error("Failed pattern match at Main line 29, column 1 - line 30, column 1: " + [ _3.constructor.name ]);
       })()();
   };
   exports["main"] = main;
