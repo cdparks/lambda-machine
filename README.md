@@ -2,20 +2,24 @@
 
 ##What?
 
-It's a machine for evaluating expressions in the untyped lambda calculus. You get lambdas, variables, applications, and <i>nothing else</i>. It's everything you need!
+It's a machine for evaluating expressions in the untyped lambda calculus. You get lambdas, variables, applications, and top-level definitions. It's everything you need!
 
 ##Really?
 
 Yep. Here's a grammar:
 
 ```plaintext
-<expression>
-    = \ <name> . <expression>                    -- Lambda
-    | <name>                                     -- Variable
-    | <expression> <expression>                  -- Application
-    | ( <expression> )                           -- Parenthesization
+<definition>
+    ::= <name> = <expression>                    -- Definition
 
-<name> = <lower-case>[<lower-case> <numeric> <hyphen> <underscore>]*
+<expression>
+    ::= \ <name> . <expression>                  -- Lambda
+    |   <name>                                   -- Variable
+    |   <expression> <expression>                -- Application
+    |   ( <expression> )                         -- Parenthesization
+
+<name>
+    ::= <lower-case>[<lower-case> <numeric> <hyphen> <underscore>]*
 ```
 
 For example, we could apply the constant function to the identity function twice:
@@ -34,7 +38,7 @@ I've been working through the exercises in [Introduction to Functional Programmi
 
 It's written in [PureScript](http://www.purescript.org/) and [React](https://facebook.github.io/react/) using the [Thermite](https://github.com/paf31/purescript-thermite) library. Expressions are converted to a locally nameless representation before being evaluated in normal order.
 
-It's not finished yet. I'm not sure how I want the UI to look, and what's there isn't all hooked up. You can run it like this:
+You can run it like this:
 
 ```bash
 pulp dep install
