@@ -11,10 +11,11 @@ import Control.Lazy (fix)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 
-import Data.Array (many)
+import Data.Array (many, replicate)
 import Data.Foldable (foldl)
 import Data.String (fromCharArray)
 import Data.Either
+import Data.Either.Unsafe (fromRight)
 
 import Data.Syntax
 
@@ -24,9 +25,18 @@ token p = p <* skipSpaces
 parseAll :: forall a. Parser String a -> String -> Either ParseError a
 parseAll p s = runParser s (skipSpaces *> p <* eof)
 
-formatParseError :: ParseError -> String
-formatParseError (ParseError { message: message, position: Position { column: column } }) =
-  "Parse error: " <> message <> " at column " <> show column
+unsafeParse :: forall a. Parser String a -> String -> a
+unsafeParse p s = fromRight (parseAll p s)
+
+formatParseError :: String -> ParseError -> String
+formatParseError text (ParseError { message: message, position: Position { column: column } }) =
+  "Parse error: " <> message <> " at column " <> show column <> "\n" <> text <> "\n" <> caretLine
+ where
+  caretLine = fromCharArray (replicate (column - 1) ' ') <> "^"
+
+caretForParseError :: ParseError -> String
+caretForParseError (ParseError { position: Position { column: column } }) =
+  fromCharArray (replicate (column - 1) ' ') <> "^"
 
 parseEither :: Parser String (Either Definition Syntax)
 parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
