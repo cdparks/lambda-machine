@@ -1,5 +1,7 @@
 #lambda-machine
 
+[Lambda Machine Screenshot](https://raw.githubusercontent.com/cdparks/lambda-machine/master/static/images/lambda-machine.png)
+
 ##What?
 
 It's a machine for evaluating expressions in the untyped lambda calculus. You get lambdas, variables, applications, and <i>nothing else</i>. It's everything you need!
