@@ -20,6 +20,8 @@ data Expr
   | Bind Name Expr
   | App Expr Expr
 
+type Environment = Map.Map Name Expr
+
 derive instance genericExpr :: Generic Expr
 instance showExpr :: Show Expr where
   show = gShow
@@ -66,24 +68,19 @@ digits n
   | n < 10    = [n]
   | otherwise = digits (n `div` 10) <> [n `mod` 10]
 
-step :: Expr -> Maybe Expr
-step e =
+step :: Environment -> Expr -> Maybe Expr
+step env e =
   case e of
-    App (Bind n e) m -> return (substitute m 0 e)
+    App (Bind n e) m ->
+      return (substitute m 0 e)
     App f a ->
-      (App <$> step f <*> pure a)
-      <|> (App <$> pure f <*> step a)
-    Bind n e -> do
-      e' <- step e
-      return (Bind n e')
-    Free n -> Nothing
-    Bound n i -> Nothing
-
-watch :: forall eff. Int -> Expr -> Eff (console :: CONSOLE | eff) Unit
-watch 0 e = log (prettyPrint (exprToSyntax e))
-watch n e = do
-  log (prettyPrint (exprToSyntax e))
-  maybe (return unit) (watch (n - 1)) (step e)
+      (App <$> step env f <*> pure a) <|> (App <$> pure f <*> step env a)
+    Bind n e ->
+      Bind n <$> step env e
+    Free n ->
+      Map.lookup n env
+    Bound n i ->
+      Nothing
 
 substitute :: Expr -> Int -> Expr -> Expr
 substitute v = walk
