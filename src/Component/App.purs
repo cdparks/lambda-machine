@@ -4,11 +4,15 @@ import Prelude
 
 import Data.Maybe
 import Data.Either
-import Data.Array (snoc)
+import Data.Tuple
+import Data.Array (snoc, filter)
+import Data.List (toList)
+import qualified Data.Map as Map
 
 import Data.Syntax
-import Data.Parse
 import Data.Expr
+import Data.Parse
+import Text.Parsing.Parser (ParseError(..))
 
 import qualified Thermite as T
 import qualified Thermite.Action as T
@@ -23,6 +27,8 @@ type AppState =
   { text    :: String
   , expr    :: Maybe Expr
   , history :: Array String
+  , defs    :: Array Definition
+  , env     :: Environment
   , error   :: Maybe String
   }
 
@@ -32,8 +38,27 @@ data AppAction
   | ParseText
   | Reduce Expr
   | DismissAlert
+  | Remove Name
 
 type AppProps = Unit
+
+initialDefs :: Array Definition
+initialDefs =
+  [ { name: "i"
+    , syntax: unsafeParse parseSyntax "λx. x"
+    }
+  , { name: "k"
+    , syntax: unsafeParse parseSyntax "λx. λy. x"
+    }
+  , { name: "fix"
+    , syntax: unsafeParse parseSyntax "λf. (λx. f (x x)) (λy. f (y y))"
+    }
+  ]
+
+initialEnv :: Environment
+initialEnv = Map.fromList (toList (map fromDef initialDefs))
+ where
+  fromDef def = Tuple def.name (syntaxToExpr def.syntax)
 
 appClass :: R.ReactClass AppProps
 appClass = T.createClass (T.simpleSpec initialState update render)
@@ -43,6 +68,8 @@ appClass = T.createClass (T.simpleSpec initialState update render)
     { text: ""
     , expr: Nothing
     , history: []
+    , defs: initialDefs
+    , env: initialEnv
     , error: Nothing
     }
 
@@ -57,6 +84,8 @@ appClass = T.createClass (T.simpleSpec initialState update render)
           \s -> s { text = text, error = Nothing }
         DismissAlert ->
           \s -> s { error = Nothing }
+        Remove name ->
+          \s -> s { defs = removeByName name s.defs, env = Map.delete name s.env }
         ParseText ->
           parse
         Reduce expr ->
@@ -66,19 +95,37 @@ appClass = T.createClass (T.simpleSpec initialState update render)
   parse s
     | s.text == "" = s
   parse s =
-    case parseAll parseSyntax s.text of
+    case parseAll parseEither s.text of
       Left error   ->
-        s { text = "", error = Just (formatParseError error) }
-      Right syntax ->
-        s { text = "", history = [prettyPrint syntax], expr = Just (syntaxToExpr syntax) }
+        s { text = "", error = Just (formatParseError s.text error) }
+      Right (Left def) ->
+        addDef def s
+      Right (Right syntax) ->
+        addExpr syntax s
+
+  removeByName :: Name -> Array Definition -> Array Definition
+  removeByName name = filter (_.name >>> (/= name))
+
+  addDef :: Definition -> AppState -> AppState
+  addDef def s =
+    s { text = "", defs = defs, env = env }
+   where
+    defs = removeByName def.name s.defs `snoc` def
+    env = Map.insert def.name (syntaxToExpr def.syntax) s.env
+
+  addExpr :: Syntax -> AppState -> AppState
+  addExpr syntax s =
+    s { text = "", history = history, expr = expr }
+   where
+    history = [prettyPrint syntax]
+    expr = Just (syntaxToExpr syntax)
 
   reduce :: Expr -> AppState -> AppState
-  reduce expr =
-    case step expr of
-      Nothing ->
-        \s -> s
+  reduce expr s =
+    case step s.env expr of
+      Nothing -> s
       Just expr' ->
-        \s -> s { history = s.history `snoc` prettyPrint (exprToSyntax expr'), expr = Just expr' }
+        s { history = s.history `snoc` prettyPrint (exprToSyntax expr'), expr = Just expr' }
 
   render :: T.Render _ AppState _ AppAction
   render send state props _ =
@@ -89,53 +136,42 @@ appClass = T.createClass (T.simpleSpec initialState update render)
         [ header]
       , RD.div
         [ RP.className "row" ]
+        (alert send state.error)
+      , RD.div
+        [ RP.className "row" ]
         [ input send state.text ]
       , RD.div
         [ RP.className "row" ]
-        (alert send state.error)
+        (define send state.defs)
       , RD.div
-        [ RP.className "row add-margin-large" ]
+        [ RP.className "row" ]
         (evaluate send state.history state.expr)
       ]
-
-  alert :: _ -> Maybe String -> Array R.ReactElement
-  alert send Nothing = []
-  alert send (Just error) =
-    [ RD.div
-      [ RP.className "alert alert-danger"
-      , RP.onClick \_ -> send DismissAlert
-      ]
-      [ RD.text error ]
-    ]
-
-  evaluate :: _ -> Array String -> Maybe Expr -> Array R.ReactElement
-  evaluate send history Nothing = []
-  evaluate send history (Just expr) =
-    [ RD.div
-      [ RP.className "col-sm-12" ]
-      [ RD.div'
-        [ RD.button
-          [ RP.className "btn btn-default pull-right"
-          , RP.onClick \_ -> send (Reduce expr)
-          ]
-          [ RD.text "Step" ]
-        ]
-      , RD.div
-        [ RP.className "monospace-font" ]
-        (map renderSyntax history)
-      ]
-    ]
-
-  renderSyntax :: String -> R.ReactElement
-  renderSyntax syntax = RD.h4' [ RD.text syntax]
 
   header :: R.ReactElement
   header = RD.div
     [ RP.className "header" ]
     [ RD.h3
       [ RP.className "text-muted" ]
-      [ RD.text "LambdaMachine" ]
+      [ RD.text "Lambda Machine" ]
     , RD.hr' []
+    ]
+
+  alert :: _ -> Maybe String -> Array R.ReactElement
+  alert send Nothing = []
+  alert send (Just error) =
+    [ RD.div
+      [ RP.className "col-sm-12" ]
+      [ RD.pre
+        [ RP.className "alert alert-danger" ]
+        [ RD.span
+          [ RP.className "glyphicon glyphicon-remove pull-right"
+          , RP.onClick \_ -> send DismissAlert
+          ]
+          []
+        , RD.text error
+        ]
+      ]
     ]
 
   input :: _ -> String -> R.ReactElement
@@ -145,7 +181,7 @@ appClass = T.createClass (T.simpleSpec initialState update render)
       [ RP.className "input-group" ]
       [ RD.input
         [ RP.className "form-control monospace-font"
-        , RP.placeholder "<expression>"
+        , RP.placeholder "<definition> or <expression>"
         , RP.value value
         , RP.onKeyUp (handleKeyPress >>> send)
         , RP.onChange (handleChangeEvent >>> send)
@@ -162,18 +198,45 @@ appClass = T.createClass (T.simpleSpec initialState update render)
       ]
     ]
 
-  evaluator :: _ -> Array String -> Maybe String -> R.ReactElement
-  evaluator send exprs scrutinee = RD.div
-    [ RP.className "col-sm-12" ]
-    [ RD.h3
-      [ RP.className "panel-title" ]
-      [ RD.text "Nothing to see here yet..." ]
-    , RD.div'
-      [ RD.ul' (map expression exprs) ]
+  define :: _ -> Array Definition -> Array R.ReactElement
+  define send definitions =
+    [ RD.h3' [ RD.text "Definitions" ]
+    , RD.div
+      [ RP.className "monospace-font col-sm-12" ]
+      (map (renderDef send) definitions)
     ]
 
-  expression :: String -> R.ReactElement
-  expression expr = RD.li' [ RD.text expr ]
+  renderDef :: _ -> Definition -> R.ReactElement
+  renderDef send def = RD.h4'
+    [ RD.div
+      [ RP.className "glyphicon glyphicon-remove"
+      , RP.onClick \_ -> send (Remove def.name)
+      ]
+      []
+    , RD.text (" " <> def.name <> " = " <> prettyPrint def.syntax)
+    ]
+
+  evaluate :: _ -> Array String -> Maybe Expr -> Array R.ReactElement
+  evaluate send history Nothing = []
+  evaluate send history (Just expr) =
+    [ RD.h3' [ RD.text "Evaluation" ]
+    , RD.div
+      [ RP.className "col-sm-12" ]
+      [ RD.div'
+        [ RD.button
+          [ RP.className "btn btn-default pull-right"
+          , RP.onClick \_ -> send (Reduce expr)
+          ]
+          [ RD.text "Step" ]
+        ]
+      , RD.div
+        [ RP.className "monospace-font" ]
+        (map renderSyntax history)
+      ]
+    ]
+
+  renderSyntax :: String -> R.ReactElement
+  renderSyntax syntax = RD.h4' [ RD.text syntax]
 
 handleKeyPress :: forall event. event -> AppAction
 handleKeyPress e =
