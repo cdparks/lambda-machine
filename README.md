@@ -1,5 +1,3 @@
-#lambda-machine
-
 ![Lambda Machine Screenshot](https://raw.githubusercontent.com/cdparks/lambda-machine/master/static/images/lambda-machine.png)
 
 ##What?
