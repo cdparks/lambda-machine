@@ -308,6 +308,9 @@ var PS = { };
   var append = function (dict) {
       return dict.append;
   };
+  var $plus$plus = function (__dict_Semigroup_27) {
+      return append(__dict_Semigroup_27);
+  };
   var $less$greater = function (__dict_Semigroup_28) {
       return append(__dict_Semigroup_28);
   };
@@ -351,6 +354,7 @@ var PS = { };
   exports["/="] = $div$eq;
   exports["=="] = $eq$eq;
   exports["eq"] = eq;
+  exports["++"] = $plus$plus;
   exports["<>"] = $less$greater;
   exports["append"] = append;
   exports["ap"] = ap;
@@ -831,8 +835,12 @@ var PS = { };
           };
       };
       return Tuple;
-  })();
-  exports["Tuple"] = Tuple;;
+  })();                                                                                                 
+  var fst = function (_481) {
+      return _481.value0;
+  };
+  exports["Tuple"] = Tuple;
+  exports["fst"] = fst;;
  
 })(PS["Data.Tuple"] = PS["Data.Tuple"] || {});
 (function(exports) {
@@ -1029,6 +1037,64 @@ var PS = { };
   var toList = function (__dict_Foldable_2) {
       return Data_Foldable.foldr(__dict_Foldable_2)(Cons.create)(Nil.value);
   };
+  var semigroupList = new Prelude.Semigroup(function (_774) {
+      return function (ys) {
+          if (_774 instanceof Nil) {
+              return ys;
+          };
+          if (_774 instanceof Cons) {
+              return new Cons(_774.value0, Prelude["<>"](semigroupList)(_774.value1)(ys));
+          };
+          throw new Error("Failed pattern match: " + [ _774.constructor.name, ys.constructor.name ]);
+      };
+  });
+  var reverse = (function () {
+      var go = function (__copy_acc) {
+          return function (__copy__752) {
+              var acc = __copy_acc;
+              var _752 = __copy__752;
+              tco: while (true) {
+                  var acc_1 = acc;
+                  if (_752 instanceof Nil) {
+                      return acc_1;
+                  };
+                  if (_752 instanceof Cons) {
+                      var __tco_acc = new Cons(_752.value0, acc);
+                      var __tco__752 = _752.value1;
+                      acc = __tco_acc;
+                      _752 = __tco__752;
+                      continue tco;
+                  };
+                  throw new Error("Failed pattern match at Data.List line 364, column 1 - line 365, column 1: " + [ acc.constructor.name, _752.constructor.name ]);
+              };
+          };
+      };
+      return go(Nil.value);
+  })();
+  var functorList = new Prelude.Functor(function (f) {
+      return function (lst) {
+          var go = function (__copy__775) {
+              return function (__copy_acc) {
+                  var _775 = __copy__775;
+                  var acc = __copy_acc;
+                  tco: while (true) {
+                      if (_775 instanceof Nil) {
+                          return acc;
+                      };
+                      if (_775 instanceof Cons) {
+                          var __tco__775 = _775.value1;
+                          var __tco_acc = new Cons(f(_775.value0), acc);
+                          _775 = __tco__775;
+                          acc = __tco_acc;
+                          continue tco;
+                      };
+                      throw new Error("Failed pattern match at Data.List line 717, column 1 - line 724, column 1: " + [ _775.constructor.name, acc.constructor.name ]);
+                  };
+              };
+          };
+          return reverse(go(lst)(Nil.value));
+      };
+  });
   var foldableList = new Data_Foldable.Foldable(function (__dict_Monoid_16) {
       return function (f) {
           return Data_Foldable.foldl(foldableList)(function (acc) {
@@ -1077,10 +1143,39 @@ var PS = { };
           };
       };
   });
+  var length = Data_Foldable.foldl(foldableList)(function (acc) {
+      return function (_719) {
+          return acc + 1 | 0;
+      };
+  })(0);                                                   
+  var applyList = new Prelude.Apply(function () {
+      return functorList;
+  }, function (_781) {
+      return function (xs) {
+          if (_781 instanceof Nil) {
+              return Nil.value;
+          };
+          if (_781 instanceof Cons) {
+              return Prelude["<>"](semigroupList)(Prelude["<$>"](functorList)(_781.value0)(xs))(Prelude["<*>"](applyList)(_781.value1)(xs));
+          };
+          throw new Error("Failed pattern match: " + [ _781.constructor.name, xs.constructor.name ]);
+      };
+  });
+  var applicativeList = new Prelude.Applicative(function () {
+      return applyList;
+  }, function (a) {
+      return new Cons(a, Nil.value);
+  });
   exports["Nil"] = Nil;
   exports["Cons"] = Cons;
+  exports["reverse"] = reverse;
+  exports["length"] = length;
   exports["toList"] = toList;
-  exports["foldableList"] = foldableList;;
+  exports["semigroupList"] = semigroupList;
+  exports["functorList"] = functorList;
+  exports["foldableList"] = foldableList;
+  exports["applyList"] = applyList;
+  exports["applicativeList"] = applicativeList;;
  
 })(PS["Data.List"] = PS["Data.List"] || {});
 (function(exports) {
@@ -1265,6 +1360,33 @@ var PS = { };
       };
       return KickUp;
   })();
+  var values = function (_795) {
+      if (_795 instanceof Leaf) {
+          return Data_List.Nil.value;
+      };
+      if (_795 instanceof Two) {
+          return Prelude["++"](Data_List.semigroupList)(values(_795.value0))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(_795.value2))(values(_795.value3)));
+      };
+      if (_795 instanceof Three) {
+          return Prelude["++"](Data_List.semigroupList)(values(_795.value0))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(_795.value2))(Prelude["++"](Data_List.semigroupList)(values(_795.value3))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(_795.value5))(values(_795.value6)))));
+      };
+      throw new Error("Failed pattern match: " + [ _795.constructor.name ]);
+  };
+  var toList = function (_793) {
+      if (_793 instanceof Leaf) {
+          return Data_List.Nil.value;
+      };
+      if (_793 instanceof Two) {
+          return Prelude["++"](Data_List.semigroupList)(toList(_793.value0))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(new Data_Tuple.Tuple(_793.value1, _793.value2)))(toList(_793.value3)));
+      };
+      if (_793 instanceof Three) {
+          return Prelude["++"](Data_List.semigroupList)(toList(_793.value0))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(new Data_Tuple.Tuple(_793.value1, _793.value2)))(Prelude["++"](Data_List.semigroupList)(toList(_793.value3))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(new Data_Tuple.Tuple(_793.value4, _793.value5)))(toList(_793.value6)))));
+      };
+      throw new Error("Failed pattern match: " + [ _793.constructor.name ]);
+  };
+  var size = function (_3463) {
+      return Data_List.length(values(_3463));
+  };
   var lookup = function (__copy___dict_Ord_6) {
       return function (__copy_k) {
           return function (__copy__790) {
@@ -1336,6 +1458,18 @@ var PS = { };
               };
           };
       };
+  };
+  var keys = function (_794) {
+      if (_794 instanceof Leaf) {
+          return Data_List.Nil.value;
+      };
+      if (_794 instanceof Two) {
+          return Prelude["++"](Data_List.semigroupList)(keys(_794.value0))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(_794.value1))(keys(_794.value3)));
+      };
+      if (_794 instanceof Three) {
+          return Prelude["++"](Data_List.semigroupList)(keys(_794.value0))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(_794.value1))(Prelude["++"](Data_List.semigroupList)(keys(_794.value3))(Prelude["++"](Data_List.semigroupList)(Prelude.pure(Data_List.applicativeList)(_794.value4))(keys(_794.value6)))));
+      };
+      throw new Error("Failed pattern match: " + [ _794.constructor.name ]);
   };
   var functorMap = new Prelude.Functor(function (f) {
       return function (_796) {
@@ -1841,14 +1975,100 @@ var PS = { };
       };
       return down(__dict_Ord_17)(Data_List.Nil.value);
   };
+  exports["size"] = size;
+  exports["values"] = values;
+  exports["keys"] = keys;
   exports["delete"] = $$delete;
   exports["fromList"] = fromList;
+  exports["toList"] = toList;
   exports["lookup"] = lookup;
   exports["insert"] = insert;
   exports["empty"] = empty;
   exports["functorMap"] = functorMap;;
  
 })(PS["Data.Map"] = PS["Data.Map"] || {});
+(function(exports) {
+  // Generated by psc version 0.7.4.1
+  "use strict";
+  var Prelude = PS["Prelude"];
+  var Data_Map = PS["Data.Map"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Monoid = PS["Data.Monoid"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Foldable = PS["Data.Foldable"];
+  var Data_List = PS["Data.List"];     
+  var Set = (function () {
+      function Set(value0) {
+          this.value0 = value0;
+      };
+      Set.create = function (value0) {
+          return new Set(value0);
+      };
+      return Set;
+  })();
+  var toList = function (_814) {
+      return Prelude.map(Data_List.functorList)(Data_Tuple.fst)(Data_Map.toList(_814.value0));
+  };
+  var size = function (_815) {
+      return Data_Map.size(_815.value0);
+  };
+  var insert = function (__dict_Ord_5) {
+      return function (a) {
+          return function (_812) {
+              return new Set(Data_Map.insert(__dict_Ord_5)(a)(Prelude.unit)(_812.value0));
+          };
+      };
+  };
+  var foldableSet = new Data_Foldable.Foldable(function (__dict_Monoid_6) {
+      return function (f) {
+          return function (_3560) {
+              return Data_Foldable.foldMap(Data_List.foldableList)(__dict_Monoid_6)(f)(toList(_3560));
+          };
+      };
+  }, function (f) {
+      return function (x) {
+          return function (_3561) {
+              return Data_Foldable.foldl(Data_List.foldableList)(f)(x)(toList(_3561));
+          };
+      };
+  }, function (f) {
+      return function (x) {
+          return function (_3562) {
+              return Data_Foldable.foldr(Data_List.foldableList)(f)(x)(toList(_3562));
+          };
+      };
+  });
+  var empty = new Set(Data_Map.empty);
+  var fromList = function (__dict_Ord_8) {
+      return Data_Foldable.foldl(Data_List.foldableList)(function (m) {
+          return function (a) {
+              return insert(__dict_Ord_8)(a)(m);
+          };
+      })(empty);
+  };
+  var $$delete = function (__dict_Ord_11) {
+      return function (a) {
+          return function (_813) {
+              return new Set(Data_Map["delete"](__dict_Ord_11)(a)(_813.value0));
+          };
+      };
+  };
+  var difference = function (__dict_Ord_12) {
+      return function (s1) {
+          return function (s2) {
+              return Data_Foldable.foldl(Data_List.foldableList)(Prelude.flip($$delete(__dict_Ord_12)))(s1)(toList(s2));
+          };
+      };
+  };
+  exports["difference"] = difference;
+  exports["size"] = size;
+  exports["fromList"] = fromList;
+  exports["toList"] = toList;
+  exports["insert"] = insert;
+  exports["empty"] = empty;
+  exports["foldableSet"] = foldableSet;;
+ 
+})(PS["Data.Set"] = PS["Data.Set"] || {});
 (function(exports) {
   // Generated by psc version 0.7.4.1
   "use strict";
@@ -1905,14 +2125,14 @@ var PS = { };
           throw new Error("Failed pattern match at Data.Syntax line 26, column 1 - line 27, column 1: " + [ cond.constructor.name ]);
       };
   };
-  var isLambda = function (_14) {
-      if (_14 instanceof Lambda) {
+  var isLambda = function (_15) {
+      if (_15 instanceof Lambda) {
           return true;
       };
       return false;
   };
-  var isComposite = function (_13) {
-      if (_13 instanceof Var) {
+  var isComposite = function (_14) {
+      if (_14 instanceof Var) {
           return false;
       };
       return true;
@@ -2108,11 +2328,15 @@ var PS = { };
   var Control_Alt = PS["Control.Alt"];
   var Data_Generic = PS["Data.Generic"];
   var Data_Map = PS["Data.Map"];
+  var Data_Set = PS["Data.Set"];
   var Data_Array_Unsafe = PS["Data.Array.Unsafe"];
   var Data_String = PS["Data.String"];
+  var Data_List = PS["Data.List"];
+  var Data_Foldable = PS["Data.Foldable"];
   var Control_Monad_Eff = PS["Control.Monad.Eff"];
   var Control_Monad_Eff_Console = PS["Control.Monad.Eff.Console"];
-  var Data_Syntax = PS["Data.Syntax"];     
+  var Data_Syntax = PS["Data.Syntax"];
+  var Data_Monoid = PS["Data.Monoid"];     
   var Bound = (function () {
       function Bound(value0, value1) {
           this.value0 = value0;
@@ -2165,15 +2389,15 @@ var PS = { };
                   return Data_Maybe.maybe(new Free(a.value0))(Bound.create(a.value0))(Data_Map.lookup(Prelude.ordString)(a.value0)(env));
               };
               if (a instanceof Data_Syntax.Lambda) {
-                  var env$prime = Data_Map.insert(Prelude.ordString)(a.value0)(0)(Prelude.map(Data_Map.functorMap)(function (_3) {
-                      return _3 + 1 | 0;
+                  var env$prime = Data_Map.insert(Prelude.ordString)(a.value0)(0)(Prelude.map(Data_Map.functorMap)(function (_1) {
+                      return _1 + 1 | 0;
                   })(env));
                   return new Bind(a.value0, loop(env$prime)(a.value1));
               };
               if (a instanceof Data_Syntax.Apply) {
                   return new App(loop(env)(a.value0), loop(env)(a.value1));
               };
-              throw new Error("Failed pattern match at Data.Expr line 29, column 1 - line 30, column 1: " + [ a.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 32, column 1 - line 33, column 1: " + [ a.constructor.name ]);
           };
       };
       return loop(Data_Map.empty);
@@ -2198,7 +2422,7 @@ var PS = { };
               if (e instanceof App) {
                   return new App(walk(index)(e.value0), walk(index)(e.value1));
               };
-              throw new Error("Failed pattern match at Data.Expr line 85, column 1 - line 86, column 1: " + [ e.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 112, column 1 - line 113, column 1: " + [ e.constructor.name ]);
           };
       };
       return walk;
@@ -2222,7 +2446,38 @@ var PS = { };
           };
           throw new Error("Failed pattern match: " + [ e.constructor.name ]);
       };
-  };                                                               
+  };    
+  var globalNames = Prelude[">>>"](Prelude.semigroupoidFn)(Data_Map.keys)(Prelude[">>>"](Prelude.semigroupoidFn)(Data_List.toList(Data_List.foldableList))(Data_Set.fromList(Prelude.ordString)));
+  var freeVars = (function () {
+      var walk = function (vars) {
+          return function (e) {
+              if (e instanceof Bound) {
+                  return vars;
+              };
+              if (e instanceof Free) {
+                  return Data_Set.insert(Prelude.ordString)(e.value0)(vars);
+              };
+              if (e instanceof Bind) {
+                  return walk(vars)(e.value1);
+              };
+              if (e instanceof App) {
+                  return walk(walk(vars)(e.value0))(e.value1);
+              };
+              throw new Error("Failed pattern match at Data.Expr line 53, column 1 - line 54, column 1: " + [ e.constructor.name ]);
+          };
+      };
+      return walk(Data_Set.empty);
+  })();
+  var undefinedNames = function (expr) {
+      return function (env) {
+          return Data_Set.difference(Prelude.ordString)(freeVars(expr))(globalNames(env));
+      };
+  };
+  var formatUndefinedError = function (text) {
+      return function (missing) {
+          return "No top-level definition for " + (Data_Foldable.intercalate(Data_Set.foldableSet)(Data_Monoid.monoidString)(", ")(missing) + (" referenced in\n" + text));
+      };
+  };
   var exprToSyntax = function (e) {
       if (e instanceof Bound) {
           return new Data_Syntax.Var(e.value0);
@@ -2244,6 +2499,10 @@ var PS = { };
   exports["App"] = App;
   exports["substitute"] = substitute;
   exports["step"] = step;
+  exports["formatUndefinedError"] = formatUndefinedError;
+  exports["undefinedNames"] = undefinedNames;
+  exports["globalNames"] = globalNames;
+  exports["freeVars"] = freeVars;
   exports["exprToSyntax"] = exprToSyntax;
   exports["syntaxToExpr"] = syntaxToExpr;;
  
@@ -2804,9 +3063,9 @@ var PS = { };
       return Prelude["<="](Prelude.ordChar)("0")(c) && Prelude["<="](Prelude.ordChar)(c)("9");
   };
   var formatParseError = function (text) {
-      return function (_15) {
-          var caretLine = Data_String.fromCharArray(Data_Array.replicate(_15.value0.position.value0.column - 1)(" ")) + "^";
-          return "Parse error: " + (_15.value0.message + (" at column " + (Prelude.show(Prelude.showInt)(_15.value0.position.value0.column) + ("\n" + (text + ("\n" + caretLine))))));
+      return function (_16) {
+          var caretLine = Data_String.fromCharArray(Data_Array.replicate(_16.value0.position.value0.column - 1)(" ")) + "^";
+          return "Parse error: " + (_16.value0.message + (" at column " + (Prelude.show(Prelude.showInt)(_16.value0.position.value0.column) + ("\n" + (text + ("\n" + caretLine))))));
       };
   };
   var firstChar = function (c) {
@@ -3799,6 +4058,7 @@ var PS = { };
   var Data_List = PS["Data.List"];
   var Data_Foldable = PS["Data.Foldable"];
   var Data_Map = PS["Data.Map"];
+  var Data_Set = PS["Data.Set"];
   var Data_Syntax = PS["Data.Syntax"];
   var Data_Expr = PS["Data.Expr"];
   var Data_Parse = PS["Data.Parse"];
@@ -3891,8 +4151,8 @@ var PS = { };
       return Data_Map.fromList(Prelude.ordString)(Data_List.toList(Data_Foldable.foldableArray)(Prelude.map(Prelude.functorArray)(fromDef)(initialDefs)));
   })();
   var handleKeyPress = function (e) {
-      var _16 = Component_Event.getKeyCode(e);
-      if (_16 === 13) {
+      var _106 = Component_Event.getKeyCode(e);
+      if (_106 === 13) {
           return ParseText.value;
       };
       return DoNothing.value;
@@ -3903,18 +4163,18 @@ var PS = { };
           return React_DOM.h4([ React_DOM_Props.className("text-muted") ])([ React_DOM.text(syntax) ]);
       };
       var renderHistory = function (hs) {
-          var _17 = Data_Array.uncons(hs);
-          if (_17 instanceof Data_Maybe.Nothing) {
+          var _107 = Data_Array.uncons(hs);
+          if (_107 instanceof Data_Maybe.Nothing) {
               return [  ];
           };
-          if (_17 instanceof Data_Maybe.Just) {
-              return Data_Array.cons(React_DOM["h4'"]([ React_DOM.text(_17.value0.head) ]))(Prelude.map(Prelude.functorArray)(renderSyntax)(_17.value0.tail));
+          if (_107 instanceof Data_Maybe.Just) {
+              return Data_Array.cons(React_DOM["h4'"]([ React_DOM.text(_107.value0.head) ]))(Prelude.map(Prelude.functorArray)(renderSyntax)(_107.value0.tail));
           };
-          throw new Error("Failed pattern match at Component.App line 69, column 1 - line 70, column 1: " + [ _17.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 70, column 1 - line 71, column 1: " + [ _107.constructor.name ]);
       };
       var renderDef = function (send) {
           return function (def) {
-              return React_DOM["h4'"]([ React_DOM.div([ React_DOM_Props.className("glyphicon glyphicon-remove"), React_DOM_Props.onClick(function (_9) {
+              return React_DOM["h4'"]([ React_DOM.div([ React_DOM_Props.className("glyphicon glyphicon-remove"), React_DOM_Props.onClick(function (_10) {
                   return send(new Remove(def.name));
               }) ])([  ]), React_DOM.text(" " + (def.name + (" = " + Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(def.syntax)))) ]);
           };
@@ -3922,33 +4182,33 @@ var PS = { };
       var removeByName = function (name) {
           return Data_Array.filter(Prelude[">>>"](Prelude.semigroupoidFn)(function (_0) {
               return _0.name;
-          })(function (_1) {
-              return Prelude["/="](Prelude.eqString)(_1)(name);
+          })(function (_2) {
+              return Prelude["/="](Prelude.eqString)(_2)(name);
           }));
       };
       var reduce = function (expr) {
           return function (s) {
-              var _22 = Data_Expr.step(s.env)(expr);
-              if (_22 instanceof Data_Maybe.Nothing) {
+              var _112 = Data_Expr.step(s.env)(expr);
+              if (_112 instanceof Data_Maybe.Nothing) {
                   return s;
               };
-              if (_22 instanceof Data_Maybe.Just) {
-                  var _23 = {};
-                  for (var _24 in s) {
-                      if (s.hasOwnProperty(_24)) {
-                          _23[_24] = s[_24];
+              if (_112 instanceof Data_Maybe.Just) {
+                  var _113 = {};
+                  for (var _114 in s) {
+                      if (s.hasOwnProperty(_114)) {
+                          _113[_114] = s[_114];
                       };
                   };
-                  _23.history = Data_Array.cons(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax(_22.value0)))(s.history);
-                  _23.expr = new Data_Maybe.Just(_22.value0);
-                  return _23;
+                  _113.history = Data_Array.cons(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax(_112.value0)))(s.history);
+                  _113.expr = new Data_Maybe.Just(_112.value0);
+                  return _113;
               };
-              throw new Error("Failed pattern match at Component.App line 69, column 1 - line 70, column 1: " + [ _22.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 70, column 1 - line 71, column 1: " + [ _112.constructor.name ]);
           };
       };
       var input = function (send) {
           return function (value) {
-              return React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("input-group") ])([ React_DOM.input([ React_DOM_Props.className("form-control monospace-font"), React_DOM_Props.placeholder("<definition> or <expression>"), React_DOM_Props.value(value), React_DOM_Props.onKeyUp(Prelude[">>>"](Prelude.semigroupoidFn)(handleKeyPress)(send)), React_DOM_Props.onChange(Prelude[">>>"](Prelude.semigroupoidFn)(handleChangeEvent)(send)) ])([  ]), React_DOM.span([ React_DOM_Props.className("input-group-btn") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_8) {
+              return React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("input-group") ])([ React_DOM.input([ React_DOM_Props.className("form-control monospace-font"), React_DOM_Props.placeholder("<definition> or <expression>"), React_DOM_Props.value(value), React_DOM_Props.onKeyUp(Prelude[">>>"](Prelude.semigroupoidFn)(handleKeyPress)(send)), React_DOM_Props.onChange(Prelude[">>>"](Prelude.semigroupoidFn)(handleChangeEvent)(send)) ])([  ]), React_DOM.span([ React_DOM_Props.className("input-group-btn") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_9) {
                   return send(ParseText.value);
               }) ])([ React_DOM.text("Parse") ]) ]) ]) ]);
           };
@@ -3962,22 +4222,35 @@ var PS = { };
           error: Data_Maybe.Nothing.value
       };
       var header = React_DOM.div([ React_DOM_Props.className("header") ])([ React_DOM.h3([ React_DOM_Props.className("text-muted") ])([ React_DOM.text("Lambda Machine") ]), React_DOM["hr'"]([  ]) ]);
+      var fail = function (message) {
+          return function (s) {
+              var _117 = {};
+              for (var _118 in s) {
+                  if (s.hasOwnProperty(_118)) {
+                      _117[_118] = s[_118];
+                  };
+              };
+              _117.text = "";
+              _117.error = new Data_Maybe.Just(message);
+              return _117;
+          };
+      };
       var evaluate = function (send) {
           return function (history) {
-              return function (_15) {
-                  if (_15 instanceof Data_Maybe.Nothing) {
+              return function (_16) {
+                  if (_16 instanceof Data_Maybe.Nothing) {
                       return [  ];
                   };
-                  if (_15 instanceof Data_Maybe.Just) {
-                      return [ React_DOM["h3'"]([ React_DOM.text("Evaluation") ]), React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("btn-group pull-right") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_10) {
-                          return send(new Reduce(_15.value0));
-                      }) ])([ React_DOM.text("Step") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_11) {
+                  if (_16 instanceof Data_Maybe.Just) {
+                      return [ React_DOM["h3'"]([ React_DOM.text("Evaluation") ]), React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("btn-group pull-right") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_11) {
+                          return send(new Reduce(_16.value0));
+                      }) ])([ React_DOM.text("Step") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_12) {
                           return send(Clear.value);
-                      }) ])([ React_DOM.text("Clear") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_12) {
+                      }) ])([ React_DOM.text("Clear") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_13) {
                           return send(Save.value);
                       }) ])([ React_DOM.text("Save") ]) ]), React_DOM.div([ React_DOM_Props.className("hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(history)) ]) ]) ];
                   };
-                  throw new Error("Failed pattern match at Component.App line 69, column 1 - line 70, column 1: " + [ send.constructor.name, history.constructor.name, _15.constructor.name ]);
+                  throw new Error("Failed pattern match at Component.App line 70, column 1 - line 71, column 1: " + [ send.constructor.name, history.constructor.name, _16.constructor.name ]);
               };
           };
       };
@@ -3987,32 +4260,32 @@ var PS = { };
           };
       };
       var clear = function (s) {
-          var _34 = {};
-          for (var _35 in s) {
-              if (s.hasOwnProperty(_35)) {
-                  _34[_35] = s[_35];
+          var _126 = {};
+          for (var _127 in s) {
+              if (s.hasOwnProperty(_127)) {
+                  _126[_127] = s[_127];
               };
           };
-          _34.history = Data_Maybe.maybe([  ])(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Expr.exprToSyntax)(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax))(Data_Array.singleton)))(s.expr);
-          return _34;
+          _126.history = Data_Maybe.maybe([  ])(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Expr.exprToSyntax)(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax))(Data_Array.singleton)))(s.expr);
+          return _126;
       };
       var alert = function (send) {
-          return function (_14) {
-              if (_14 instanceof Data_Maybe.Nothing) {
+          return function (_15) {
+              if (_15 instanceof Data_Maybe.Nothing) {
                   return [  ];
               };
-              if (_14 instanceof Data_Maybe.Just) {
-                  return [ React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.pre([ React_DOM_Props.className("alert alert-danger") ])([ React_DOM.span([ React_DOM_Props.className("glyphicon glyphicon-remove pull-right"), React_DOM_Props.onClick(function (_7) {
+              if (_15 instanceof Data_Maybe.Just) {
+                  return [ React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.pre([ React_DOM_Props.className("alert alert-danger") ])([ React_DOM.span([ React_DOM_Props.className("glyphicon glyphicon-remove pull-right"), React_DOM_Props.onClick(function (_8) {
                       return send(DismissAlert.value);
-                  }) ])([  ]), React_DOM.text(_14.value0) ]) ]) ];
+                  }) ])([  ]), React_DOM.text(_15.value0) ]) ]) ];
               };
-              throw new Error("Failed pattern match at Component.App line 69, column 1 - line 70, column 1: " + [ send.constructor.name, _14.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 70, column 1 - line 71, column 1: " + [ send.constructor.name, _15.constructor.name ]);
           };
       };
       var render = function (send) {
           return function (state) {
               return function (props) {
-                  return function (_13) {
+                  return function (_14) {
                       return React_DOM.div([ React_DOM_Props.className("container") ])([ React_DOM.div([ React_DOM_Props.className("row") ])([ header ]), React_DOM.div([ React_DOM_Props.className("row") ])(alert(send)(state.error)), React_DOM.div([ React_DOM_Props.className("row") ])([ input(send)(state.text) ]), React_DOM.div([ React_DOM_Props.className("row") ])(define(send)(state.defs)), React_DOM.div([ React_DOM_Props.className("row") ])(evaluate(send)(state.history)(state.expr)) ]);
                   };
               };
@@ -4022,57 +4295,58 @@ var PS = { };
           return function (s) {
               var history = [ Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(syntax) ];
               var expr = new Data_Maybe.Just(Data_Expr.syntaxToExpr(syntax));
-              var _40 = {};
-              for (var _41 in s) {
-                  if (s.hasOwnProperty(_41)) {
-                      _40[_41] = s[_41];
+              var _132 = {};
+              for (var _133 in s) {
+                  if (s.hasOwnProperty(_133)) {
+                      _132[_133] = s[_133];
                   };
               };
-              _40.text = "";
-              _40.history = history;
-              _40.expr = expr;
-              return _40;
+              _132.text = "";
+              _132.history = history;
+              _132.expr = expr;
+              return _132;
           };
       };
       var addDef = function (def) {
           return function (s) {
-              var env = Data_Map.insert(Prelude.ordString)(def.name)(Data_Expr.syntaxToExpr(def.syntax))(s.env);
+              var expr = Data_Expr.syntaxToExpr(def.syntax);
+              var missing = Data_Expr.undefinedNames(expr)(Data_Map["delete"](Prelude.ordString)(def.name)(s.env));
+              var env = Data_Map.insert(Prelude.ordString)(def.name)(expr)(s.env);
               var defs = Data_Array.snoc(removeByName(def.name)(s.defs))(def);
-              var _42 = {};
-              for (var _43 in s) {
-                  if (s.hasOwnProperty(_43)) {
-                      _42[_43] = s[_43];
+              var _134 = Data_Set.size(missing) === 0;
+              if (_134) {
+                  var _135 = {};
+                  for (var _136 in s) {
+                      if (s.hasOwnProperty(_136)) {
+                          _135[_136] = s[_136];
+                      };
                   };
+                  _135.text = "";
+                  _135.defs = defs;
+                  _135.env = env;
+                  return _135;
               };
-              _42.text = "";
-              _42.defs = defs;
-              _42.env = env;
-              return _42;
+              if (!_134) {
+                  return fail(Data_Expr.formatUndefinedError(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(def.syntax))(missing))(s);
+              };
+              throw new Error("Failed pattern match at Component.App line 70, column 1 - line 71, column 1: " + [ _134.constructor.name ]);
           };
       };
       var parse = function (s) {
           if (Prelude["=="](Prelude.eqString)(s.text)("")) {
               return s;
           };
-          var _45 = Data_Parse.parseAll(Data_Parse.parseEither)(s.text);
-          if (_45 instanceof Data_Either.Left) {
-              var _46 = {};
-              for (var _47 in s) {
-                  if (s.hasOwnProperty(_47)) {
-                      _46[_47] = s[_47];
-                  };
-              };
-              _46.text = "";
-              _46.error = new Data_Maybe.Just(Data_Parse.formatParseError(s.text)(_45.value0));
-              return _46;
+          var _138 = Data_Parse.parseAll(Data_Parse.parseEither)(s.text);
+          if (_138 instanceof Data_Either.Left) {
+              return fail(Data_Parse.formatParseError(s.text)(_138.value0))(s);
           };
-          if (_45 instanceof Data_Either.Right && _45.value0 instanceof Data_Either.Left) {
-              return addDef(_45.value0.value0)(s);
+          if (_138 instanceof Data_Either.Right && _138.value0 instanceof Data_Either.Left) {
+              return addDef(_138.value0.value0)(s);
           };
-          if (_45 instanceof Data_Either.Right && _45.value0 instanceof Data_Either.Right) {
-              return addExpr(_45.value0.value0)(s);
+          if (_138 instanceof Data_Either.Right && _138.value0 instanceof Data_Either.Right) {
+              return addExpr(_138.value0.value0)(s);
           };
-          throw new Error("Failed pattern match at Component.App line 69, column 1 - line 70, column 1: " + [ _45.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 70, column 1 - line 71, column 1: " + [ _138.constructor.name ]);
       };
       var update = function (props) {
           return function (action) {
@@ -4084,40 +4358,40 @@ var PS = { };
               };
               if (action instanceof NewText) {
                   return Thermite_Action.modifyState(function (s) {
-                      var _54 = {};
-                      for (var _55 in s) {
-                          if (s.hasOwnProperty(_55)) {
-                              _54[_55] = s[_55];
+                      var _145 = {};
+                      for (var _146 in s) {
+                          if (s.hasOwnProperty(_146)) {
+                              _145[_146] = s[_146];
                           };
                       };
-                      _54.text = action.value0;
-                      _54.error = Data_Maybe.Nothing.value;
-                      return _54;
+                      _145.text = action.value0;
+                      _145.error = Data_Maybe.Nothing.value;
+                      return _145;
                   });
               };
               if (action instanceof DismissAlert) {
                   return Thermite_Action.modifyState(function (s) {
-                      var _57 = {};
-                      for (var _58 in s) {
-                          if (s.hasOwnProperty(_58)) {
-                              _57[_58] = s[_58];
+                      var _148 = {};
+                      for (var _149 in s) {
+                          if (s.hasOwnProperty(_149)) {
+                              _148[_149] = s[_149];
                           };
                       };
-                      _57.error = Data_Maybe.Nothing.value;
-                      return _57;
+                      _148.error = Data_Maybe.Nothing.value;
+                      return _148;
                   });
               };
               if (action instanceof Remove) {
                   return Thermite_Action.modifyState(function (s) {
-                      var _59 = {};
-                      for (var _60 in s) {
-                          if (s.hasOwnProperty(_60)) {
-                              _59[_60] = s[_60];
+                      var _150 = {};
+                      for (var _151 in s) {
+                          if (s.hasOwnProperty(_151)) {
+                              _150[_151] = s[_151];
                           };
                       };
-                      _59.defs = removeByName(action.value0)(s.defs);
-                      _59.env = Data_Map["delete"](Prelude.ordString)(action.value0)(s.env);
-                      return _59;
+                      _150.defs = removeByName(action.value0)(s.defs);
+                      _150.env = Data_Map["delete"](Prelude.ordString)(action.value0)(s.env);
+                      return _150;
                   });
               };
               if (action instanceof ParseText) {
@@ -4130,9 +4404,9 @@ var PS = { };
                   return Thermite_Action.modifyState(clear);
               };
               if (action instanceof Save) {
-                  return Prelude.bind(Thermite_Action.bindAction)(Thermite_Action.getState)(function (_2) {
+                  return Prelude.bind(Thermite_Action.bindAction)(Thermite_Action.getState)(function (_3) {
                       return Thermite_Action.async(function (k) {
-                          var text = Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)("\n")(Prelude["<>"](Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(defToString)(_2.defs))(Data_Array.reverse(_2.history)));
+                          var text = Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)("\n")(Prelude["<>"](Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(defToString)(_3.defs))(Data_Array.reverse(_3.history)));
                           return function __do() {
                               Control_Monad_Eff_Save.saveTextAs(text)("evaluation.txt")();
                               return k(Prelude.unit)();
@@ -4140,7 +4414,7 @@ var PS = { };
                       });
                   });
               };
-              throw new Error("Failed pattern match at Component.App line 69, column 1 - line 70, column 1: " + [ action.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 70, column 1 - line 71, column 1: " + [ action.constructor.name ]);
           };
       };
       return Thermite.createClass(Thermite.simpleSpec(initialState)(update)(render));
@@ -4260,24 +4534,24 @@ var PS = { };
   var DOM_HTML_Window = PS["DOM.HTML.Window"];
   var DOM_Node_Types = PS["DOM.Node.Types"];     
   var body = function __do() {
-      var _5 = DOM_HTML.window();
-      var _4 = DOM_HTML_Window.document(_5)();
-      var _3 = Prelude["<$>"](Control_Monad_Eff.functorEff)(Data_Nullable.toMaybe)(DOM_HTML_Document.body(_4))();
-      return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude["<$>"](Data_Maybe.functorMaybe)(DOM_HTML_Types.htmlElementToElement)(_3))();
+      var _6 = DOM_HTML.window();
+      var _5 = DOM_HTML_Window.document(_6)();
+      var _4 = Prelude["<$>"](Control_Monad_Eff.functorEff)(Data_Nullable.toMaybe)(DOM_HTML_Document.body(_5))();
+      return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude["<$>"](Data_Maybe.functorMaybe)(DOM_HTML_Types.htmlElementToElement)(_4))();
   };
   var main = function __do() {
-      var _6 = body();
+      var _7 = body();
       return (function () {
-          if (_6 instanceof Data_Maybe.Nothing) {
+          if (_7 instanceof Data_Maybe.Nothing) {
               return Control_Monad_Eff_Console.log("No body element");
           };
-          if (_6 instanceof Data_Maybe.Just) {
+          if (_7 instanceof Data_Maybe.Just) {
               return function __do() {
-                  React.render(React.createFactory(Component_App.appClass)(Prelude.unit))(_6.value0)();
+                  React.render(React.createFactory(Component_App.appClass)(Prelude.unit))(_7.value0)();
                   return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude.unit)();
               };
           };
-          throw new Error("Failed pattern match at Main line 29, column 1 - line 30, column 1: " + [ _6.constructor.name ]);
+          throw new Error("Failed pattern match at Main line 29, column 1 - line 30, column 1: " + [ _7.constructor.name ]);
       })()();
   };
   exports["main"] = main;

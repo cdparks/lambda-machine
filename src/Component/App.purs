@@ -9,6 +9,7 @@ import Data.Array (uncons, cons, snoc, filter, singleton, reverse, null)
 import Data.List (toList)
 import Data.Foldable (intercalate)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Data.Syntax
 import Data.Expr
@@ -111,7 +112,7 @@ appClass = T.createClass (T.simpleSpec initialState update render)
   parse s =
     case parseAll parseEither s.text of
       Left error   ->
-        s { text = "", error = Just (formatParseError s.text error) }
+        fail (formatParseError s.text error) s
       Right (Left def) ->
         addDef def s
       Right (Right syntax) ->
@@ -120,12 +121,22 @@ appClass = T.createClass (T.simpleSpec initialState update render)
   removeByName :: Name -> Array Definition -> Array Definition
   removeByName name = filter (_.name >>> (/= name))
 
+  fail :: String -> AppState -> AppState
+  fail message s =
+    s { text = "", error = Just message }
+
   addDef :: Definition -> AppState -> AppState
   addDef def s =
-    s { text = "", defs = defs, env = env }
+    if Set.size missing == 0
+      then
+        s { text = "", defs = defs, env = env }
+      else
+        fail (formatUndefinedError s.text missing) s
    where
     defs = removeByName def.name s.defs `snoc` def
-    env = Map.insert def.name (syntaxToExpr def.syntax) s.env
+    expr = syntaxToExpr def.syntax
+    env = Map.insert def.name expr s.env
+    missing = undefinedNames expr (Map.delete def.name s.env)
 
   addExpr :: Syntax -> AppState -> AppState
   addExpr syntax s =

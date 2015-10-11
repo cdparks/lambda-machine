@@ -6,8 +6,11 @@ import Control.Alt ((<|>))
 import Data.Generic
 
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Array.Unsafe (unsafeIndex)
 import Data.String (fromCharArray)
+import Data.List (toList)
+import Data.Foldable (intercalate)
 
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
@@ -46,6 +49,30 @@ exprToSyntax e =
     Free n    -> Var n
     Bind n e  -> Lambda n (exprToSyntax e)
     App f a   -> Apply (exprToSyntax f) (exprToSyntax a)
+
+freeVars :: Expr -> Set.Set Name
+freeVars = walk Set.empty
+ where
+  walk vars e =
+    case e of
+      Bound _ _ ->
+        vars
+      Free n ->
+        Set.insert n vars
+      Bind _ b ->
+        walk vars b
+      App f a ->
+        walk (walk vars f) a
+
+globalNames :: Environment -> Set.Set Name
+globalNames = Map.keys >>> toList >>> Set.fromList
+
+undefinedNames :: Expr -> Environment -> Set.Set Name
+undefinedNames expr env = freeVars expr `Set.difference` globalNames env
+
+formatUndefinedError :: String -> Set.Set Name -> String
+formatUndefinedError text missing =
+  "No top-level definition for " <> intercalate ", " missing <> " referenced in\n" <> text
 
 instance prettyPrintExpr :: PrettyPrint Expr where
   prettyPrint = walk false
