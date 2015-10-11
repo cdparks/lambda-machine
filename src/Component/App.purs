@@ -5,7 +5,7 @@ import Prelude
 import Data.Maybe
 import Data.Either
 import Data.Tuple
-import Data.Array (snoc, filter)
+import Data.Array (uncons, cons, snoc, filter, singleton)
 import Data.List (toList)
 import qualified Data.Map as Map
 
@@ -37,6 +37,7 @@ data AppAction
   | NewText String
   | ParseText
   | Reduce Expr
+  | Clear
   | DismissAlert
   | Remove Name
 
@@ -86,6 +87,8 @@ appClass = T.createClass (T.simpleSpec initialState update render)
           \s -> s { error = Nothing }
         Remove name ->
           \s -> s { defs = removeByName name s.defs, env = Map.delete name s.env }
+        Clear ->
+          clear
         ParseText ->
           parse
         Reduce expr ->
@@ -125,7 +128,10 @@ appClass = T.createClass (T.simpleSpec initialState update render)
     case step s.env expr of
       Nothing -> s
       Just expr' ->
-        s { history = s.history `snoc` prettyPrint (exprToSyntax expr'), expr = Just expr' }
+        s { history = prettyPrint (exprToSyntax expr') `cons` s.history, expr = Just expr' }
+
+  clear :: AppState -> AppState
+  clear s = s { history = maybe [] (exprToSyntax >>> prettyPrint >>> singleton) s.expr }
 
   render :: T.Render _ AppState _ AppAction
   render send state props _ =
@@ -222,21 +228,39 @@ appClass = T.createClass (T.simpleSpec initialState update render)
     [ RD.h3' [ RD.text "Evaluation" ]
     , RD.div
       [ RP.className "col-sm-12" ]
-      [ RD.div'
+      [ RD.div
+        [ RP.className "btn-group pull-right" ]
         [ RD.button
-          [ RP.className "btn btn-default pull-right"
+          [ RP.className "btn btn-default"
           , RP.onClick \_ -> send (Reduce expr)
           ]
           [ RD.text "Step" ]
+        , RD.button
+          [ RP.className "btn btn-default"
+          , RP.onClick \_ -> send Clear
+          ]
+          [ RD.text "Clear" ]
         ]
       , RD.div
-        [ RP.className "monospace-font" ]
-        (map renderSyntax history)
+        [ RP.className "hide-overflow" ]
+        [ RD.div
+          [ RP.className "scroll-overflow monospace-font" ]
+          (renderHistory history)
+        ]
       ]
     ]
 
+  renderHistory :: Array String -> Array R.ReactElement
+  renderHistory hs =
+    case uncons hs of
+      Nothing -> []
+      Just { head = head, tail = tail } ->
+        RD.h4' [ RD.text head ] `cons` map renderSyntax tail
+
   renderSyntax :: String -> R.ReactElement
-  renderSyntax syntax = RD.h4' [ RD.text syntax]
+  renderSyntax syntax = RD.h4
+    [ RP.className "text-muted" ]
+    [ RD.text syntax]
 
 handleKeyPress :: forall event. event -> AppAction
 handleKeyPress e =
