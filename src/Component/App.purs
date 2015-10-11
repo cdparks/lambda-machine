@@ -5,14 +5,18 @@ import Prelude
 import Data.Maybe
 import Data.Either
 import Data.Tuple
-import Data.Array (uncons, cons, snoc, filter, singleton)
+import Data.Array (uncons, cons, snoc, filter, singleton, reverse, null)
 import Data.List (toList)
+import Data.Foldable (intercalate)
 import qualified Data.Map as Map
 
 import Data.Syntax
 import Data.Expr
 import Data.Parse
 import Text.Parsing.Parser (ParseError(..))
+
+import Control.Monad.Eff
+import Control.Monad.Eff.Save
 
 import qualified Thermite as T
 import qualified Thermite.Action as T
@@ -37,9 +41,10 @@ data AppAction
   | NewText String
   | ParseText
   | Reduce Expr
-  | Clear
   | DismissAlert
   | Remove Name
+  | Clear
+  | Save
 
 type AppProps = Unit
 
@@ -75,24 +80,30 @@ appClass = T.createClass (T.simpleSpec initialState update render)
     }
 
   update :: T.PerformAction _ AppState _ AppAction
-  update props action = T.modifyState (step action)
-   where
-    step action =
-      case action of
-        DoNothing ->
-          \s -> s
-        NewText text ->
-          \s -> s { text = text, error = Nothing }
-        DismissAlert ->
-          \s -> s { error = Nothing }
-        Remove name ->
-          \s -> s { defs = removeByName name s.defs, env = Map.delete name s.env }
-        Clear ->
-          clear
-        ParseText ->
-          parse
-        Reduce expr ->
-          reduce expr
+  update props action =
+    case action of
+      DoNothing ->
+        return unit
+      NewText text ->
+        T.modifyState (\s -> s { text = text, error = Nothing })
+      DismissAlert ->
+        T.modifyState (\s -> s { error = Nothing })
+      Remove name ->
+        T.modifyState (\s -> s { defs = removeByName name s.defs, env = Map.delete name s.env })
+      ParseText ->
+        T.modifyState parse
+      Reduce expr ->
+        T.modifyState (reduce expr)
+      Clear ->
+        T.modifyState clear
+      Save -> do
+        s <- T.getState
+        T.async \k -> do
+          let text = intercalate "\n" (map defToString s.defs <> reverse s.history)
+          saveTextAs text "evaluation.txt"
+          k unit
+       where
+        defToString def = def.name <> " = " <> prettyPrint def.syntax
 
   parse :: AppState -> AppState
   parse s
@@ -240,6 +251,11 @@ appClass = T.createClass (T.simpleSpec initialState update render)
           , RP.onClick \_ -> send Clear
           ]
           [ RD.text "Clear" ]
+        , RD.button
+          [ RP.className "btn btn-default"
+          , RP.onClick \_ -> send Save
+          ]
+          [ RD.text "Save" ]
         ]
       , RD.div
         [ RP.className "hide-overflow" ]
