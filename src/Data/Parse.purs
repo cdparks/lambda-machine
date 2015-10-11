@@ -80,7 +80,7 @@ firstChar :: Char -> Boolean
 firstChar c = isLower c
 
 bodyChar :: Char -> Boolean
-bodyChar c = isLower c || isDigit c || c == '-'
+bodyChar c = isLower c || isDigit c || c == '-' || c == '?'
 
 isDigit :: Char -> Boolean
 isDigit c = '0' <= c && c <= '9'
