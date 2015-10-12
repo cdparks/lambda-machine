@@ -3103,20 +3103,20 @@ var PS = { };
       return Prelude["<="](Prelude.ordChar)("0")(c) && Prelude["<="](Prelude.ordChar)(c)("9");
   };
   var formatParseError = function (text) {
-      return function (_16) {
-          var caretLine = Data_String.fromCharArray(Data_Array.replicate(_16.value0.position.value0.column - 1)(" ")) + "^";
-          return "Parse error: " + (_16.value0.message + (" at column " + (Prelude.show(Prelude.showInt)(_16.value0.position.value0.column) + ("\n" + (text + ("\n" + caretLine))))));
+      return function (_13) {
+          var caretLine = Data_String.fromCharArray(Data_Array.replicate(_13.value0.position.value0.column - 1)(" ")) + "^";
+          return "Parse error: " + (_13.value0.message + (" at column " + (Prelude.show(Prelude.showInt)(_13.value0.position.value0.column) + ("\n" + (text + ("\n" + caretLine))))));
       };
   };
   var firstChar = function (c) {
-      return isLower(c);
+      return isLower(c) || Prelude["=="](Prelude.eqChar)(c)("_");
   };
   var bodyChar = function (c) {
-      return isLower(c) || (isDigit(c) || (Prelude["=="](Prelude.eqChar)(c)("-") || Prelude["=="](Prelude.eqChar)(c)("?")));
+      return isLower(c) || (isDigit(c) || (Prelude["=="](Prelude.eqChar)(c)("-") || (Prelude["=="](Prelude.eqChar)(c)("?") || Prelude["=="](Prelude.eqChar)(c)("'"))));
   };
-  var parseName = token(Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String.satisfy(Data_Identity.monadIdentity)(firstChar))(function (_8) {
-      return Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Data_Identity.monadIdentity)(bodyChar)))(function (_7) {
-          return Prelude["return"](Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(Data_String.fromCharArray(Prelude["<>"](Prelude.semigroupArray)([ _8 ])(_7)));
+  var parseName = token(Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String.satisfy(Data_Identity.monadIdentity)(firstChar))(function (_7) {
+      return Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Data_Identity.monadIdentity)(bodyChar)))(function (_6) {
+          return Prelude["return"](Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(Data_String.fromCharArray(Prelude["<>"](Prelude.semigroupArray)([ _7 ])(_6)));
       });
   }));
   var parseVar = Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Syntax.Var.create)(parseName);
@@ -3124,12 +3124,12 @@ var PS = { };
       var parseApply = function (p) {
           var parseLambda = Prelude["<*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Syntax.Lambda.create)(Control_Apply["*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(token(Control_Alt["<|>"](Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String.string(Data_Identity.monadIdentity)("\\"))(Text_Parsing_Parser_String.string(Data_Identity.monadIdentity)("\u03bb"))))(parseName)))(Control_Apply["*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(token(Text_Parsing_Parser_String.string(Data_Identity.monadIdentity)(".")))(p));
           var parseAtom = Control_Alt["<|>"](Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Control_Alt["<|>"](Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(parseLambda)(parseVar))(parens(p));
-          return Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(parseAtom)(function (_6) {
-              return Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(parseAtom))(function (_5) {
-                  if (_5.length === 0) {
-                      return Prelude["return"](Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(_6);
+          return Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(parseAtom)(function (_5) {
+              return Prelude.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(parseAtom))(function (_4) {
+                  if (_4.length === 0) {
+                      return Prelude["return"](Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(_5);
                   };
-                  return Prelude["return"](Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(Data_Foldable.foldl(Data_Foldable.foldableArray)(Data_Syntax.Apply.create)(_6)(_5));
+                  return Prelude["return"](Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(Data_Foldable.foldl(Data_Foldable.foldableArray)(Data_Syntax.Apply.create)(_5)(_4));
               });
           });
       };
@@ -4188,14 +4188,14 @@ var PS = { };
       Save.value = new Save();
       return Save;
   })();
-  var showLevel = new Prelude.Show(function (_15) {
-      if (_15 instanceof Warning) {
+  var showLevel = new Prelude.Show(function (_21) {
+      if (_21 instanceof Warning) {
           return "warning";
       };
-      if (_15 instanceof Danger) {
+      if (_21 instanceof Danger) {
           return "danger";
       };
-      throw new Error("Failed pattern match at Component.App line 33, column 1 - line 37, column 1: " + [ _15.constructor.name ]);
+      throw new Error("Failed pattern match at Component.App line 33, column 1 - line 37, column 1: " + [ _21.constructor.name ]);
   });
   var initialDefs = [ {
       name: "i", 
@@ -4214,8 +4214,8 @@ var PS = { };
       return Data_Map.fromList(Prelude.ordString)(Data_List.toList(Data_Foldable.foldableArray)(Prelude.map(Prelude.functorArray)(fromDef)(initialDefs)));
   })();
   var handleKeyPress = function (e) {
-      var _113 = Component_Event.getKeyCode(e);
-      if (_113 === 13) {
+      var _43 = Component_Event.getKeyCode(e);
+      if (_43 === 13) {
           return ParseText.value;
       };
       return DoNothing.value;
@@ -4226,45 +4226,45 @@ var PS = { };
           return React_DOM.h4([ React_DOM_Props.className("text-muted") ])([ React_DOM.text(syntax) ]);
       };
       var renderHistory = function (hs) {
-          var _114 = Data_Array.uncons(hs);
-          if (_114 instanceof Data_Maybe.Nothing) {
+          var _44 = Data_Array.uncons(hs);
+          if (_44 instanceof Data_Maybe.Nothing) {
               return [  ];
           };
-          if (_114 instanceof Data_Maybe.Just) {
-              return Data_Array.cons(React_DOM["h4'"]([ React_DOM.text(_114.value0.head) ]))(Prelude.map(Prelude.functorArray)(renderSyntax)(_114.value0.tail));
+          if (_44 instanceof Data_Maybe.Just) {
+              return Data_Array.cons(React_DOM["h4'"]([ React_DOM.text(_44.value0.head) ]))(Prelude.map(Prelude.functorArray)(renderSyntax)(_44.value0.tail));
           };
-          throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _114.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _44.constructor.name ]);
       };
       var renderDef = function (send) {
           return function (def) {
-              return React_DOM["h4'"]([ React_DOM.div([ React_DOM_Props.className("glyphicon glyphicon-remove"), React_DOM_Props.onClick(function (_11) {
+              return React_DOM["h4'"]([ React_DOM.div([ React_DOM_Props.className("glyphicon glyphicon-remove"), React_DOM_Props.onClick(function (_17) {
                   return send(new Remove(def.name));
               }) ])([  ]), React_DOM.text(" " + (def.name + (" = " + Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(def.syntax)))) ]);
           };
       };
       var reduce = function (expr) {
           return function (s) {
-              var _119 = Data_Expr.step(s.env)(expr);
-              if (_119 instanceof Data_Maybe.Nothing) {
+              var _49 = Data_Expr.step(s.env)(expr);
+              if (_49 instanceof Data_Maybe.Nothing) {
                   return s;
               };
-              if (_119 instanceof Data_Maybe.Just) {
-                  var _120 = {};
-                  for (var _121 in s) {
-                      if (s.hasOwnProperty(_121)) {
-                          _120[_121] = s[_121];
+              if (_49 instanceof Data_Maybe.Just) {
+                  var _50 = {};
+                  for (var _51 in s) {
+                      if (s.hasOwnProperty(_51)) {
+                          _50[_51] = s[_51];
                       };
                   };
-                  _120.history = Data_Array.cons(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax(_119.value0)))(s.history);
-                  _120.expr = new Data_Maybe.Just(_119.value0);
-                  return _120;
+                  _50.history = Data_Array.cons(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax(_49.value0)))(s.history);
+                  _50.expr = new Data_Maybe.Just(_49.value0);
+                  return _50;
               };
-              throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _119.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _49.constructor.name ]);
           };
       };
       var input = function (send) {
           return function (value) {
-              return React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("input-group") ])([ React_DOM.input([ React_DOM_Props.className("form-control monospace-font"), React_DOM_Props.placeholder("<definition> or <expression>"), React_DOM_Props.value(value), React_DOM_Props.onKeyUp(Prelude[">>>"](Prelude.semigroupoidFn)(handleKeyPress)(send)), React_DOM_Props.onChange(Prelude[">>>"](Prelude.semigroupoidFn)(handleChangeEvent)(send)) ])([  ]), React_DOM.span([ React_DOM_Props.className("input-group-btn") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_10) {
+              return React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("input-group") ])([ React_DOM.input([ React_DOM_Props.className("form-control monospace-font"), React_DOM_Props.placeholder("<definition> or <expression>"), React_DOM_Props.value(value), React_DOM_Props.onKeyUp(Prelude[">>>"](Prelude.semigroupoidFn)(handleKeyPress)(send)), React_DOM_Props.onChange(Prelude[">>>"](Prelude.semigroupoidFn)(handleChangeEvent)(send)) ])([  ]), React_DOM.span([ React_DOM_Props.className("input-group-btn") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_16) {
                   return send(ParseText.value);
               }) ])([ React_DOM.text("Parse") ]) ]) ]) ]);
           };
@@ -4280,41 +4280,41 @@ var PS = { };
       var header = React_DOM.div([ React_DOM_Props.className("header") ])([ React_DOM.h3([ React_DOM_Props.className("text-muted") ])([ React_DOM.text("Lambda Machine") ]), React_DOM["hr'"]([  ]) ]);
       var fail = function (message) {
           return function (s) {
-              var _124 = {};
-              for (var _125 in s) {
-                  if (s.hasOwnProperty(_125)) {
-                      _124[_125] = s[_125];
+              var _54 = {};
+              for (var _55 in s) {
+                  if (s.hasOwnProperty(_55)) {
+                      _54[_55] = s[_55];
                   };
               };
-              _124.text = "";
-              _124.error = new Data_Maybe.Just(new Data_Tuple.Tuple(Danger.value, message));
-              return _124;
+              _54.text = "";
+              _54.error = new Data_Maybe.Just(new Data_Tuple.Tuple(Danger.value, message));
+              return _54;
           };
       };
       var evaluate = function (send) {
           return function (history) {
-              return function (_18) {
-                  if (_18 instanceof Data_Maybe.Nothing) {
+              return function (_24) {
+                  if (_24 instanceof Data_Maybe.Nothing) {
                       return [  ];
                   };
-                  if (_18 instanceof Data_Maybe.Just) {
-                      return [ React_DOM["h3'"]([ React_DOM.text("Evaluation") ]), React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("btn-group pull-right") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_12) {
-                          return send(new Reduce(_18.value0));
-                      }) ])([ React_DOM.text("Step") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_13) {
+                  if (_24 instanceof Data_Maybe.Just) {
+                      return [ React_DOM["h3'"]([ React_DOM.text("Evaluation") ]), React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("btn-group pull-right") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_18) {
+                          return send(new Reduce(_24.value0));
+                      }) ])([ React_DOM.text("Step") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_19) {
                           return send(Clear.value);
-                      }) ])([ React_DOM.text("Clear") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_14) {
+                      }) ])([ React_DOM.text("Clear") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (_20) {
                           return send(Save.value);
                       }) ])([ React_DOM.text("Save") ]) ]), React_DOM.div([ React_DOM_Props.className("hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(history)) ]) ]) ];
                   };
-                  throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ send.constructor.name, history.constructor.name, _18.constructor.name ]);
+                  throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ send.constructor.name, history.constructor.name, _24.constructor.name ]);
               };
           };
       };
       var deleteByName = function (name) {
-          return Data_Array.filter(Prelude[">>>"](Prelude.semigroupoidFn)(function (_0) {
-              return _0.name;
-          })(function (_2) {
-              return Prelude["/="](Prelude.eqString)(_2)(name);
+          return Data_Array.filter(Prelude[">>>"](Prelude.semigroupoidFn)(function (_2) {
+              return _2.name;
+          })(function (_3) {
+              return Prelude["/="](Prelude.eqString)(_3)(name);
           }));
       };
       var remove = function (name) {
@@ -4322,25 +4322,25 @@ var PS = { };
               var env$prime = Data_Map["delete"](Prelude.ordString)(name)(s.env);
               var names = Data_Expr.namesReferencing(name)(env$prime);
               var error = (function () {
-                  var _133 = Data_Set.size(names) === 0;
-                  if (_133) {
+                  var _63 = Data_Set.size(names) === 0;
+                  if (_63) {
                       return Data_Maybe.Nothing.value;
                   };
-                  if (!_133) {
+                  if (!_63) {
                       return new Data_Maybe.Just(new Data_Tuple.Tuple(Warning.value, Data_Expr.formatUndefinedWarning(name)(names)));
                   };
-                  throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _133.constructor.name ]);
+                  throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _63.constructor.name ]);
               })();
-              var _134 = {};
-              for (var _135 in s) {
-                  if (s.hasOwnProperty(_135)) {
-                      _134[_135] = s[_135];
+              var _64 = {};
+              for (var _65 in s) {
+                  if (s.hasOwnProperty(_65)) {
+                      _64[_65] = s[_65];
                   };
               };
-              _134.defs = deleteByName(name)(s.defs);
-              _134.env = env$prime;
-              _134.error = error;
-              return _134;
+              _64.defs = deleteByName(name)(s.defs);
+              _64.env = env$prime;
+              _64.error = error;
+              return _64;
           };
       };
       var define = function (send) {
@@ -4349,32 +4349,32 @@ var PS = { };
           };
       };
       var clear = function (s) {
-          var _136 = {};
-          for (var _137 in s) {
-              if (s.hasOwnProperty(_137)) {
-                  _136[_137] = s[_137];
+          var _66 = {};
+          for (var _67 in s) {
+              if (s.hasOwnProperty(_67)) {
+                  _66[_67] = s[_67];
               };
           };
-          _136.history = Data_Maybe.maybe([  ])(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Expr.exprToSyntax)(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax))(Data_Array.singleton)))(s.expr);
-          return _136;
+          _66.history = Data_Maybe.maybe([  ])(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Expr.exprToSyntax)(Prelude[">>>"](Prelude.semigroupoidFn)(Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax))(Data_Array.singleton)))(s.expr);
+          return _66;
       };
       var alert = function (send) {
-          return function (_17) {
-              if (_17 instanceof Data_Maybe.Nothing) {
+          return function (_23) {
+              if (_23 instanceof Data_Maybe.Nothing) {
                   return [  ];
               };
-              if (_17 instanceof Data_Maybe.Just) {
-                  return [ React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.pre([ React_DOM_Props.className("alert alert-" + Prelude.show(showLevel)(_17.value0.value0)) ])([ React_DOM.span([ React_DOM_Props.className("glyphicon glyphicon-remove pull-right"), React_DOM_Props.onClick(function (_9) {
+              if (_23 instanceof Data_Maybe.Just) {
+                  return [ React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.pre([ React_DOM_Props.className("alert alert-" + Prelude.show(showLevel)(_23.value0.value0)) ])([ React_DOM.span([ React_DOM_Props.className("glyphicon glyphicon-remove pull-right"), React_DOM_Props.onClick(function (_15) {
                       return send(DismissAlert.value);
-                  }) ])([  ]), React_DOM.text(_17.value0.value1) ]) ]) ];
+                  }) ])([  ]), React_DOM.text(_23.value0.value1) ]) ]) ];
               };
-              throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ send.constructor.name, _17.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ send.constructor.name, _23.constructor.name ]);
           };
       };
       var render = function (send) {
           return function (state) {
               return function (props) {
-                  return function (_16) {
+                  return function (_22) {
                       return React_DOM.div([ React_DOM_Props.className("container") ])([ React_DOM.div([ React_DOM_Props.className("row") ])([ header ]), React_DOM.div([ React_DOM_Props.className("row") ])(alert(send)(state.error)), React_DOM.div([ React_DOM_Props.className("row") ])([ input(send)(state.text) ]), React_DOM.div([ React_DOM_Props.className("row") ])(define(send)(state.defs)), React_DOM.div([ React_DOM_Props.className("row") ])(evaluate(send)(state.history)(state.expr)) ]);
                   };
               };
@@ -4384,16 +4384,16 @@ var PS = { };
           return function (s) {
               var history = [ Data_Syntax.prettyPrint(Data_Syntax.prettyPrintSyntax)(syntax) ];
               var expr = new Data_Maybe.Just(Data_Expr.syntaxToExpr(syntax));
-              var _144 = {};
-              for (var _145 in s) {
-                  if (s.hasOwnProperty(_145)) {
-                      _144[_145] = s[_145];
+              var _74 = {};
+              for (var _75 in s) {
+                  if (s.hasOwnProperty(_75)) {
+                      _74[_75] = s[_75];
                   };
               };
-              _144.text = "";
-              _144.history = history;
-              _144.expr = expr;
-              return _144;
+              _74.text = "";
+              _74.history = history;
+              _74.expr = expr;
+              return _74;
           };
       };
       var addDef = function (def) {
@@ -4402,40 +4402,40 @@ var PS = { };
               var missing = Data_Expr.undefinedNames(expr)(Data_Map["delete"](Prelude.ordString)(def.name)(s.env));
               var env = Data_Map.insert(Prelude.ordString)(def.name)(expr)(s.env);
               var defs = Data_Array.snoc(deleteByName(def.name)(s.defs))(def);
-              var _146 = Data_Set.size(missing) === 0;
-              if (_146) {
-                  var _147 = {};
-                  for (var _148 in s) {
-                      if (s.hasOwnProperty(_148)) {
-                          _147[_148] = s[_148];
+              var _76 = Data_Set.size(missing) === 0;
+              if (_76) {
+                  var _77 = {};
+                  for (var _78 in s) {
+                      if (s.hasOwnProperty(_78)) {
+                          _77[_78] = s[_78];
                       };
                   };
-                  _147.text = "";
-                  _147.defs = defs;
-                  _147.env = env;
-                  return _147;
+                  _77.text = "";
+                  _77.defs = defs;
+                  _77.env = env;
+                  return _77;
               };
-              if (!_146) {
+              if (!_76) {
                   return fail(Data_Expr.formatUndefinedError(s.text)(missing))(s);
               };
-              throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _146.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _76.constructor.name ]);
           };
       };
       var parse = function (s) {
           if (Prelude["=="](Prelude.eqString)(s.text)("")) {
               return s;
           };
-          var _150 = Data_Parse.parseAll(Data_Parse.parseEither)(s.text);
-          if (_150 instanceof Data_Either.Left) {
-              return fail(Data_Parse.formatParseError(s.text)(_150.value0))(s);
+          var _80 = Data_Parse.parseAll(Data_Parse.parseEither)(s.text);
+          if (_80 instanceof Data_Either.Left) {
+              return fail(Data_Parse.formatParseError(s.text)(_80.value0))(s);
           };
-          if (_150 instanceof Data_Either.Right && _150.value0 instanceof Data_Either.Left) {
-              return addDef(_150.value0.value0)(s);
+          if (_80 instanceof Data_Either.Right && _80.value0 instanceof Data_Either.Left) {
+              return addDef(_80.value0.value0)(s);
           };
-          if (_150 instanceof Data_Either.Right && _150.value0 instanceof Data_Either.Right) {
-              return addExpr(_150.value0.value0)(s);
+          if (_80 instanceof Data_Either.Right && _80.value0 instanceof Data_Either.Right) {
+              return addExpr(_80.value0.value0)(s);
           };
-          throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _150.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 76, column 1 - line 77, column 1: " + [ _80.constructor.name ]);
       };
       var update = function (props) {
           return function (action) {
@@ -4447,27 +4447,27 @@ var PS = { };
               };
               if (action instanceof NewText) {
                   return Thermite_Action.modifyState(function (s) {
-                      var _157 = {};
-                      for (var _158 in s) {
-                          if (s.hasOwnProperty(_158)) {
-                              _157[_158] = s[_158];
+                      var _87 = {};
+                      for (var _88 in s) {
+                          if (s.hasOwnProperty(_88)) {
+                              _87[_88] = s[_88];
                           };
                       };
-                      _157.text = action.value0;
-                      _157.error = Data_Maybe.Nothing.value;
-                      return _157;
+                      _87.text = action.value0;
+                      _87.error = Data_Maybe.Nothing.value;
+                      return _87;
                   });
               };
               if (action instanceof DismissAlert) {
                   return Thermite_Action.modifyState(function (s) {
-                      var _160 = {};
-                      for (var _161 in s) {
-                          if (s.hasOwnProperty(_161)) {
-                              _160[_161] = s[_161];
+                      var _90 = {};
+                      for (var _91 in s) {
+                          if (s.hasOwnProperty(_91)) {
+                              _90[_91] = s[_91];
                           };
                       };
-                      _160.error = Data_Maybe.Nothing.value;
-                      return _160;
+                      _90.error = Data_Maybe.Nothing.value;
+                      return _90;
                   });
               };
               if (action instanceof Remove) {
@@ -4483,9 +4483,9 @@ var PS = { };
                   return Thermite_Action.modifyState(clear);
               };
               if (action instanceof Save) {
-                  return Prelude.bind(Thermite_Action.bindAction)(Thermite_Action.getState)(function (_3) {
+                  return Prelude.bind(Thermite_Action.bindAction)(Thermite_Action.getState)(function (_8) {
                       return Thermite_Action.async(function (k) {
-                          var text = Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)("\n")(Prelude["<>"](Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(defToString)(_3.defs))(Data_Array.reverse(_3.history)));
+                          var text = Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)("\n")(Prelude["<>"](Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(defToString)(_8.defs))(Data_Array.reverse(_8.history)));
                           return function __do() {
                               Control_Monad_Eff_Save.saveTextAs(text)("evaluation.txt")();
                               return k(Prelude.unit)();
@@ -4616,24 +4616,24 @@ var PS = { };
   var DOM_HTML_Window = PS["DOM.HTML.Window"];
   var DOM_Node_Types = PS["DOM.Node.Types"];     
   var body = function __do() {
-      var _6 = DOM_HTML.window();
-      var _5 = DOM_HTML_Window.document(_6)();
-      var _4 = Prelude["<$>"](Control_Monad_Eff.functorEff)(Data_Nullable.toMaybe)(DOM_HTML_Document.body(_5))();
-      return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude["<$>"](Data_Maybe.functorMaybe)(DOM_HTML_Types.htmlElementToElement)(_4))();
+      var _11 = DOM_HTML.window();
+      var _10 = DOM_HTML_Window.document(_11)();
+      var _9 = Prelude["<$>"](Control_Monad_Eff.functorEff)(Data_Nullable.toMaybe)(DOM_HTML_Document.body(_10))();
+      return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude["<$>"](Data_Maybe.functorMaybe)(DOM_HTML_Types.htmlElementToElement)(_9))();
   };
   var main = function __do() {
-      var _7 = body();
+      var _12 = body();
       return (function () {
-          if (_7 instanceof Data_Maybe.Nothing) {
+          if (_12 instanceof Data_Maybe.Nothing) {
               return Control_Monad_Eff_Console.log("No body element");
           };
-          if (_7 instanceof Data_Maybe.Just) {
+          if (_12 instanceof Data_Maybe.Just) {
               return function __do() {
-                  React.render(React.createFactory(Component_App.appClass)(Prelude.unit))(_7.value0)();
+                  React.render(React.createFactory(Component_App.appClass)(Prelude.unit))(_12.value0)();
                   return Prelude["return"](Control_Monad_Eff.applicativeEff)(Prelude.unit)();
               };
           };
-          throw new Error("Failed pattern match at Main line 29, column 1 - line 30, column 1: " + [ _7.constructor.name ]);
+          throw new Error("Failed pattern match at Main line 29, column 1 - line 30, column 1: " + [ _12.constructor.name ]);
       })()();
   };
   exports["main"] = main;

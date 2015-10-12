@@ -77,10 +77,10 @@ parseName = token do
   return (fromCharArray ([first] <> rest))
 
 firstChar :: Char -> Boolean
-firstChar c = isLower c
+firstChar c = isLower c || c == '_'
 
 bodyChar :: Char -> Boolean
-bodyChar c = isLower c || isDigit c || c == '-' || c == '?'
+bodyChar c = isLower c || isDigit c || c == '-' || c == '?' || c == '\''
 
 isDigit :: Char -> Boolean
 isDigit c = '0' <= c && c <= '9'
