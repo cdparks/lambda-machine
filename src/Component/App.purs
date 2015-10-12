@@ -28,13 +28,19 @@ import qualified React.DOM.Props as RP
 
 import Component.Event
 
+data Level = Warning | Danger
+
+instance showLevel :: Show Level where
+  show Warning = "warning"
+  show Danger  = "danger"
+
 type AppState =
   { text    :: String
   , expr    :: Maybe Expr
   , history :: Array String
   , defs    :: Array Definition
   , env     :: Environment
-  , error   :: Maybe String
+  , error   :: Maybe (Tuple Level String)
   }
 
 data AppAction
@@ -90,7 +96,7 @@ appClass = T.createClass (T.simpleSpec initialState update render)
       DismissAlert ->
         T.modifyState (\s -> s { error = Nothing })
       Remove name ->
-        T.modifyState (\s -> s { defs = removeByName name s.defs, env = Map.delete name s.env })
+        T.modifyState (remove name)
       ParseText ->
         T.modifyState parse
       Reduce expr ->
@@ -118,12 +124,22 @@ appClass = T.createClass (T.simpleSpec initialState update render)
       Right (Right syntax) ->
         addExpr syntax s
 
-  removeByName :: Name -> Array Definition -> Array Definition
-  removeByName name = filter (_.name >>> (/= name))
+  remove :: String -> AppState -> AppState
+  remove name s =
+    s { defs = deleteByName name s.defs, env = env', error = error }
+   where
+    env' = Map.delete name s.env
+    names = namesReferencing name env'
+    error = if Set.size names == 0
+               then Nothing
+               else Just (Tuple Warning (formatUndefinedWarning name names))
+
+  deleteByName :: Name -> Array Definition -> Array Definition
+  deleteByName name = filter (_.name >>> (/= name))
 
   fail :: String -> AppState -> AppState
   fail message s =
-    s { text = "", error = Just message }
+    s { text = "", error = Just (Tuple Danger message) }
 
   addDef :: Definition -> AppState -> AppState
   addDef def s =
@@ -133,7 +149,7 @@ appClass = T.createClass (T.simpleSpec initialState update render)
       else
         fail (formatUndefinedError s.text missing) s
    where
-    defs = removeByName def.name s.defs `snoc` def
+    defs = deleteByName def.name s.defs `snoc` def
     expr = syntaxToExpr def.syntax
     env = Map.insert def.name expr s.env
     missing = undefinedNames expr (Map.delete def.name s.env)
@@ -185,13 +201,13 @@ appClass = T.createClass (T.simpleSpec initialState update render)
     , RD.hr' []
     ]
 
-  alert :: _ -> Maybe String -> Array R.ReactElement
+  alert :: _ -> Maybe (Tuple Level String) -> Array R.ReactElement
   alert send Nothing = []
-  alert send (Just error) =
+  alert send (Just (Tuple level error)) =
     [ RD.div
       [ RP.className "col-sm-12" ]
       [ RD.pre
-        [ RP.className "alert alert-danger" ]
+        [ RP.className ("alert alert-" <> show level) ]
         [ RD.span
           [ RP.className "glyphicon glyphicon-remove pull-right"
           , RP.onClick \_ -> send DismissAlert

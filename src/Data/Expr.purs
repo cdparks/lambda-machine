@@ -2,6 +2,7 @@ module Data.Expr where
 
 import Prelude
 import Data.Maybe
+import Data.Tuple
 import Control.Alt ((<|>))
 import Data.Generic
 
@@ -10,7 +11,7 @@ import qualified Data.Set as Set
 import Data.Array.Unsafe (unsafeIndex)
 import Data.String (fromCharArray)
 import Data.List (toList)
-import Data.Foldable (intercalate)
+import Data.Foldable (intercalate, foldl)
 
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
@@ -70,9 +71,20 @@ globalNames = Map.keys >>> toList >>> Set.fromList
 undefinedNames :: Expr -> Environment -> Set.Set Name
 undefinedNames expr env = freeVars expr `Set.difference` globalNames env
 
+namesReferencing :: String -> Environment -> Set.Set Name
+namesReferencing name = Map.toList >>> foldl step Set.empty 
+ where
+  step keys (Tuple key expr)
+    | name `Set.member` freeVars expr = Set.insert key keys
+    | otherwise                       = keys
+
 formatUndefinedError :: String -> Set.Set Name -> String
 formatUndefinedError text missing =
   "No top-level definition for " <> intercalate ", " missing <> " referenced in\n" <> text
+
+formatUndefinedWarning :: Name -> Set.Set Name -> String
+formatUndefinedWarning name names =
+  "Deleted definition " <> name <> " is still referenced by " <> intercalate ", " names
 
 instance prettyPrintExpr :: PrettyPrint Expr where
   prettyPrint = walk false
