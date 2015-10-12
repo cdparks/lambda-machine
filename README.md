@@ -19,7 +19,8 @@ Yep. Here's a grammar:
     |   ( <expression> )                         -- Parenthesization
 
 <name>
-    ::= [<lower> <underscore>][<lower> <digit> <hyphen> <underscore> <question-mark> <apostrophe>]*
+    ::= [<lower> <underscore>]
+        [<lower> <digit> <hyphen> <underscore> <question-mark> <apostrophe>]*
 ```
 
 For example, we could apply the constant function to the identity function twice:
