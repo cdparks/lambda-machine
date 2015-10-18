@@ -1,4 +1,7 @@
-module Component.Event where
+module Component.Event
+  ( getValue
+  , getKeyCode
+  ) where
 
 import Prelude
 

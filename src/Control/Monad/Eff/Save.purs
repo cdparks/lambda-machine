@@ -1,4 +1,8 @@
-module Control.Monad.Eff.Save where
+module Control.Monad.Eff.Save
+  ( FileName(..)
+  , SAVE(..)
+  , saveTextAs
+  ) where
 
 import Prelude
 import Control.Monad.Eff

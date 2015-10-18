@@ -1,4 +1,17 @@
-module Data.Expr where
+module Data.Expr
+  ( Expr(..)
+  , Environment(..)
+  , syntaxToExpr
+  , exprToSyntax
+  , freeVars
+  , globalNames
+  , undefinedNames
+  , namesReferencing
+  , formatUndefinedError
+  , formatUndefinedWarning
+  , substitute
+  , step
+  ) where
 
 import Prelude
 import Data.Maybe
@@ -17,6 +30,7 @@ import Control.Monad.Eff
 import Control.Monad.Eff.Console
 
 import Data.Syntax
+import Data.PrettyPrint
 
 data Expr
   = Bound Name Int

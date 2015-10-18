@@ -1,8 +1,14 @@
-module Data.Syntax where
+module Data.Syntax
+  ( Name(..)
+  , Definition(..)
+  , Syntax(..)
+  ) where
 
 import Prelude
 import Data.Maybe
 import Data.Generic
+
+import Data.PrettyPrint
 
 type Name = String
 
@@ -19,12 +25,6 @@ data Syntax
 derive instance genericSyntax :: Generic Syntax
 instance showSyntax :: Show Syntax where
   show = gShow
-
-class PrettyPrint a where
-  prettyPrint :: a -> String
-
-parensIf :: Boolean -> String -> String
-parensIf cond s = if cond then "(" <> s <> ")" else s
 
 isComposite :: Syntax -> Boolean
 isComposite (Var _) = false

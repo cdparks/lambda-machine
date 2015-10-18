@@ -1,4 +1,11 @@
-module Data.Parse where
+module Data.Parse
+  ( parseAll
+  , parseDefinition
+  , parseSyntax
+  , parseEither
+  , unsafeParse
+  , formatParseError
+  ) where
 
 import Prelude
 
