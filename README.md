@@ -44,10 +44,10 @@ You can run it like this:
 ```bash
 pulp dep install
 pulp build -O --to static/js/main.js
-open static/index.html
+open index.html
 ```
 
 ##Who?
 
-Me, [Chris Parks](mailto:christopher.daniel.parks@gmail.com)
+Me, [Chris Parks](mailto:christopher.daniel.parks@gmail.com). Feel free to say hi!
 
