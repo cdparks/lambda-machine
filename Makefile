@@ -1,5 +1,5 @@
 run: lambda-machine
-	open static/index.html
+	open index.html
 
 lambda-machine: src/**/*.purs
 	pulp build -O --to static/js/main.js

@@ -182,7 +182,7 @@ render send state props _ =
     [ RP.className "container" ]
     [ RD.div
       [ RP.className "row" ]
-      [ header]
+      [ header ]
     , RD.div
       [ RP.className "row" ]
       (alert send state.error)
@@ -195,15 +195,26 @@ render send state props _ =
     , RD.div
       [ RP.className "row" ]
       (renderExprs send state.history state.expr)
+    , RD.div
+      [ RP.className "row" ]
+      [ footer ]
     ]
 
 header :: R.ReactElement
 header = RD.div
-  [ RP.className "header" ]
-  [ RD.h3
-    [ RP.className "text-muted" ]
+  [ RP.className "page-header" ]
+  [ RD.h2'
     [ RD.text "Lambda Machine" ]
-  , RD.hr' []
+  ]
+
+footer :: R.ReactElement
+footer = RD.div'
+  [ RD.hr' []
+  , RD.a
+    [ RP.href "https://github.com/cdparks/lambda-machine"
+    , RP.className "pull-right"
+    ]
+    [ RD.text "Source on GitHub" ]
   ]
 
 alert :: _ -> Maybe (Tuple Level String) -> Array R.ReactElement

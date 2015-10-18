@@ -3714,13 +3714,15 @@ var PS = { };
   };
   var onChange = function (f) {
       return $foreign.unsafeMkProps("onChange")(React.handle(f));
-  };                                              
+  };                                                
+  var href = $foreign.unsafeMkProps("href");      
   var className = $foreign.unsafeMkProps("className");
   exports["onClick"] = onClick;
   exports["onChange"] = onChange;
   exports["onKeyUp"] = onKeyUp;
   exports["value"] = value;
   exports["placeholder"] = placeholder;
+  exports["href"] = href;
   exports["className"] = className;;
  
 })(PS["React.DOM.Props"] = PS["React.DOM.Props"] || {});
@@ -3740,8 +3742,12 @@ var PS = { };
   var h4$prime = h4([  ]);
   var h3 = $foreign.mkDOM("h3");
   var h3$prime = h3([  ]);
+  var h2 = $foreign.mkDOM("h2");
+  var h2$prime = h2([  ]);
   var div = $foreign.mkDOM("div");
+  var div$prime = div([  ]);      
   var button = $foreign.mkDOM("button");
+  var a = $foreign.mkDOM("a");
   exports["span"] = span;
   exports["pre"] = pre;
   exports["input"] = input;
@@ -3751,8 +3757,12 @@ var PS = { };
   exports["h4"] = h4;
   exports["h3'"] = h3$prime;
   exports["h3"] = h3;
+  exports["h2'"] = h2$prime;
+  exports["h2"] = h2;
+  exports["div'"] = div$prime;
   exports["div"] = div;
   exports["button"] = button;
+  exports["a"] = a;
   exports["text"] = $foreign.text;;
  
 })(PS["React.DOM"] = PS["React.DOM"] || {});
@@ -4208,7 +4218,7 @@ var PS = { };
       if (_18 instanceof Data_Maybe.Just) {
           return Data_Array.cons(React_DOM["h4'"]([ React_DOM.text(_18.value0.head) ]))(Prelude.map(Prelude.functorArray)(renderSyntax)(_18.value0.tail));
       };
-      throw new Error("Failed pattern match at Component.App line 301, column 1 - line 302, column 1: " + [ _18.constructor.name ]);
+      throw new Error("Failed pattern match at Component.App line 312, column 1 - line 313, column 1: " + [ _18.constructor.name ]);
   };
   var renderExprs = function (send) {
       return function (history) {
@@ -4225,7 +4235,7 @@ var PS = { };
                       return send(Save.value);
                   }) ])([ React_DOM.text("Save") ]) ]), React_DOM.div([ React_DOM_Props.className("hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(history)) ]) ]) ];
               };
-              throw new Error("Failed pattern match at Component.App line 268, column 1 - line 269, column 1: " + [ send.constructor.name, history.constructor.name, _15.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 279, column 1 - line 280, column 1: " + [ send.constructor.name, history.constructor.name, _15.constructor.name ]);
           };
       };
   };
@@ -4285,7 +4295,7 @@ var PS = { };
       env: initialEnv, 
       error: Data_Maybe.Nothing.value
   };
-  var header = React_DOM.div([ React_DOM_Props.className("header") ])([ React_DOM.h3([ React_DOM_Props.className("text-muted") ])([ React_DOM.text("Lambda Machine") ]), React_DOM["hr'"]([  ]) ]);
+  var header = React_DOM.div([ React_DOM_Props.className("page-header") ])([ React_DOM["h2'"]([ React_DOM.text("Lambda Machine") ]) ]);
   var handleKeyPress = function (e) {
       var _34 = Component_Event.getKeyCode(e);
       if (_34 === 13) {
@@ -4301,6 +4311,7 @@ var PS = { };
           }) ])([ React_DOM.text("Parse") ]) ]) ]) ]);
       };
   };
+  var footer = React_DOM["div'"]([ React_DOM["hr'"]([  ]), React_DOM.a([ React_DOM_Props.href("https://github.com/cdparks/lambda-machine"), React_DOM_Props.className("pull-right") ])([ React_DOM.text("Source on GitHub") ]) ]);
   var fail = function (message) {
       return function (s) {
           var _36 = {};
@@ -4367,14 +4378,14 @@ var PS = { };
                   return send(DismissAlert.value);
               }) ])([  ]), React_DOM.text(_14.value0.value1) ]) ]) ];
           };
-          throw new Error("Failed pattern match at Component.App line 209, column 1 - line 210, column 1: " + [ send.constructor.name, _14.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 220, column 1 - line 221, column 1: " + [ send.constructor.name, _14.constructor.name ]);
       };
   };
   var render = function (send) {
       return function (state) {
           return function (props) {
               return function (_13) {
-                  return React_DOM.div([ React_DOM_Props.className("container") ])([ React_DOM.div([ React_DOM_Props.className("row") ])([ header ]), React_DOM.div([ React_DOM_Props.className("row") ])(alert(send)(state.error)), React_DOM.div([ React_DOM_Props.className("row") ])([ input(send)(state.text) ]), React_DOM.div([ React_DOM_Props.className("row") ])(renderDefs(send)(state.defs)), React_DOM.div([ React_DOM_Props.className("row") ])(renderExprs(send)(state.history)(state.expr)) ]);
+                  return React_DOM.div([ React_DOM_Props.className("container") ])([ React_DOM.div([ React_DOM_Props.className("row") ])([ header ]), React_DOM.div([ React_DOM_Props.className("row") ])(alert(send)(state.error)), React_DOM.div([ React_DOM_Props.className("row") ])([ input(send)(state.text) ]), React_DOM.div([ React_DOM_Props.className("row") ])(renderDefs(send)(state.defs)), React_DOM.div([ React_DOM_Props.className("row") ])(renderExprs(send)(state.history)(state.expr)), React_DOM.div([ React_DOM_Props.className("row") ])([ footer ]) ]);
               };
           };
       };
