@@ -2,7 +2,7 @@
 
 ##What?
 
-It's a machine for evaluating expressions in the untyped lambda calculus. You get lambdas, variables, applications, and top-level definitions. It's everything you need!
+It's a machine for evaluating expressions in the untyped lambda calculus. You get lambdas, variables, applications, and top-level definitions. You can try it [here](http://cdparks.github.io/lambda-machine).
 
 ##Really?
 
