@@ -119,7 +119,7 @@ update props action =
 
 fail :: String -> AppState -> AppState
 fail message s =
-  s { text = "", error = Just (Tuple Danger message) }
+  s { error = Just (Tuple Danger message) }
 
 parse :: AppState -> AppState
 parse s
