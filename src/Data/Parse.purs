@@ -18,13 +18,14 @@ import Control.Lazy (fix)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 
-import Data.Array (many, replicate)
-import Data.Foldable (foldl)
+import Data.Array (some, many, replicate, length)
+import Data.Foldable (foldl, elem)
 import Data.String (fromCharArray)
 import Data.Either
 import Data.Either.Unsafe (fromRight)
 
 import Data.Syntax
+import Data.Name
 
 token :: forall a. Parser String a -> Parser String a
 token p = p <* skipSpaces
@@ -77,17 +78,25 @@ parens = between (token (string "(")) (token (string ")"))
 parseVar :: Parser String Syntax
 parseVar = Var <$> parseName
 
-parseName :: Parser String String
+parseName :: Parser String Name
 parseName = token do
   first <- satisfy firstChar
-  rest <- many (satisfy bodyChar)
-  return (fromCharArray ([first] <> rest))
+  body <- many (satisfy bodyChar)
+  question <- string "?" <|> pure ""
+  subscript <- parsePrimes <|> parseSubscript
+  return (name (fromCharArray ([first] <> body) <> question) subscript)
+
+parsePrimes :: Parser String Int
+parsePrimes = length <$> some (satisfy (== '\''))
+
+parseSubscript :: Parser String Int
+parseSubscript = subscriptToInt <<< fromCharArray <$> many (satisfy isSubscriptChar)
 
 firstChar :: Char -> Boolean
 firstChar c = isLower c || c == '_'
 
 bodyChar :: Char -> Boolean
-bodyChar c = isLower c || isDigit c || c == '-' || c == '?' || c == '\''
+bodyChar c = isLower c || isDigit c || c == '-'
 
 isDigit :: Char -> Boolean
 isDigit c = '0' <= c && c <= '9'

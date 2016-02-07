@@ -20,7 +20,9 @@ Yep. Here's a grammar:
 
 <name>
     ::= [<lower> <underscore>]
-        [<lower> <digit> <hyphen> <underscore> <question-mark> <apostrophe>]*
+        [<lower> <digit> <hyphen>]*
+        [<question-mark>]?
+        ([<prime>]* | [<subscript>]*)
 ```
 
 For example, we could apply the constant function to the identity function twice:
