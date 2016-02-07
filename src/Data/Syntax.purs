@@ -1,6 +1,5 @@
 module Data.Syntax
-  ( Name(..)
-  , Definition(..)
+  ( Definition(..)
   , Syntax(..)
   ) where
 
@@ -9,8 +8,7 @@ import Data.Maybe
 import Data.Generic
 
 import Data.PrettyPrint
-
-type Name = String
+import Data.Name
 
 type Definition =
   { name   :: Name
@@ -40,9 +38,9 @@ instance prettyPrintSyntax :: PrettyPrint Syntax where
     walk e =
       case e of
         Var v ->
-          v
+          show v
         Lambda n b ->
-          "λ" <> n <> ". " <> walk b
+          "λ" <> show n <> ". " <> walk b
         Apply f a ->
           parensIf (isLambda f) (walk f) <> " " <> parensIf (isComposite a) (walk a)
 

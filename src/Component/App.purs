@@ -14,6 +14,7 @@ import Data.Foldable (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import Data.Name
 import Data.Syntax
 import Data.Expr
 import Data.Parse
@@ -44,7 +45,7 @@ type AppState =
   , expr    :: Maybe Expr
   , history :: Array String
   , defs    :: Array Definition
-  , env     :: Environment
+  , env     :: Environment Expr
   , error   :: Maybe (Tuple Level String)
   }
 
@@ -65,18 +66,18 @@ appClass = T.createClass (T.simpleSpec initialState update render)
 
 initialDefs :: Array Definition
 initialDefs =
-  [ { name: "i"
+  [ { name: name_ "i"
     , syntax: unsafeParse parseSyntax "λx. x"
     }
-  , { name: "k"
+  , { name: name_ "k"
     , syntax: unsafeParse parseSyntax "λx. λy. x"
     }
-  , { name: "fix"
+  , { name: name_ "fix"
     , syntax: unsafeParse parseSyntax "λf. (λx. f (x x)) (λy. f (y y))"
     }
   ]
 
-initialEnv :: Environment
+initialEnv :: Environment Expr
 initialEnv = Map.fromList (toList (map fromDef initialDefs))
  where
   fromDef def = Tuple def.name (syntaxToExpr def.syntax)
@@ -115,7 +116,7 @@ update props action =
         saveTextAs text "evaluation.txt"
         k unit
      where
-      defToString def = def.name <> " = " <> prettyPrint def.syntax
+      defToString def = show def.name <> " = " <> prettyPrint def.syntax
 
 fail :: String -> AppState -> AppState
 fail message s =
@@ -133,7 +134,7 @@ parse s =
     Right (Right syntax) ->
       addExpr syntax s
 
-remove :: String -> AppState -> AppState
+remove :: Name -> AppState -> AppState
 remove name s =
   s { defs = deleteByName name s.defs, env = env', error = error }
  where
@@ -171,7 +172,8 @@ reduce expr s =
   case step s.env expr of
     Nothing -> s
     Just expr' ->
-      s { history = prettyPrint (exprToSyntax expr') `cons` s.history, expr = Just expr' }
+      let expr'' = alpha expr'
+      in s { history = prettyPrint (exprToSyntax expr'') `cons` s.history, expr = Just expr'' }
 
 clear :: AppState -> AppState
 clear s = s { history = maybe [] (exprToSyntax >>> prettyPrint >>> singleton) s.expr }
@@ -273,7 +275,7 @@ renderDef send def = RD.h4'
     , RP.onClick \_ -> send (Remove def.name)
     ]
     []
-  , RD.text (" " <> def.name <> " = " <> prettyPrint def.syntax)
+  , RD.text (" " <> show def.name <> " = " <> prettyPrint def.syntax)
   ]
 
 renderExprs :: _ -> Array String -> Maybe Expr -> Array R.ReactElement
