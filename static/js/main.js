@@ -4926,7 +4926,7 @@ var PS = { };
           throw new Error("Failed pattern match at Component.App line 167, column 1 - line 168, column 1: " + [ $26.constructor.name ]);
       };
   };
-  var initialDefs = Prelude.map(Prelude.functorArray)(Data_Parse.unsafeParse(Data_Parse.parseDefinition))([ "i x = x", "k x _ = y", "fix f = (\u03bbx. f (x x)) (\u03bby. f (y y))", "true t _ = t", "false _ f = f", "and x y = x y false", "or x y = x true y" ]);
+  var initialDefs = Prelude.map(Prelude.functorArray)(Data_Parse.unsafeParse(Data_Parse.parseDefinition))([ "i x = x", "k x _ = x", "fix f = (\u03bbx. f (x x)) (\u03bby. f (y y))", "true t _ = t", "false _ f = f", "and x y = x y false", "or x y = x true y" ]);
   var initialEnv = (function () {
       var fromDef = function (def) {
           return new Data_Tuple.Tuple(def.name, Data_Expr.syntaxToExpr(Data_Syntax.defToSyntax(def)));

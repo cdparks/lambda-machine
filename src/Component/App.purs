@@ -68,7 +68,7 @@ initialDefs :: Array Definition
 initialDefs =
   map (unsafeParse parseDefinition)
     [ "i x = x"
-    , "k x _ = y"
+    , "k x _ = x"
     , "fix f = (λx. f (x x)) (λy. f (y y))"
     , "true t _ = t"
     , "false _ f = f"
