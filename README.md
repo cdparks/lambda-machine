@@ -10,7 +10,7 @@ Yep. Here's a grammar:
 
 ```plaintext
 <definition>
-    ::= <name> = <expression>                    -- Definition
+    ::= <name> [<name> ...] = <expression>       -- Definition
 
 <expression>
     ::= \ <name> . <expression>                  -- Lambda
