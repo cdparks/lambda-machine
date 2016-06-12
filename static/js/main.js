@@ -2737,9 +2737,6 @@ var PS = { };
   var next = function (v) {
       return new Name(v.value0, v.value1 + 1 | 0);
   };
-  var name_ = function (n) {
-      return new Name(n, 0);
-  };
   var name = Name.create;
   var isSubscriptChar = function (v) {
       return Data_Set.member(Prelude.ordChar)(v)(subscriptChars);
@@ -2791,7 +2788,6 @@ var PS = { };
       throw new Error("Failed pattern match at Data.Name line 32, column 1 - line 37, column 1: " + [ v.constructor.name ]);
   });
   exports["next"] = next;
-  exports["name_"] = name_;
   exports["name"] = name;
   exports["subscriptToInt"] = subscriptToInt;
   exports["intToSubscript"] = intToSubscript;
@@ -2834,9 +2830,11 @@ var PS = { };
   "use strict";
   var Prelude = PS["Prelude"];
   var Data_Maybe = PS["Data.Maybe"];
+  var Data_Foldable = PS["Data.Foldable"];
   var Data_Generic = PS["Data.Generic"];
   var Data_PrettyPrint = PS["Data.PrettyPrint"];
-  var Data_Name = PS["Data.Name"];     
+  var Data_Name = PS["Data.Name"];
+  var Data_Monoid = PS["Data.Monoid"];     
   var Var = (function () {
       function Var(value0) {
           this.value0 = value0;
@@ -2893,13 +2891,27 @@ var PS = { };
           if (e instanceof Apply) {
               return Data_PrettyPrint.parensIf(isLambda(e.value0))(walk(e.value0)) + (" " + Data_PrettyPrint.parensIf(isComposite(e.value1))(walk(e.value1)));
           };
-          throw new Error("Failed pattern match at Data.Syntax line 35, column 1 - line 45, column 84: " + [ e.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Syntax line 48, column 1 - line 58, column 84: " + [ e.constructor.name ]);
       };
       return walk;
-  })());
+  })());                                                               
+  var defToSyntax = function (def) {
+      return Data_Foldable.foldr(Data_Foldable.foldableArray)(Lambda.create)(def.syntax)(def.args);
+  };
+  var defToString = function (def) {
+      var prettyArgs = function (v) {
+          if (v.length === 0) {
+              return "";
+          };
+          return " " + Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)(" ")(Prelude.map(Prelude.functorArray)(Prelude.show(Data_Name.showName))(v));
+      };
+      return Prelude.show(Data_Name.showName)(def.name) + (prettyArgs(def.args) + (" = " + Data_PrettyPrint.prettyPrint(prettyPrintSyntax)(def.syntax)));
+  };
   exports["Var"] = Var;
   exports["Lambda"] = Lambda;
   exports["Apply"] = Apply;
+  exports["defToString"] = defToString;
+  exports["defToSyntax"] = defToSyntax;
   exports["prettyPrintSyntax"] = prettyPrintSyntax;;
  
 })(PS["Data.Syntax"] = PS["Data.Syntax"] || {});
@@ -3710,8 +3722,8 @@ var PS = { };
   var token = function (p) {
       return Control_Apply["<*"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(p)(Text_Parsing_Parser_String.skipSpaces(Data_Identity.monadIdentity));
   };
-  var parseSubscript = Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(function ($30) {
-      return Data_Name.subscriptToInt(Data_String.fromCharArray($30));
+  var parseSubscript = Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(function ($31) {
+      return Data_Name.subscriptToInt(Data_String.fromCharArray($31));
   })(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Data_Identity.monadIdentity)(Data_Name.isSubscriptChar)));
   var parsePrimes = Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Array.length)(Data_Array.some(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Data_Identity.monadIdentity)(function (v) {
       return v === "'";
@@ -3770,14 +3782,17 @@ var PS = { };
       };
       return Control_Lazy.fix(Text_Parsing_Parser.lazyParserT)(parseApply);
   })();
-  var parseDefinition = Prelude["<*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(function (v) {
+  var parseDefinition = Prelude["<*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(Prelude["<*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(function (v) {
       return function (v1) {
-          return {
-              name: v, 
-              syntax: v1
+          return function (v2) {
+              return {
+                  name: v, 
+                  args: v1, 
+                  syntax: v2
+              };
           };
       };
-  })(parseName))(Control_Apply["*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(token(Text_Parsing_Parser_String.string(Data_Identity.monadIdentity)("=")))(parseSyntax));
+  })(parseName))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(parseName)))(Control_Apply["*>"](Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(token(Text_Parsing_Parser_String.string(Data_Identity.monadIdentity)("=")))(parseSyntax));
   var parseEither = Control_Alt["<|>"](Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_Combinators["try"](Data_Identity.functorIdentity)(Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Either.Left.create)(parseDefinition)))(Prelude["<$>"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Either.Right.create)(parseSyntax));
   exports["formatParseError"] = formatParseError;
   exports["unsafeParse"] = unsafeParse;
@@ -4857,7 +4872,7 @@ var PS = { };
       if ($14 instanceof Data_Maybe.Just) {
           return Data_Array.cons(React_DOM["h4'"]([ React_DOM.text($14.value0.head) ]))(Prelude.map(Prelude.functorArray)(renderSyntax)($14.value0.tail));
       };
-      throw new Error("Failed pattern match at Component.App line 314, column 1 - line 315, column 1: " + [ $14.constructor.name ]);
+      throw new Error("Failed pattern match at Component.App line 311, column 1 - line 312, column 1: " + [ $14.constructor.name ]);
   };
   var renderExprs = function (send) {
       return function (history) {
@@ -4874,7 +4889,7 @@ var PS = { };
                       return send(Save.value);
                   }) ])([ React_DOM.text("Save") ]) ]), React_DOM.div([ React_DOM_Props.className("hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(history)) ]) ]) ];
               };
-              throw new Error("Failed pattern match at Component.App line 281, column 1 - line 282, column 1: " + [ send.constructor.name, history.constructor.name, v.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 278, column 1 - line 279, column 1: " + [ send.constructor.name, history.constructor.name, v.constructor.name ]);
           };
       };
   };
@@ -4882,7 +4897,7 @@ var PS = { };
       return function (def) {
           return React_DOM["h4'"]([ React_DOM.div([ React_DOM_Props.className("glyphicon glyphicon-remove"), React_DOM_Props.onClick(function (v) {
               return send(new Remove(def.name));
-          }) ])([  ]), React_DOM.text(" " + (Prelude.show(Data_Name.showName)(def.name) + (" = " + Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(def.syntax)))) ]);
+          }) ])([  ]), React_DOM.text(" " + Data_Syntax.defToString(def)) ]);
       };
   };
   var renderDefs = function (send) {
@@ -4908,22 +4923,13 @@ var PS = { };
               $27.expr = new Data_Maybe.Just(expr$prime$prime);
               return $27;
           };
-          throw new Error("Failed pattern match at Component.App line 170, column 1 - line 171, column 1: " + [ $26.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 167, column 1 - line 168, column 1: " + [ $26.constructor.name ]);
       };
   };
-  var initialDefs = [ {
-      name: Data_Name.name_("i"), 
-      syntax: Data_Parse.unsafeParse(Data_Parse.parseSyntax)("\u03bbx. x")
-  }, {
-      name: Data_Name.name_("k"), 
-      syntax: Data_Parse.unsafeParse(Data_Parse.parseSyntax)("\u03bbx. \u03bby. x")
-  }, {
-      name: Data_Name.name_("fix"), 
-      syntax: Data_Parse.unsafeParse(Data_Parse.parseSyntax)("\u03bbf. (\u03bbx. f (x x)) (\u03bby. f (y y))")
-  } ];
+  var initialDefs = Prelude.map(Prelude.functorArray)(Data_Parse.unsafeParse(Data_Parse.parseDefinition))([ "i x = x", "k x _ = y", "fix f = (\u03bbx. f (x x)) (\u03bby. f (y y))", "true t _ = t", "false _ f = f", "and x y = x y false", "or x y = x true y" ]);
   var initialEnv = (function () {
       var fromDef = function (def) {
-          return new Data_Tuple.Tuple(def.name, Data_Expr.syntaxToExpr(def.syntax));
+          return new Data_Tuple.Tuple(def.name, Data_Expr.syntaxToExpr(Data_Syntax.defToSyntax(def)));
       };
       return Data_Map.fromList(Data_Name.ordName)(Data_List.toList(Data_Foldable.foldableArray)(Prelude.map(Prelude.functorArray)(fromDef)(initialDefs)));
   })();
@@ -4991,7 +4997,7 @@ var PS = { };
               if (!$34) {
                   return new Data_Maybe.Just(new Data_Tuple.Tuple(Warning.value, Data_Expr.formatUndefinedWarning(name)(names)));
               };
-              throw new Error("Failed pattern match at Component.App line 137, column 1 - line 138, column 1: " + [ $34.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 134, column 1 - line 135, column 1: " + [ $34.constructor.name ]);
           })();
           var $35 = {};
           for (var $36 in s) {
@@ -5027,7 +5033,7 @@ var PS = { };
                   return send(DismissAlert.value);
               }) ])([  ]), React_DOM.text(v.value0.value1) ]) ]) ];
           };
-          throw new Error("Failed pattern match at Component.App line 222, column 1 - line 223, column 1: " + [ send.constructor.name, v.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 219, column 1 - line 220, column 1: " + [ send.constructor.name, v.constructor.name ]);
       };
   };
   var render = function (send) {
@@ -5057,7 +5063,7 @@ var PS = { };
   };
   var addDef = function (def) {
       return function (s) {
-          var expr = Data_Expr.syntaxToExpr(def.syntax);
+          var expr = Data_Expr.syntaxToExpr(Data_Syntax.defToSyntax(def));
           var missing = Data_Expr.undefinedNames(expr)(Data_Map["delete"](Data_Name.ordName)(def.name)(s.env));
           var env = Data_Map.insert(Data_Name.ordName)(def.name)(expr)(s.env);
           var defs = Data_Array.snoc(deleteByName(def.name)(s.defs))(def);
@@ -5077,7 +5083,7 @@ var PS = { };
           if (!$47) {
               return fail(Data_Expr.formatUndefinedError(s.text)(missing))(s);
           };
-          throw new Error("Failed pattern match at Component.App line 150, column 1 - line 151, column 1: " + [ $47.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 147, column 1 - line 148, column 1: " + [ $47.constructor.name ]);
       };
   };
   var parse = function (s) {
@@ -5094,13 +5100,10 @@ var PS = { };
       if ($51 instanceof Data_Either.Right && $51.value0 instanceof Data_Either.Right) {
           return addExpr($51.value0.value0)(s);
       };
-      throw new Error("Failed pattern match at Component.App line 125, column 1 - line 126, column 1: " + [ $51.constructor.name ]);
+      throw new Error("Failed pattern match at Component.App line 122, column 1 - line 123, column 1: " + [ $51.constructor.name ]);
   };
   var update = function (props) {
       return function (action) {
-          var defToString = function (def) {
-              return Prelude.show(Data_Name.showName)(def.name) + (" = " + Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(def.syntax));
-          };
           if (action instanceof DoNothing) {
               return Prelude["return"](Thermite_Action.applicativeAction)(Prelude.unit);
           };
@@ -5144,7 +5147,7 @@ var PS = { };
           if (action instanceof Save) {
               return Prelude.bind(Thermite_Action.bindAction)(Thermite_Action.getState)(function (v) {
                   return Thermite_Action.async(function (k) {
-                      var text = Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)("\n")(Prelude["<>"](Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(defToString)(v.defs))(Data_Array.reverse(v.history)));
+                      var text = Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)("\n")(Prelude["<>"](Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(Data_Syntax.defToString)(v.defs))(Data_Array.reverse(v.history)));
                       return function __do() {
                           Control_Monad_Eff_Save.saveTextAs(text)("evaluation.txt")();
                           return k(Prelude.unit)();
@@ -5152,7 +5155,7 @@ var PS = { };
                   });
               });
           };
-          throw new Error("Failed pattern match at Component.App line 95, column 1 - line 96, column 1: " + [ action.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 94, column 1 - line 95, column 1: " + [ action.constructor.name ]);
       };
   };
   var appClass = Thermite.createClass(Thermite.simpleSpec(initialState)(update)(render));

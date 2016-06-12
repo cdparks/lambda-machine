@@ -50,8 +50,9 @@ parseEither :: Parser String (Either Definition Syntax)
 parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
 
 parseDefinition :: Parser String Definition
-parseDefinition = {name:_, syntax:_}
+parseDefinition = {name:_, args:_, syntax:_}
   <$> parseName
+  <*> many parseName
   <*> (token (string "=") *> parseSyntax)
 
 parseSyntax :: Parser String Syntax

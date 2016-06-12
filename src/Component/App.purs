@@ -66,21 +66,20 @@ appClass = T.createClass (T.simpleSpec initialState update render)
 
 initialDefs :: Array Definition
 initialDefs =
-  [ { name: name_ "i"
-    , syntax: unsafeParse parseSyntax "λx. x"
-    }
-  , { name: name_ "k"
-    , syntax: unsafeParse parseSyntax "λx. λy. x"
-    }
-  , { name: name_ "fix"
-    , syntax: unsafeParse parseSyntax "λf. (λx. f (x x)) (λy. f (y y))"
-    }
-  ]
+  map (unsafeParse parseDefinition)
+    [ "i x = x"
+    , "k x _ = y"
+    , "fix f = (λx. f (x x)) (λy. f (y y))"
+    , "true t _ = t"
+    , "false _ f = f"
+    , "and x y = x y false"
+    , "or x y = x true y"
+    ]
 
 initialEnv :: Environment Expr
 initialEnv = Map.fromList (toList (map fromDef initialDefs))
  where
-  fromDef def = Tuple def.name (syntaxToExpr def.syntax)
+  fromDef def = Tuple def.name (syntaxToExpr (defToSyntax def))
 
 initialState :: AppState
 initialState =
@@ -115,8 +114,6 @@ update props action =
         let text = intercalate "\n" (map defToString s.defs <> reverse s.history)
         saveTextAs text "evaluation.txt"
         k unit
-     where
-      defToString def = show def.name <> " = " <> prettyPrint def.syntax
 
 fail :: String -> AppState -> AppState
 fail message s =
@@ -156,7 +153,7 @@ addDef def s =
       fail (formatUndefinedError s.text missing) s
  where
   defs = deleteByName def.name s.defs `snoc` def
-  expr = syntaxToExpr def.syntax
+  expr = syntaxToExpr (defToSyntax def)
   env = Map.insert def.name expr s.env
   missing = undefinedNames expr (Map.delete def.name s.env)
 
@@ -275,7 +272,7 @@ renderDef send def = RD.h4'
     , RP.onClick \_ -> send (Remove def.name)
     ]
     []
-  , RD.text (" " <> show def.name <> " = " <> prettyPrint def.syntax)
+  , RD.text (" " <> defToString def)
   ]
 
 renderExprs :: _ -> Array String -> Maybe Expr -> Array R.ReactElement
