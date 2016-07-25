@@ -5139,7 +5139,7 @@ var PS = { };
                   return renderSyntax(rep($73));
               })($15.value0.tail));
           };
-          throw new Error("Failed pattern match at Component.App line 337, column 1 - line 338, column 1: " + [ $15.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 338, column 1 - line 339, column 1: " + [ $15.constructor.name ]);
       };
   };
   var renderDef = function (send) {
@@ -5176,10 +5176,10 @@ var PS = { };
               $21.expr = new Data_Maybe.Just(expr$prime$prime);
               return $21;
           };
-          throw new Error("Failed pattern match at Component.App line 176, column 1 - line 177, column 1: " + [ $20.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 175, column 1 - line 176, column 1: " + [ $20.constructor.name ]);
       };
   };
-  var initialDefs = Prelude.map(Prelude.functorArray)(Data_Parse.unsafeParse(Data_Parse.parseDefinition))([ "fix f = (\u03bbx. f (x x)) (\u03bby. f (y y))", "true t _ = t", "false _ f = f", "and x y = x y false", "or x y = x true y", "succ n s z = s (n s z)", "add m n s z = m s (n s z)", "mul m n s z = m (n s) z", "foldr f z l = l f z", "any = foldr or false", "all = foldr and true" ]);
+  var initialDefs = Prelude.map(Prelude.functorArray)(Data_Parse.unsafeParse(Data_Parse.parseDefinition))([ "fix f = (\u03bbx. f (x x)) (\u03bby. f (y y))", "true t _ = t", "false _ f = f", "and x y = x y false", "or x y = x true y", "foldr f z l = l f z", "any = foldr or false", "all = foldr and true", "add m n s z = m s (n s z)", "mul m n s z = m (n s) z" ]);
   var initialEnv = (function () {
       var fromDef = function (def) {
           return new Data_Tuple.Tuple(def.name, Data_Expr.syntaxToExpr(Data_Syntax.defToSyntax(def)));
@@ -5213,7 +5213,7 @@ var PS = { };
                       return [  ];
                   };
                   if (v instanceof Data_Maybe.Just) {
-                      return [ React_DOM["h3'"]([ React_DOM.text("Evaluation") ]), React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("btn-group pull-right") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (v1) {
+                      return [ React_DOM.div([ React_DOM_Props.className("col-sm-6") ])([ React_DOM["h3'"]([ React_DOM.text("Evaluation") ]) ]), React_DOM.div([ React_DOM_Props.className("col-sm-6") ])([ React_DOM.div([ React_DOM_Props.className("add-margin-medium btn-group pull-right") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (v1) {
                           return send(new Reduce(v.value0));
                       }) ])([ React_DOM.text("Step") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (v1) {
                           return send(Clear.value);
@@ -5221,9 +5221,9 @@ var PS = { };
                           return send(Save.value);
                       }) ])([ React_DOM.text("Save") ]), React_DOM.button([ React_DOM_Props.className("btn " + ifSugar(rep)("btn-danger")("btn-success")), React_DOM_Props.onClick(function (v1) {
                           return send(ToggleSugar.value);
-                      }) ])([ React_DOM.text(ifSugar(rep)("Raw")("Sugar")) ]) ]), React_DOM.div([ React_DOM_Props.className("hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(rep)(history)) ]) ]) ];
+                      }) ])([ React_DOM.text(ifSugar(rep)("Raw")("Sugar")) ]) ]) ]), React_DOM.div([ React_DOM_Props.className("col-sm-12 hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(rep)(history)) ]) ];
                   };
-                  throw new Error("Failed pattern match at Component.App line 299, column 1 - line 300, column 1: " + [ send.constructor.name, rep.constructor.name, history.constructor.name, v.constructor.name ]);
+                  throw new Error("Failed pattern match at Component.App line 298, column 1 - line 299, column 1: " + [ send.constructor.name, rep.constructor.name, history.constructor.name, v.constructor.name ]);
               };
           };
       };
@@ -5305,7 +5305,7 @@ var PS = { };
               if (!$41) {
                   return new Data_Maybe.Just(new Data_Tuple.Tuple(Warning.value, Data_Expr.formatUndefinedWarning(name)(names)));
               };
-              throw new Error("Failed pattern match at Component.App line 143, column 1 - line 144, column 1: " + [ $41.constructor.name ]);
+              throw new Error("Failed pattern match at Component.App line 142, column 1 - line 143, column 1: " + [ $41.constructor.name ]);
           })();
           var $42 = {};
           for (var $43 in s) {
@@ -5341,7 +5341,7 @@ var PS = { };
                   return send(DismissAlert.value);
               }) ])([  ]), React_DOM.text(v.value0.value1) ]) ]) ];
           };
-          throw new Error("Failed pattern match at Component.App line 240, column 1 - line 241, column 1: " + [ send.constructor.name, v.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 239, column 1 - line 240, column 1: " + [ send.constructor.name, v.constructor.name ]);
       };
   };
   var render = function (send) {
@@ -5391,7 +5391,7 @@ var PS = { };
           if (!$54) {
               return fail(Data_Expr.formatUndefinedError(s.text)(missing))(s);
           };
-          throw new Error("Failed pattern match at Component.App line 156, column 1 - line 157, column 1: " + [ $54.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 155, column 1 - line 156, column 1: " + [ $54.constructor.name ]);
       };
   };
   var parse = function (s) {
@@ -5408,7 +5408,7 @@ var PS = { };
       if ($58 instanceof Data_Either.Right && $58.value0 instanceof Data_Either.Right) {
           return addExpr($58.value0.value0)(s);
       };
-      throw new Error("Failed pattern match at Component.App line 131, column 1 - line 132, column 1: " + [ $58.constructor.name ]);
+      throw new Error("Failed pattern match at Component.App line 130, column 1 - line 131, column 1: " + [ $58.constructor.name ]);
   };
   var update = function (props) {
       return function (action) {
@@ -5460,7 +5460,7 @@ var PS = { };
           if (action instanceof ToggleSugar) {
               return Thermite_Action.modifyState(toggleSugar);
           };
-          throw new Error("Failed pattern match at Component.App line 104, column 1 - line 105, column 1: " + [ action.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 103, column 1 - line 104, column 1: " + [ action.constructor.name ]);
       };
   };
   var appClass = Thermite.createClass(Thermite.simpleSpec(initialState)(update)(render));

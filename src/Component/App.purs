@@ -77,12 +77,11 @@ initialDefs =
     , "false _ f = f"
     , "and x y = x y false"
     , "or x y = x true y"
-    , "succ n s z = s (n s z)"
-    , "add m n s z = m s (n s z)"
-    , "mul m n s z = m (n s) z"
     , "foldr f z l = l f z"
     , "any = foldr or false"
     , "all = foldr and true"
+    , "add m n s z = m s (n s z)"
+    , "mul m n s z = m (n s) z"
     ]
 
 initialEnv :: Environment Expr
@@ -299,11 +298,13 @@ renderDef send rep def = RD.h4'
 renderExprs :: _ -> (Doc String -> String) -> Array (Doc String) -> Maybe Expr -> Array R.ReactElement
 renderExprs send rep history Nothing = []
 renderExprs send rep history (Just expr) =
-  [ RD.h3' [ RD.text "Evaluation" ]
+  [ RD.div
+    [ RP.className "col-sm-6" ]
+    [ RD.h3' [ RD.text "Evaluation" ] ]
   , RD.div
-    [ RP.className "col-sm-12" ]
+    [ RP.className "col-sm-6" ]
     [ RD.div
-      [ RP.className "btn-group pull-right" ]
+      [ RP.className "add-margin-medium btn-group pull-right" ]
       [ RD.button
         [ RP.className "btn btn-default"
         , RP.onClick \_ -> send (Reduce expr)
@@ -325,12 +326,12 @@ renderExprs send rep history (Just expr) =
         ]
         [ RD.text (ifSugar rep "Raw" "Sugar") ]
       ]
-    , RD.div
-      [ RP.className "hide-overflow" ]
-      [ RD.div
-        [ RP.className "scroll-overflow monospace-font" ]
-        (renderHistory rep history)
-      ]
+    ]
+  , RD.div
+    [ RP.className "col-sm-12 hide-overflow" ]
+    [ RD.div
+      [ RP.className "scroll-overflow monospace-font" ]
+      (renderHistory rep history)
     ]
   ]
 
