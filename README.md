@@ -25,12 +25,15 @@ Yep. Here's a grammar:
         ([<prime>]* | [<subscript>]*)
 ```
 
-For example, we could apply the constant function to the identity function twice:
+There is also optional syntax for natural numbers and lists, but these are desugared to plain lambda calculus at parse time:
 
 ```plaintext
-(\x. \y. x) (\a. a) (\b. b)
-(\y. \a. a) (\b. b)
-\a. a
+[a, b, c]
+    -> λcons. λnil. cons a (cons b (cons c nil))
+3
+    -> λs. λz. s (s (s z))
+[1]
+    -> λcons. λnil. cons (λs. λz. s z) nil
 ```
 
 ##Why?

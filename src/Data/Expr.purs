@@ -137,13 +137,13 @@ instance prettyPrintExpr :: PrettyPrint Expr where
     walk inApp e =
       case e of
         Bound i ->
-          show i
+          pure (show i)
         Free n ->
-          show n
+          pure (show n)
         Bind _ b ->
-          parensIf inApp ("λ. " <> walk false b)
+          parensIf inApp (pure "λ. " <> walk false b)
         App f a ->
-          walk true f <> " " <> walk true a
+          walk true f <> pure " " <> walk true a
 
 step :: Environment Expr -> Expr -> Maybe Expr
 step env e =

@@ -41,13 +41,17 @@ instance showLevel :: Show Level where
   show Danger  = "danger"
 
 type AppState =
-  { text    :: String
-  , expr    :: Maybe Expr
-  , history :: Array String
-  , defs    :: Array Definition
-  , env     :: Environment Expr
-  , error   :: Maybe (Tuple Level String)
+  { text     :: String
+  , expr     :: Maybe Expr
+  , history  :: Array (Doc String)
+  , defs     :: Array Definition
+  , env      :: Environment Expr
+  , rep      :: forall a. Doc a -> a
+  , error    :: Maybe (Tuple Level String)
   }
+
+ifSugar :: forall a. (Doc a -> a) -> a -> a -> a
+ifSugar rep s r = rep (doc {sugar: s, raw: r})
 
 data AppAction
   = DoNothing
@@ -58,6 +62,7 @@ data AppAction
   | Remove Name
   | Clear
   | Save
+  | ToggleSugar
 
 type AppProps = Unit
 
@@ -67,13 +72,17 @@ appClass = T.createClass (T.simpleSpec initialState update render)
 initialDefs :: Array Definition
 initialDefs =
   map (unsafeParse parseDefinition)
-    [ "i x = x"
-    , "k x _ = x"
-    , "fix f = (λx. f (x x)) (λy. f (y y))"
+    [ "fix f = (λx. f (x x)) (λy. f (y y))"
     , "true t _ = t"
     , "false _ f = f"
     , "and x y = x y false"
     , "or x y = x true y"
+    , "succ n s z = s (n s z)"
+    , "add m n s z = m s (n s z)"
+    , "mul m n s z = m (n s) z"
+    , "foldr f z l = l f z"
+    , "any = foldr or false"
+    , "all = foldr and true"
     ]
 
 initialEnv :: Environment Expr
@@ -88,6 +97,7 @@ initialState =
   , history: []
   , defs: initialDefs
   , env: initialEnv
+  , rep: raw
   , error: Nothing
   }
 
@@ -110,10 +120,9 @@ update props action =
       T.modifyState clear
     Save -> do
       s <- T.getState
-      T.async \k -> do
-        let text = intercalate "\n" (map defToString s.defs <> reverse s.history)
-        saveTextAs text "evaluation.txt"
-        k unit
+      save s
+    ToggleSugar ->
+      T.modifyState toggleSugar
 
 fail :: String -> AppState -> AppState
 fail message s =
@@ -175,6 +184,18 @@ reduce expr s =
 clear :: AppState -> AppState
 clear s = s { history = maybe [] (exprToSyntax >>> prettyPrint >>> singleton) s.expr }
 
+toggleSugar :: AppState -> AppState
+toggleSugar s = ifSugar s.rep (s { rep = raw }) (s { rep = sugar })
+
+save :: forall eff. AppState -> T.Action (save :: SAVE | eff) AppState Unit
+save s = do
+  let
+    allDefs = map defToDoc s.defs <> reverse s.history
+    text = intercalate "\n" (map s.rep allDefs)
+  T.async \k -> do
+    saveTextAs text "evaluation.txt"
+    k unit
+
 render :: T.Render _ AppState _ AppAction
 render send state props _ =
   RD.div
@@ -190,10 +211,10 @@ render send state props _ =
       [ input send state.text ]
     , RD.div
       [ RP.className "row" ]
-      (renderDefs send state.defs)
+      (renderDefs send state.rep state.defs)
     , RD.div
       [ RP.className "row" ]
-      (renderExprs send state.history state.expr)
+      (renderExprs send state.rep state.history state.expr)
     , RD.div
       [ RP.className "row" ]
       [ footer ]
@@ -257,27 +278,27 @@ input send value = RD.div
     ]
   ]
 
-renderDefs :: _ -> Array Definition -> Array R.ReactElement
-renderDefs send definitions =
+renderDefs :: _ -> (Doc String -> String) -> Array Definition -> Array R.ReactElement
+renderDefs send rep definitions =
   [ RD.h3' [ RD.text "Definitions" ]
   , RD.div
     [ RP.className "monospace-font col-sm-12" ]
-    (map (renderDef send) definitions)
+    (map (renderDef send rep) definitions)
   ]
 
-renderDef :: _ -> Definition -> R.ReactElement
-renderDef send def = RD.h4'
+renderDef :: _ -> (Doc String -> String) -> Definition -> R.ReactElement
+renderDef send rep def = RD.h4'
   [ RD.div
     [ RP.className "glyphicon glyphicon-remove"
     , RP.onClick \_ -> send (Remove def.name)
     ]
     []
-  , RD.text (" " <> defToString def)
+  , RD.text (" " <> rep (defToDoc def))
   ]
 
-renderExprs :: _ -> Array String -> Maybe Expr -> Array R.ReactElement
-renderExprs send history Nothing = []
-renderExprs send history (Just expr) =
+renderExprs :: _ -> (Doc String -> String) -> Array (Doc String) -> Maybe Expr -> Array R.ReactElement
+renderExprs send rep history Nothing = []
+renderExprs send rep history (Just expr) =
   [ RD.h3' [ RD.text "Evaluation" ]
   , RD.div
     [ RP.className "col-sm-12" ]
@@ -298,22 +319,27 @@ renderExprs send history (Just expr) =
         , RP.onClick \_ -> send Save
         ]
         [ RD.text "Save" ]
+      , RD.button
+        [ RP.className ("btn " <> ifSugar rep "btn-danger" "btn-success")
+        , RP.onClick \_ -> send ToggleSugar
+        ]
+        [ RD.text (ifSugar rep "Raw" "Sugar") ]
       ]
     , RD.div
       [ RP.className "hide-overflow" ]
       [ RD.div
         [ RP.className "scroll-overflow monospace-font" ]
-        (renderHistory history)
+        (renderHistory rep history)
       ]
     ]
   ]
 
-renderHistory :: Array String -> Array R.ReactElement
-renderHistory hs =
+renderHistory :: (Doc String -> String) -> Array (Doc String) -> Array R.ReactElement
+renderHistory rep hs =
   case uncons hs of
     Nothing -> []
     Just { head = head, tail = tail } ->
-      RD.h4' [ RD.text head ] `cons` map renderSyntax tail
+      RD.h4' [ RD.text (rep head) ] `cons` map (rep >>> renderSyntax) tail
 
 renderSyntax :: String -> R.ReactElement
 renderSyntax syntax = RD.h4

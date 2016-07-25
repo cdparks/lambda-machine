@@ -23,6 +23,9 @@ import Data.Foldable (foldl, elem)
 import Data.String (fromCharArray)
 import Data.Either
 import Data.Either.Unsafe (fromRight)
+import Data.Maybe.Unsafe (fromJust)
+import Data.Int (fromString)
+import Data.List (List(..))
 
 import Data.Syntax
 import Data.Name
@@ -66,7 +69,7 @@ parseSyntax = fix parseApply
       _  -> return (foldl Apply first rest)
    where
     parseAtom :: Parser String Syntax
-    parseAtom = parseLambda <|> parseVar <|> parens p
+    parseAtom = parseLambda <|> parseNat <|> parseList p <|> parens p <|> parseVar
 
     parseLambda :: Parser String Syntax
     parseLambda = Lambda
@@ -75,6 +78,32 @@ parseSyntax = fix parseApply
 
 parens :: forall a. Parser String a -> Parser String a
 parens = between (token (string "(")) (token (string ")"))
+
+toList :: List Syntax -> Syntax
+toList xs = Lambda (name_ "cons") (Lambda (name_ "nil") (loop xs))
+ where
+  loop Nil = Var (name_ "nil")
+  loop (Cons x xs) = Apply (Apply (Var (name_ "cons")) x) (loop xs)
+
+toChurch :: Int -> Syntax
+toChurch n = Lambda (name_ "s") (Lambda (name_ "z") (loop n))
+ where
+  loop k
+    | k <= 0 = Var (name_ "z")
+    | otherwise = Apply (Var (name_ "s")) (loop (k - 1))
+
+parseNat :: Parser String Syntax
+parseNat = token do
+  digits <- some (satisfy isDigit)
+  let n = fromJust (fromString (fromCharArray digits))
+  return (toChurch n)
+
+parseList :: Parser String Syntax -> Parser String Syntax
+parseList p = token do
+  _ <- char '['
+  elements <- p `sepBy` token (char ',')
+  _ <- char ']'
+  return (toList elements)
 
 parseVar :: Parser String Syntax
 parseVar = Var <$> parseName
