@@ -86,10 +86,10 @@ prettySyntax = walk false
         pure (show v)
       l@(Lambda n b) ->
         let
-          simple = raw (parensIf inApp (pure "λ" <> pure (show n) <> pure ". " <> walk false b))
+          simple = parensIf inApp (pure "λ" <> pure (show n) <> pure ". " <> walk false b)
           literal = tryFromChurch l <|> tryFromList l
         in
-          doc {raw: simple, sugar: fromMaybe simple literal}
+          doc {raw: raw simple, sugar: fromMaybe (sugar simple) literal}
       Apply f a ->
         parensIf inApp (walk (isLambda f) f <> pure " " <> walk (isComposite a) a)
 

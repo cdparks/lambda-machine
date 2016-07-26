@@ -3044,11 +3044,11 @@ var PS = { };
                   return Prelude.pure(Data_PrettyPrint.docApplicative)(Prelude.show(Data_Name.showName)(e.value0));
               };
               if (e instanceof Lambda) {
-                  var simple = Data_PrettyPrint.raw(Data_PrettyPrint.parensIf(inApp)(Prelude["<>"](Data_PrettyPrint.docSemigroup(Prelude.semigroupString))(Prelude.pure(Data_PrettyPrint.docApplicative)("\u03bb"))(Prelude["<>"](Data_PrettyPrint.docSemigroup(Prelude.semigroupString))(Prelude.pure(Data_PrettyPrint.docApplicative)(Prelude.show(Data_Name.showName)(e.value0)))(Prelude["<>"](Data_PrettyPrint.docSemigroup(Prelude.semigroupString))(Prelude.pure(Data_PrettyPrint.docApplicative)(". "))(walk(false)(e.value1))))));
+                  var simple = Data_PrettyPrint.parensIf(inApp)(Prelude["<>"](Data_PrettyPrint.docSemigroup(Prelude.semigroupString))(Prelude.pure(Data_PrettyPrint.docApplicative)("\u03bb"))(Prelude["<>"](Data_PrettyPrint.docSemigroup(Prelude.semigroupString))(Prelude.pure(Data_PrettyPrint.docApplicative)(Prelude.show(Data_Name.showName)(e.value0)))(Prelude["<>"](Data_PrettyPrint.docSemigroup(Prelude.semigroupString))(Prelude.pure(Data_PrettyPrint.docApplicative)(". "))(walk(false)(e.value1)))));
                   var literal = Control_Alt["<|>"](Data_Maybe.altMaybe)(tryFromChurch(e))(tryFromList(e));
                   return Data_PrettyPrint.doc({
-                      raw: simple, 
-                      sugar: Data_Maybe.fromMaybe(simple)(literal)
+                      raw: Data_PrettyPrint.raw(simple), 
+                      sugar: Data_Maybe.fromMaybe(Data_PrettyPrint.sugar(simple))(literal)
                   });
               };
               if (e instanceof Apply) {
