@@ -5139,7 +5139,7 @@ var PS = { };
                   return renderSyntax(rep($73));
               })($15.value0.tail));
           };
-          throw new Error("Failed pattern match at Component.App line 338, column 1 - line 339, column 1: " + [ $15.constructor.name ]);
+          throw new Error("Failed pattern match at Component.App line 340, column 1 - line 341, column 1: " + [ $15.constructor.name ]);
       };
   };
   var renderDef = function (send) {
@@ -5154,7 +5154,7 @@ var PS = { };
   var renderDefs = function (send) {
       return function (rep) {
           return function (definitions) {
-              return [ React_DOM["h3'"]([ React_DOM.text("Definitions") ]), React_DOM.div([ React_DOM_Props.className("monospace-font col-sm-12") ])(Prelude.map(Prelude.functorArray)(renderDef(send)(rep))(definitions)) ];
+              return [ React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM["h3'"]([ React_DOM.text("Definitions") ]) ]), React_DOM.div([ React_DOM_Props.className("col-sm-12 monospace-font col-sm-12") ])(Prelude.map(Prelude.functorArray)(renderDef(send)(rep))(definitions)) ];
           };
       };
   };
@@ -5223,7 +5223,7 @@ var PS = { };
                           return send(ToggleSugar.value);
                       }) ])([ React_DOM.text(ifSugar(rep)("Raw")("Sugar")) ]) ]) ]), React_DOM.div([ React_DOM_Props.className("col-sm-12 hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(rep)(history)) ]) ];
                   };
-                  throw new Error("Failed pattern match at Component.App line 298, column 1 - line 299, column 1: " + [ send.constructor.name, rep.constructor.name, history.constructor.name, v.constructor.name ]);
+                  throw new Error("Failed pattern match at Component.App line 300, column 1 - line 301, column 1: " + [ send.constructor.name, rep.constructor.name, history.constructor.name, v.constructor.name ]);
               };
           };
       };

@@ -279,9 +279,11 @@ input send value = RD.div
 
 renderDefs :: _ -> (Doc String -> String) -> Array Definition -> Array R.ReactElement
 renderDefs send rep definitions =
-  [ RD.h3' [ RD.text "Definitions" ]
+  [ RD.div
+    [ RP.className "col-sm-12" ]
+    [ RD.h3' [ RD.text "Definitions" ] ]
   , RD.div
-    [ RP.className "monospace-font col-sm-12" ]
+    [ RP.className "col-sm-12 monospace-font col-sm-12" ]
     (map (renderDef send rep) definitions)
   ]
 
