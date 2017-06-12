@@ -1,0 +1,11 @@
+{
+  "name": "lambda-machine",
+  "version": "0.1.2",
+  "repository": "https://github.com/cdparks/lambda-machine",
+  "license": "MIT",
+  "files": [],
+  "dependencies": {
+    "react": "^15.5.4",
+    "react-dom": "^15.5.4"
+  }
+}
