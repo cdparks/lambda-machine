@@ -1,6 +1,6 @@
 {
   "name": "lambda-machine",
-  "version": "1.0.0",
+  "version": "0.1.2",
   "moduleType": [
     "node"
   ],
@@ -11,19 +11,21 @@
     "output"
   ],
   "dependencies": {
-    "purescript-console": "^0.1.0",
-    "react": "~0.13.3",
-    "purescript-arrays": "~0.4.2",
-    "purescript-maybe": "~0.3.4",
-    "purescript-strings": "~0.7.0",
-    "purescript-thermite": "~0.10.1",
-    "purescript-foreign-lens": "~0.1.0",
-    "purescript-maps": "~0.5.0",
-    "purescript-control": "~0.3.1",
-    "purescript-parsing": "~0.7.0",
-    "purescript-generics": "~0.7.1",
-    "purescript-sets": "~0.5.7",
-    "purescript-integers": "^0.2.1",
-    "purescript-prelude": "^0.1.0"
+    "purescript-console": "^3.0.0",
+    "purescript-arrays": "^4.1.0",
+    "purescript-maybe": "^3.0.0",
+    "purescript-strings": "^3.2.1",
+    "purescript-thermite": "^4.1.0",
+    "purescript-foreign-lens": "^3.0.0",
+    "purescript-maps": "^3.3.1",
+    "purescript-control": "^3.3.0",
+    "purescript-parsing": "^4.2.2",
+    "purescript-generics": "^4.0.0",
+    "purescript-sets": "^3.0.0",
+    "purescript-integers": "^3.0.0",
+    "purescript-prelude": "^3.0.0",
+    "purescript-profunctor-lenses": "^3.2.0",
+    "purescript-foldable-traversable": "^3.3.0",
+    "purescript-transformers": "^3.4.0"
   }
 }

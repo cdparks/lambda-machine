@@ -9,12 +9,30 @@ module Data.Name
   ) where
 
 import Prelude
-import Data.Array.Unsafe (unsafeIndex)
+  ( class Eq
+  , class Ord
+  , class Show
+  , div
+  , map
+  , mod
+  , otherwise
+  , (&&)
+  , (*)
+  , (+)
+  , (-)
+  , (<)
+  , (<=)
+  , (<>)
+  , (==)
+  , (>>>)
+  )
+import Data.Array (unsafeIndex)
 import Data.Foldable (foldl)
 import Data.String (fromCharArray, toCharArray)
 import Data.Char (toCharCode)
-import Data.Generic
-import qualified Data.Set as Set
+import Data.Generic (class Generic, gCompare, gEq)
+import Data.Set as Set
+import Partial.Unsafe (unsafePartial)
 
 data Name = Name String Int
 
@@ -41,7 +59,7 @@ instance ordName :: Ord Name where
   compare = gCompare
 
 intToSubscript :: Int -> String
-intToSubscript = digits >>> map (subscriptTable `unsafeIndex`) >>> fromCharArray
+intToSubscript = digits >>> map (unsafePartial (subscriptTable `unsafeIndex` _)) >>> fromCharArray
 
 subscriptToInt :: String -> Int
 subscriptToInt = toCharArray >>> foldl step 0
@@ -59,7 +77,7 @@ subscriptChars =
         Set.fromFoldable subscriptTable
 
 isSubscriptChar :: Char -> Boolean
-isSubscriptChar = (`Set.member` subscriptChars)
+isSubscriptChar = (_ `Set.member` subscriptChars)
 
 subscriptTable :: Array Char
 subscriptTable = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']

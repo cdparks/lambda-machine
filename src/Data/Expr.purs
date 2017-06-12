@@ -14,24 +14,22 @@ module Data.Expr
   , alpha
   ) where
 
-import Prelude
-import Data.Maybe
-import Data.Tuple
+import Prelude (class Show, map, otherwise, pure, show, (+), (<$>), (<*>), (<>), (==), (>>>))
+import Data.Maybe (Maybe(..), maybe)
+import Data.Tuple (Tuple(..), fst, snd)
 import Control.Alt ((<|>))
-import Data.Generic
+import Data.Generic (class Generic, gShow)
 
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import Data.Array (cons)
-import Data.Array.Unsafe (unsafeIndex)
+import Data.Map as Map
+import Data.Set as Set
+import Data.List (List)
+import Data.Array (cons, unsafeIndex)
 import Data.Foldable (intercalate, foldl)
+import Partial.Unsafe (unsafePartial)
 
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
-
-import Data.Syntax
-import Data.PrettyPrint
-import Data.Name
+import Data.Syntax (Syntax(..))
+import Data.PrettyPrint (class PrettyPrint, parensIf)
+import Data.Name (Name, next)
 
 data Expr
   = Bound Int
@@ -48,28 +46,28 @@ instance showExpr :: Show Expr where
 syntaxToExpr :: Syntax -> Expr
 syntaxToExpr = loop Map.empty >>> alpha
  where
-  loop env a =
-    case a of
+  loop env s =
+    case s of
       Var n ->
         maybe (Free n) Bound (Map.lookup n env)
       Lambda n b ->
-        let env' = Map.insert n 0 (map (+1) env)
+        let env' = Map.insert n 0 (map (_ + 1) env)
         in Bind n (loop env' b)
       Apply f a ->
         App (loop env f) (loop env a)
 
 alpha :: Expr -> Expr
-alpha e = loop (freeVars e) e
+alpha e0 = loop (freeVars e0) e0
  where
-  loop env e =
-    case e of
+  loop env e1 =
+    case e1 of
       Bound i ->
         Bound i
       Free n ->
         Free n
-      Bind n e ->
+      Bind n b ->
         let pair = fresh env n
-        in Bind (snd pair) (loop (fst pair) e)
+        in Bind (snd pair) (loop (fst pair) b)
       App f a ->
         App (loop env f) (loop env a)
 
@@ -84,12 +82,12 @@ exprToSyntax = loop []
   loop env e =
     case e of
       Bound i ->
-        Var (env `unsafeIndex` i)
+        Var (unsafePartial (env `unsafeIndex` i))
       Free n ->
         Var n
-      Bind n e ->
+      Bind n b ->
         let env' = n `cons` env
-        in Lambda n (loop env' e)
+        in Lambda n (loop env' b)
       App f a ->
         Apply (loop env f) (loop env a)
 
@@ -114,9 +112,12 @@ undefinedNames :: Expr -> Environment Expr -> Set.Set Name
 undefinedNames expr env = freeVars expr `Set.difference` globalNames env
 
 namesReferencing :: Name -> Environment Expr -> Set.Set Name
-namesReferencing name = Map.toList >>> foldl step Set.empty
+namesReferencing name =
+  toList >>> foldl step' Set.empty
  where
-  step keys (Tuple key expr)
+  toList :: forall a. Environment a -> List (Tuple Name a)
+  toList = Map.toUnfoldable
+  step' keys (Tuple key expr)
     | name `Set.member` freeVars expr = Set.insert key keys
     | otherwise                       = keys
 
@@ -129,7 +130,11 @@ formatUndefinedWarning name names =
   "Deleted definition " <> show name <> " is still referenced by " <> formatNames names
 
 formatNames :: Set.Set Name -> String
-formatNames = Set.toList >>> map show >>> intercalate ", "
+formatNames =
+  toList >>> map show >>> intercalate ", "
+ where
+  toList :: forall a. Set.Set a -> List a
+  toList = Set.toUnfoldable
 
 instance prettyPrintExpr :: PrettyPrint Expr where
   prettyPrint = walk false
@@ -148,12 +153,12 @@ instance prettyPrintExpr :: PrettyPrint Expr where
 step :: Environment Expr -> Expr -> Maybe Expr
 step env e =
   case e of
-    App (Bind n e) m ->
-      return (substitute m e)
+    App (Bind n b) m ->
+      pure (substitute m b)
     App f a ->
       (App <$> step env f <*> pure a) <|> (App <$> pure f <*> step env a)
-    Bind n e ->
-      Bind n <$> step env e
+    Bind n b ->
+      Bind n <$> step env b
     Free n ->
       Map.lookup n env
     Bound i ->

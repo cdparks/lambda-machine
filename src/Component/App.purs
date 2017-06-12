@@ -1,38 +1,66 @@
 module Component.App
-  ( appClass
-  , AppProps(..)
+  ( spec
+  , initialState
+  , Level
+  , AppAction
   ) where
 
 import Prelude
+  ( class Show
+  , Unit
+  , bind
+  , id
+  , map
+  , pure
+  , show
+  , unit
+  , void
+  , ($)
+  , (/=)
+  , (<$)
+  , (<>)
+  , (==)
+  , (>>>)
+  )
 
-import Data.Maybe
-import Data.Either
-import Data.Tuple
-import Data.Array (uncons, cons, snoc, filter, singleton, reverse, null)
-import Data.List (toList)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Either (Either(..))
+import Data.Tuple (Tuple(..))
+import Data.Array (uncons, cons, snoc, filter, singleton, reverse)
 import Data.Foldable (intercalate)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import Data.Map as Map
+import Data.Set as Set
 
-import Data.Name
-import Data.Syntax
+import Data.Name (Name)
+import Data.Syntax (Definition, Syntax, defToDoc, defToSyntax)
 import Data.Expr
-import Data.Parse
-import Data.PrettyPrint
+  ( Environment
+  , Expr
+  , alpha
+  , exprToSyntax
+  , formatUndefinedError
+  , formatUndefinedWarning
+  , namesReferencing
+  , step
+  , syntaxToExpr
+  , undefinedNames
+  )
+import Data.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
+import Data.PrettyPrint (Doc, doc, prettyPrint, raw, sugar)
+import Data.Traversable (for)
 
-import Text.Parsing.Parser (ParseError(..))
+import Control.Monad.Eff.Save (SAVE, saveTextAs)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Aff (Aff, Canceler, forkAff)
 
-import Control.Monad.Eff
-import Control.Monad.Eff.Save
+import Thermite as T
 
-import qualified Thermite as T
-import qualified Thermite.Action as T
+import React as R
+import React.DOM as RD
+import React.DOM.Props as RP
 
-import qualified React as R
-import qualified React.DOM as RD
-import qualified React.DOM.Props as RP
-
-import Component.Event
+import Component.Event (getKeyCode, getValue)
 
 data Level = Warning | Danger
 
@@ -64,10 +92,8 @@ data AppAction
   | Save
   | ToggleSugar
 
-type AppProps = Unit
-
-appClass :: R.ReactClass AppProps
-appClass = T.createClass (T.simpleSpec initialState update render)
+spec :: T.Spec _ AppState _ AppAction
+spec = T.simpleSpec update render
 
 initialDefs :: Array Definition
 initialDefs =
@@ -85,7 +111,7 @@ initialDefs =
     ]
 
 initialEnv :: Environment Expr
-initialEnv = Map.fromList (toList (map fromDef initialDefs))
+initialEnv = Map.fromFoldable (map fromDef initialDefs)
  where
   fromDef def = Tuple def.name (syntaxToExpr (defToSyntax def))
 
@@ -101,27 +127,35 @@ initialState =
   }
 
 update :: T.PerformAction _ AppState _ AppAction
-update props action =
+update action _ _ =
   case action of
     DoNothing ->
-      return unit
+      pure unit
     NewText text ->
-      T.modifyState (\s -> s { text = text, error = Nothing })
+      void (T.modifyState (\s -> s { text = text, error = Nothing }))
     DismissAlert ->
-      T.modifyState (\s -> s { error = Nothing })
+      void (T.modifyState (\s -> s { error = Nothing }))
     Remove name ->
-      T.modifyState (remove name)
+      void (T.modifyState (remove name))
     ParseText ->
-      T.modifyState parse
+      void (T.modifyState parse)
     Reduce expr ->
-      T.modifyState (reduce expr)
+      void (T.modifyState (reduce expr))
     Clear ->
-      T.modifyState clear
-    Save -> do
-      s <- T.getState
-      save s
+      void (T.modifyState clear)
+    Save -> void do
+      mState <- T.modifyState id
+      for mState $ \state ->
+        state <$ lift (save state)
     ToggleSugar ->
-      T.modifyState toggleSugar
+      void (T.modifyState toggleSugar)
+
+save :: forall eff. AppState -> Aff (save :: SAVE | eff) (Canceler (save :: SAVE | eff))
+save s = do
+  let
+    allDefs = map defToDoc s.defs <> reverse s.history
+    text = intercalate "\n" (map s.rep allDefs)
+  forkAff (liftEff (saveTextAs text "evaluation.txt"))
 
 fail :: String -> AppState -> AppState
 fail message s =
@@ -150,7 +184,7 @@ remove name s =
              else Just (Tuple Warning (formatUndefinedWarning name names))
 
 deleteByName :: Name -> Array Definition -> Array Definition
-deleteByName name = filter (_.name >>> (/= name))
+deleteByName name = filter (_.name >>> (_ /= name))
 
 addDef :: Definition -> AppState -> AppState
 addDef def s =
@@ -186,18 +220,9 @@ clear s = s { history = maybe [] (exprToSyntax >>> prettyPrint >>> singleton) s.
 toggleSugar :: AppState -> AppState
 toggleSugar s = ifSugar s.rep (s { rep = raw }) (s { rep = sugar })
 
-save :: forall eff. AppState -> T.Action (save :: SAVE | eff) AppState Unit
-save s = do
-  let
-    allDefs = map defToDoc s.defs <> reverse s.history
-    text = intercalate "\n" (map s.rep allDefs)
-  T.async \k -> do
-    saveTextAs text "evaluation.txt"
-    k unit
-
-render :: T.Render _ AppState _ AppAction
-render send state props _ =
-  RD.div
+render :: T.Render AppState _ AppAction
+render send _ state _ =
+  [ RD.div
     [ RP.className "container" ]
     [ RD.div
       [ RP.className "row" ]
@@ -218,6 +243,7 @@ render send state props _ =
       [ RP.className "row" ]
       [ footer ]
     ]
+  ]
 
 header :: R.ReactElement
 header = RD.div
@@ -341,7 +367,7 @@ renderHistory :: (Doc String -> String) -> Array (Doc String) -> Array R.ReactEl
 renderHistory rep hs =
   case uncons hs of
     Nothing -> []
-    Just { head = head, tail = tail } ->
+    Just { head: head, tail: tail } ->
       RD.h4' [ RD.text (rep head) ] `cons` map (rep >>> renderSyntax) tail
 
 renderSyntax :: String -> R.ReactElement

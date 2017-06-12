@@ -8,27 +8,42 @@ module Data.Parse
   ) where
 
 import Prelude
+  ( bind
+  , otherwise
+  , pure
+  , show
+  , (&&)
+  , (*>)
+  , (-)
+  , (<$>)
+  , (<*)
+  , (<*>)
+  , (<<<)
+  , (<=)
+  , (<>)
+  , (==)
+  , (||)
+  )
 
-import Text.Parsing.Parser
-import Text.Parsing.Parser.Combinators
-import Text.Parsing.Parser.String
-import Text.Parsing.Parser.Pos
+import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
+import Text.Parsing.Parser.Combinators (between, sepBy, try)
+import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
+import Text.Parsing.Parser.Pos (Position(..))
 
 import Control.Lazy (fix)
 import Control.Alt ((<|>))
-import Control.Apply ((*>), (<*))
 
 import Data.Array (some, many, replicate, length)
-import Data.Foldable (foldl, elem)
+import Data.Foldable (foldl)
 import Data.String (fromCharArray)
-import Data.Either
-import Data.Either.Unsafe (fromRight)
-import Data.Maybe.Unsafe (fromJust)
+import Data.Either (Either(..), fromRight)
+import Data.Maybe (fromJust)
 import Data.Int (fromString)
 import Data.List (List(..))
+import Partial.Unsafe (unsafePartial)
 
-import Data.Syntax
-import Data.Name
+import Data.Syntax (Definition, Syntax(..))
+import Data.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
 
 token :: forall a. Parser String a -> Parser String a
 token p = p <* skipSpaces
@@ -37,17 +52,18 @@ parseAll :: forall a. Parser String a -> String -> Either ParseError a
 parseAll p s = runParser s (skipSpaces *> p <* eof)
 
 unsafeParse :: forall a. Parser String a -> String -> a
-unsafeParse p s = fromRight (parseAll p s)
+unsafeParse p s = unsafePartial (fromRight (parseAll p s))
 
 formatParseError :: String -> ParseError -> String
-formatParseError text (ParseError { message: message, position: Position { column: column } }) =
+formatParseError text err =
   "Parse error: " <> message <> " at column " <> show column <> "\n" <> text <> "\n" <> caretLine
  where
+  message = parseErrorMessage err
+  column = positionColumn (parseErrorPosition err)
   caretLine = fromCharArray (replicate (column - 1) ' ') <> "^"
 
-caretForParseError :: ParseError -> String
-caretForParseError (ParseError { position: Position { column: column } }) =
-  fromCharArray (replicate (column - 1) ' ') <> "^"
+positionColumn :: Position -> Int
+positionColumn (Position {column: column}) = column
 
 parseEither :: Parser String (Either Definition Syntax)
 parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
@@ -65,8 +81,8 @@ parseSyntax = fix parseApply
     first <- parseAtom
     rest <- many parseAtom
     case rest of
-      [] -> return first
-      _  -> return (foldl Apply first rest)
+      [] -> pure first
+      _  -> pure (foldl Apply first rest)
    where
     parseAtom :: Parser String Syntax
     parseAtom = parseLambda <|> parseNat <|> parseList p <|> parens p <|> parseVar
@@ -83,7 +99,7 @@ toList :: List Syntax -> Syntax
 toList xs = Lambda (name_ "cons") (Lambda (name_ "nil") (loop xs))
  where
   loop Nil = Var (name_ "nil")
-  loop (Cons x xs) = Apply (Apply (Var (name_ "cons")) x) (loop xs)
+  loop (Cons y ys) = Apply (Apply (Var (name_ "cons")) y) (loop ys)
 
 toChurch :: Int -> Syntax
 toChurch n = Lambda (name_ "s") (Lambda (name_ "z") (loop n))
@@ -95,15 +111,15 @@ toChurch n = Lambda (name_ "s") (Lambda (name_ "z") (loop n))
 parseNat :: Parser String Syntax
 parseNat = token do
   digits <- some (satisfy isDigit)
-  let n = fromJust (fromString (fromCharArray digits))
-  return (toChurch n)
+  let n = unsafePartial (fromJust (fromString (fromCharArray digits)))
+  pure (toChurch n)
 
 parseList :: Parser String Syntax -> Parser String Syntax
 parseList p = token do
   _ <- char '['
   elements <- p `sepBy` token (char ',')
   _ <- char ']'
-  return (toList elements)
+  pure (toList elements)
 
 parseVar :: Parser String Syntax
 parseVar = Var <$> parseName
@@ -114,10 +130,10 @@ parseName = token do
   body <- many (satisfy bodyChar)
   question <- string "?" <|> pure ""
   subscript <- parsePrimes <|> parseSubscript
-  return (name (fromCharArray ([first] <> body) <> question) subscript)
+  pure (name (fromCharArray ([first] <> body) <> question) subscript)
 
 parsePrimes :: Parser String Int
-parsePrimes = length <$> some (satisfy (== '\''))
+parsePrimes = length <$> some (satisfy (_ == '\''))
 
 parseSubscript :: Parser String Int
 parseSubscript = subscriptToInt <<< fromCharArray <$> many (satisfy isSubscriptChar)

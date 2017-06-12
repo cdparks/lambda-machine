@@ -10,7 +10,19 @@ module Data.PrettyPrint
   ) where
 
 import Prelude
-import Data.Monoid
+  ( class Applicative
+  , class Apply
+  , class Functor
+  , class Semigroup
+  , append
+  , otherwise
+  , pure
+  , (<$>)
+  , (<*>)
+  , (<>)
+  )
+
+import Data.Monoid (class Monoid, mempty)
 
 data Doc a = Doc a a
 

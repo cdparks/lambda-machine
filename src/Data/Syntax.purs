@@ -5,16 +5,14 @@ module Data.Syntax
   , Syntax(..)
   ) where
 
-import Prelude
+import Prelude (class Show, map, otherwise, pure, show, (+), (<$>), (<>), (==))
 import Control.Alt ((<|>))
-import Data.Maybe
-import Data.Tuple
-import Data.Foldable (foldr, intercalate)
-import Data.Generic
-import Data.List
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Generic (class Generic, gShow)
+import Data.List (List(..), foldr, intercalate)
 
-import Data.PrettyPrint
-import Data.Name
+import Data.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, raw, sugar)
+import Data.Name (Name)
 
 type Definition =
   { name   :: Name
@@ -53,7 +51,7 @@ tryFromChurch (Lambda s (Lambda z body)) =
   show <$> walk body
  where
   walk (Apply (Var s') arg)
-    | s' == s = (+1) <$> walk arg
+    | s' == s = (_ + 1) <$> walk arg
     | otherwise = Nothing
   walk (Var z')
     | z' == z = pure 0

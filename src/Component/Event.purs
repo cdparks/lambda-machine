@@ -3,16 +3,15 @@ module Component.Event
   , getKeyCode
   ) where
 
-import Prelude
+import Prelude ((>>>))
 
 import Data.Maybe (fromMaybe)
-import Data.Nullable (toMaybe)
 import Data.Foreign (toForeign)
-import Data.Foreign.Lens
+import Data.Foreign.Lens (int, prop, string)
+import Data.Lens.Fold (preview)
 
 getValue :: forall event. event -> String
-getValue = toForeign >>> get (string >>> prop "value" >>> prop "target") >>> fromMaybe ""
+getValue = toForeign >>> preview (string >>> prop "value" >>> prop "target") >>> fromMaybe ""
 
 getKeyCode :: forall event. event -> Int
-getKeyCode = toForeign >>> get (int >>> prop "keyCode") >>> fromMaybe 0
-
+getKeyCode = toForeign >>> preview (int >>> prop "keyCode") >>> fromMaybe 0
