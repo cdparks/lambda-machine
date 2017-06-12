@@ -1,10 +1,10 @@
 ![Lambda Machine Screenshot](https://raw.githubusercontent.com/cdparks/lambda-machine/master/static/images/lambda-machine.png)
 
-##What?
+## What?
 
 It's a machine for evaluating expressions in the untyped lambda calculus. You get lambdas, variables, applications, and top-level definitions. You can try it [here](http://cdparks.github.io/lambda-machine).
 
-##Really?
+## Really?
 
 Yep. Here's a grammar:
 
@@ -36,23 +36,23 @@ There is also optional syntax for natural numbers and lists, but these are desug
     -> λcons. λnil. cons (λs. λz. s z) nil
 ```
 
-##Why?
+## Why?
 
 I've been working through the exercises in [Introduction to Functional Programming Through Lambda Calculus](http://www.amazon.com/Introduction-Functional-Programming-Calculus-Mathematics/dp/0486478831) by [Greg Michaelson](http://www.macs.hw.ac.uk/~greg/), and some of these expressions have become rather tedious to reduce by hand. It'd be nice to have something that would do it for me step-by-step, ya know?
 
-##How?
+## How?
 
 It's written in [PureScript](http://www.purescript.org/) and [React](https://facebook.github.io/react/) using the [Thermite](https://github.com/paf31/purescript-thermite) library. Expressions are converted to a locally nameless representation before being evaluated in normal order.
 
 You can run it like this:
 
 ```bash
-pulp dep install
-pulp build -O --to static/js/main.js
+npm install
+bower install
+pulp browserify --optimise --to static/js/main.js
 open index.html
 ```
 
-##Who?
+## Who?
 
 Me, [Chris Parks](mailto:christopher.daniel.parks@gmail.com). Feel free to say hi!
-
