@@ -1,4 +1,2087 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+(function (process){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+var _assign = require('object-assign');
+
+var emptyObject = require('fbjs/lib/emptyObject');
+var _invariant = require('fbjs/lib/invariant');
+
+if (process.env.NODE_ENV !== 'production') {
+  var warning = require('fbjs/lib/warning');
+}
+
+var MIXINS_KEY = 'mixins';
+
+// Helper function to allow the creation of anonymous functions which do not
+// have .name set to the name of the variable being assigned to.
+function identity(fn) {
+  return fn;
+}
+
+var ReactPropTypeLocationNames;
+if (process.env.NODE_ENV !== 'production') {
+  ReactPropTypeLocationNames = {
+    prop: 'prop',
+    context: 'context',
+    childContext: 'child context'
+  };
+} else {
+  ReactPropTypeLocationNames = {};
+}
+
+function factory(ReactComponent, isValidElement, ReactNoopUpdateQueue) {
+  /**
+   * Policies that describe methods in `ReactClassInterface`.
+   */
+
+  var injectedMixins = [];
+
+  /**
+   * Composite components are higher-level components that compose other composite
+   * or host components.
+   *
+   * To create a new type of `ReactClass`, pass a specification of
+   * your new class to `React.createClass`. The only requirement of your class
+   * specification is that you implement a `render` method.
+   *
+   *   var MyComponent = React.createClass({
+   *     render: function() {
+   *       return <div>Hello World</div>;
+   *     }
+   *   });
+   *
+   * The class specification supports a specific protocol of methods that have
+   * special meaning (e.g. `render`). See `ReactClassInterface` for
+   * more the comprehensive protocol. Any other properties and methods in the
+   * class specification will be available on the prototype.
+   *
+   * @interface ReactClassInterface
+   * @internal
+   */
+  var ReactClassInterface = {
+    /**
+     * An array of Mixin objects to include when defining your component.
+     *
+     * @type {array}
+     * @optional
+     */
+    mixins: 'DEFINE_MANY',
+
+    /**
+     * An object containing properties and methods that should be defined on
+     * the component's constructor instead of its prototype (static methods).
+     *
+     * @type {object}
+     * @optional
+     */
+    statics: 'DEFINE_MANY',
+
+    /**
+     * Definition of prop types for this component.
+     *
+     * @type {object}
+     * @optional
+     */
+    propTypes: 'DEFINE_MANY',
+
+    /**
+     * Definition of context types for this component.
+     *
+     * @type {object}
+     * @optional
+     */
+    contextTypes: 'DEFINE_MANY',
+
+    /**
+     * Definition of context types this component sets for its children.
+     *
+     * @type {object}
+     * @optional
+     */
+    childContextTypes: 'DEFINE_MANY',
+
+    // ==== Definition methods ====
+
+    /**
+     * Invoked when the component is mounted. Values in the mapping will be set on
+     * `this.props` if that prop is not specified (i.e. using an `in` check).
+     *
+     * This method is invoked before `getInitialState` and therefore cannot rely
+     * on `this.state` or use `this.setState`.
+     *
+     * @return {object}
+     * @optional
+     */
+    getDefaultProps: 'DEFINE_MANY_MERGED',
+
+    /**
+     * Invoked once before the component is mounted. The return value will be used
+     * as the initial value of `this.state`.
+     *
+     *   getInitialState: function() {
+     *     return {
+     *       isOn: false,
+     *       fooBaz: new BazFoo()
+     *     }
+     *   }
+     *
+     * @return {object}
+     * @optional
+     */
+    getInitialState: 'DEFINE_MANY_MERGED',
+
+    /**
+     * @return {object}
+     * @optional
+     */
+    getChildContext: 'DEFINE_MANY_MERGED',
+
+    /**
+     * Uses props from `this.props` and state from `this.state` to render the
+     * structure of the component.
+     *
+     * No guarantees are made about when or how often this method is invoked, so
+     * it must not have side effects.
+     *
+     *   render: function() {
+     *     var name = this.props.name;
+     *     return <div>Hello, {name}!</div>;
+     *   }
+     *
+     * @return {ReactComponent}
+     * @required
+     */
+    render: 'DEFINE_ONCE',
+
+    // ==== Delegate methods ====
+
+    /**
+     * Invoked when the component is initially created and about to be mounted.
+     * This may have side effects, but any external subscriptions or data created
+     * by this method must be cleaned up in `componentWillUnmount`.
+     *
+     * @optional
+     */
+    componentWillMount: 'DEFINE_MANY',
+
+    /**
+     * Invoked when the component has been mounted and has a DOM representation.
+     * However, there is no guarantee that the DOM node is in the document.
+     *
+     * Use this as an opportunity to operate on the DOM when the component has
+     * been mounted (initialized and rendered) for the first time.
+     *
+     * @param {DOMElement} rootNode DOM element representing the component.
+     * @optional
+     */
+    componentDidMount: 'DEFINE_MANY',
+
+    /**
+     * Invoked before the component receives new props.
+     *
+     * Use this as an opportunity to react to a prop transition by updating the
+     * state using `this.setState`. Current props are accessed via `this.props`.
+     *
+     *   componentWillReceiveProps: function(nextProps, nextContext) {
+     *     this.setState({
+     *       likesIncreasing: nextProps.likeCount > this.props.likeCount
+     *     });
+     *   }
+     *
+     * NOTE: There is no equivalent `componentWillReceiveState`. An incoming prop
+     * transition may cause a state change, but the opposite is not true. If you
+     * need it, you are probably looking for `componentWillUpdate`.
+     *
+     * @param {object} nextProps
+     * @optional
+     */
+    componentWillReceiveProps: 'DEFINE_MANY',
+
+    /**
+     * Invoked while deciding if the component should be updated as a result of
+     * receiving new props, state and/or context.
+     *
+     * Use this as an opportunity to `return false` when you're certain that the
+     * transition to the new props/state/context will not require a component
+     * update.
+     *
+     *   shouldComponentUpdate: function(nextProps, nextState, nextContext) {
+     *     return !equal(nextProps, this.props) ||
+     *       !equal(nextState, this.state) ||
+     *       !equal(nextContext, this.context);
+     *   }
+     *
+     * @param {object} nextProps
+     * @param {?object} nextState
+     * @param {?object} nextContext
+     * @return {boolean} True if the component should update.
+     * @optional
+     */
+    shouldComponentUpdate: 'DEFINE_ONCE',
+
+    /**
+     * Invoked when the component is about to update due to a transition from
+     * `this.props`, `this.state` and `this.context` to `nextProps`, `nextState`
+     * and `nextContext`.
+     *
+     * Use this as an opportunity to perform preparation before an update occurs.
+     *
+     * NOTE: You **cannot** use `this.setState()` in this method.
+     *
+     * @param {object} nextProps
+     * @param {?object} nextState
+     * @param {?object} nextContext
+     * @param {ReactReconcileTransaction} transaction
+     * @optional
+     */
+    componentWillUpdate: 'DEFINE_MANY',
+
+    /**
+     * Invoked when the component's DOM representation has been updated.
+     *
+     * Use this as an opportunity to operate on the DOM when the component has
+     * been updated.
+     *
+     * @param {object} prevProps
+     * @param {?object} prevState
+     * @param {?object} prevContext
+     * @param {DOMElement} rootNode DOM element representing the component.
+     * @optional
+     */
+    componentDidUpdate: 'DEFINE_MANY',
+
+    /**
+     * Invoked when the component is about to be removed from its parent and have
+     * its DOM representation destroyed.
+     *
+     * Use this as an opportunity to deallocate any external resources.
+     *
+     * NOTE: There is no `componentDidUnmount` since your component will have been
+     * destroyed by that point.
+     *
+     * @optional
+     */
+    componentWillUnmount: 'DEFINE_MANY',
+
+    /**
+     * Replacement for (deprecated) `componentWillMount`.
+     *
+     * @optional
+     */
+    UNSAFE_componentWillMount: 'DEFINE_MANY',
+
+    /**
+     * Replacement for (deprecated) `componentWillReceiveProps`.
+     *
+     * @optional
+     */
+    UNSAFE_componentWillReceiveProps: 'DEFINE_MANY',
+
+    /**
+     * Replacement for (deprecated) `componentWillUpdate`.
+     *
+     * @optional
+     */
+    UNSAFE_componentWillUpdate: 'DEFINE_MANY',
+
+    // ==== Advanced methods ====
+
+    /**
+     * Updates the component's currently mounted DOM representation.
+     *
+     * By default, this implements React's rendering and reconciliation algorithm.
+     * Sophisticated clients may wish to override this.
+     *
+     * @param {ReactReconcileTransaction} transaction
+     * @internal
+     * @overridable
+     */
+    updateComponent: 'OVERRIDE_BASE'
+  };
+
+  /**
+   * Similar to ReactClassInterface but for static methods.
+   */
+  var ReactClassStaticInterface = {
+    /**
+     * This method is invoked after a component is instantiated and when it
+     * receives new props. Return an object to update state in response to
+     * prop changes. Return null to indicate no change to state.
+     *
+     * If an object is returned, its keys will be merged into the existing state.
+     *
+     * @return {object || null}
+     * @optional
+     */
+    getDerivedStateFromProps: 'DEFINE_MANY_MERGED'
+  };
+
+  /**
+   * Mapping from class specification keys to special processing functions.
+   *
+   * Although these are declared like instance properties in the specification
+   * when defining classes using `React.createClass`, they are actually static
+   * and are accessible on the constructor instead of the prototype. Despite
+   * being static, they must be defined outside of the "statics" key under
+   * which all other static methods are defined.
+   */
+  var RESERVED_SPEC_KEYS = {
+    displayName: function(Constructor, displayName) {
+      Constructor.displayName = displayName;
+    },
+    mixins: function(Constructor, mixins) {
+      if (mixins) {
+        for (var i = 0; i < mixins.length; i++) {
+          mixSpecIntoComponent(Constructor, mixins[i]);
+        }
+      }
+    },
+    childContextTypes: function(Constructor, childContextTypes) {
+      if (process.env.NODE_ENV !== 'production') {
+        validateTypeDef(Constructor, childContextTypes, 'childContext');
+      }
+      Constructor.childContextTypes = _assign(
+        {},
+        Constructor.childContextTypes,
+        childContextTypes
+      );
+    },
+    contextTypes: function(Constructor, contextTypes) {
+      if (process.env.NODE_ENV !== 'production') {
+        validateTypeDef(Constructor, contextTypes, 'context');
+      }
+      Constructor.contextTypes = _assign(
+        {},
+        Constructor.contextTypes,
+        contextTypes
+      );
+    },
+    /**
+     * Special case getDefaultProps which should move into statics but requires
+     * automatic merging.
+     */
+    getDefaultProps: function(Constructor, getDefaultProps) {
+      if (Constructor.getDefaultProps) {
+        Constructor.getDefaultProps = createMergedResultFunction(
+          Constructor.getDefaultProps,
+          getDefaultProps
+        );
+      } else {
+        Constructor.getDefaultProps = getDefaultProps;
+      }
+    },
+    propTypes: function(Constructor, propTypes) {
+      if (process.env.NODE_ENV !== 'production') {
+        validateTypeDef(Constructor, propTypes, 'prop');
+      }
+      Constructor.propTypes = _assign({}, Constructor.propTypes, propTypes);
+    },
+    statics: function(Constructor, statics) {
+      mixStaticSpecIntoComponent(Constructor, statics);
+    },
+    autobind: function() {}
+  };
+
+  function validateTypeDef(Constructor, typeDef, location) {
+    for (var propName in typeDef) {
+      if (typeDef.hasOwnProperty(propName)) {
+        // use a warning instead of an _invariant so components
+        // don't show up in prod but only in __DEV__
+        if (process.env.NODE_ENV !== 'production') {
+          warning(
+            typeof typeDef[propName] === 'function',
+            '%s: %s type `%s` is invalid; it must be a function, usually from ' +
+              'React.PropTypes.',
+            Constructor.displayName || 'ReactClass',
+            ReactPropTypeLocationNames[location],
+            propName
+          );
+        }
+      }
+    }
+  }
+
+  function validateMethodOverride(isAlreadyDefined, name) {
+    var specPolicy = ReactClassInterface.hasOwnProperty(name)
+      ? ReactClassInterface[name]
+      : null;
+
+    // Disallow overriding of base class methods unless explicitly allowed.
+    if (ReactClassMixin.hasOwnProperty(name)) {
+      _invariant(
+        specPolicy === 'OVERRIDE_BASE',
+        'ReactClassInterface: You are attempting to override ' +
+          '`%s` from your class specification. Ensure that your method names ' +
+          'do not overlap with React methods.',
+        name
+      );
+    }
+
+    // Disallow defining methods more than once unless explicitly allowed.
+    if (isAlreadyDefined) {
+      _invariant(
+        specPolicy === 'DEFINE_MANY' || specPolicy === 'DEFINE_MANY_MERGED',
+        'ReactClassInterface: You are attempting to define ' +
+          '`%s` on your component more than once. This conflict may be due ' +
+          'to a mixin.',
+        name
+      );
+    }
+  }
+
+  /**
+   * Mixin helper which handles policy validation and reserved
+   * specification keys when building React classes.
+   */
+  function mixSpecIntoComponent(Constructor, spec) {
+    if (!spec) {
+      if (process.env.NODE_ENV !== 'production') {
+        var typeofSpec = typeof spec;
+        var isMixinValid = typeofSpec === 'object' && spec !== null;
+
+        if (process.env.NODE_ENV !== 'production') {
+          warning(
+            isMixinValid,
+            "%s: You're attempting to include a mixin that is either null " +
+              'or not an object. Check the mixins included by the component, ' +
+              'as well as any mixins they include themselves. ' +
+              'Expected object but got %s.',
+            Constructor.displayName || 'ReactClass',
+            spec === null ? null : typeofSpec
+          );
+        }
+      }
+
+      return;
+    }
+
+    _invariant(
+      typeof spec !== 'function',
+      "ReactClass: You're attempting to " +
+        'use a component class or function as a mixin. Instead, just use a ' +
+        'regular object.'
+    );
+    _invariant(
+      !isValidElement(spec),
+      "ReactClass: You're attempting to " +
+        'use a component as a mixin. Instead, just use a regular object.'
+    );
+
+    var proto = Constructor.prototype;
+    var autoBindPairs = proto.__reactAutoBindPairs;
+
+    // By handling mixins before any other properties, we ensure the same
+    // chaining order is applied to methods with DEFINE_MANY policy, whether
+    // mixins are listed before or after these methods in the spec.
+    if (spec.hasOwnProperty(MIXINS_KEY)) {
+      RESERVED_SPEC_KEYS.mixins(Constructor, spec.mixins);
+    }
+
+    for (var name in spec) {
+      if (!spec.hasOwnProperty(name)) {
+        continue;
+      }
+
+      if (name === MIXINS_KEY) {
+        // We have already handled mixins in a special case above.
+        continue;
+      }
+
+      var property = spec[name];
+      var isAlreadyDefined = proto.hasOwnProperty(name);
+      validateMethodOverride(isAlreadyDefined, name);
+
+      if (RESERVED_SPEC_KEYS.hasOwnProperty(name)) {
+        RESERVED_SPEC_KEYS[name](Constructor, property);
+      } else {
+        // Setup methods on prototype:
+        // The following member methods should not be automatically bound:
+        // 1. Expected ReactClass methods (in the "interface").
+        // 2. Overridden methods (that were mixed in).
+        var isReactClassMethod = ReactClassInterface.hasOwnProperty(name);
+        var isFunction = typeof property === 'function';
+        var shouldAutoBind =
+          isFunction &&
+          !isReactClassMethod &&
+          !isAlreadyDefined &&
+          spec.autobind !== false;
+
+        if (shouldAutoBind) {
+          autoBindPairs.push(name, property);
+          proto[name] = property;
+        } else {
+          if (isAlreadyDefined) {
+            var specPolicy = ReactClassInterface[name];
+
+            // These cases should already be caught by validateMethodOverride.
+            _invariant(
+              isReactClassMethod &&
+                (specPolicy === 'DEFINE_MANY_MERGED' ||
+                  specPolicy === 'DEFINE_MANY'),
+              'ReactClass: Unexpected spec policy %s for key %s ' +
+                'when mixing in component specs.',
+              specPolicy,
+              name
+            );
+
+            // For methods which are defined more than once, call the existing
+            // methods before calling the new property, merging if appropriate.
+            if (specPolicy === 'DEFINE_MANY_MERGED') {
+              proto[name] = createMergedResultFunction(proto[name], property);
+            } else if (specPolicy === 'DEFINE_MANY') {
+              proto[name] = createChainedFunction(proto[name], property);
+            }
+          } else {
+            proto[name] = property;
+            if (process.env.NODE_ENV !== 'production') {
+              // Add verbose displayName to the function, which helps when looking
+              // at profiling tools.
+              if (typeof property === 'function' && spec.displayName) {
+                proto[name].displayName = spec.displayName + '_' + name;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function mixStaticSpecIntoComponent(Constructor, statics) {
+    if (!statics) {
+      return;
+    }
+
+    for (var name in statics) {
+      var property = statics[name];
+      if (!statics.hasOwnProperty(name)) {
+        continue;
+      }
+
+      var isReserved = name in RESERVED_SPEC_KEYS;
+      _invariant(
+        !isReserved,
+        'ReactClass: You are attempting to define a reserved ' +
+          'property, `%s`, that shouldn\'t be on the "statics" key. Define it ' +
+          'as an instance property instead; it will still be accessible on the ' +
+          'constructor.',
+        name
+      );
+
+      var isAlreadyDefined = name in Constructor;
+      if (isAlreadyDefined) {
+        var specPolicy = ReactClassStaticInterface.hasOwnProperty(name)
+          ? ReactClassStaticInterface[name]
+          : null;
+
+        _invariant(
+          specPolicy === 'DEFINE_MANY_MERGED',
+          'ReactClass: You are attempting to define ' +
+            '`%s` on your component more than once. This conflict may be ' +
+            'due to a mixin.',
+          name
+        );
+
+        Constructor[name] = createMergedResultFunction(Constructor[name], property);
+
+        return;
+      }
+
+      Constructor[name] = property;
+    }
+  }
+
+  /**
+   * Merge two objects, but throw if both contain the same key.
+   *
+   * @param {object} one The first object, which is mutated.
+   * @param {object} two The second object
+   * @return {object} one after it has been mutated to contain everything in two.
+   */
+  function mergeIntoWithNoDuplicateKeys(one, two) {
+    _invariant(
+      one && two && typeof one === 'object' && typeof two === 'object',
+      'mergeIntoWithNoDuplicateKeys(): Cannot merge non-objects.'
+    );
+
+    for (var key in two) {
+      if (two.hasOwnProperty(key)) {
+        _invariant(
+          one[key] === undefined,
+          'mergeIntoWithNoDuplicateKeys(): ' +
+            'Tried to merge two objects with the same key: `%s`. This conflict ' +
+            'may be due to a mixin; in particular, this may be caused by two ' +
+            'getInitialState() or getDefaultProps() methods returning objects ' +
+            'with clashing keys.',
+          key
+        );
+        one[key] = two[key];
+      }
+    }
+    return one;
+  }
+
+  /**
+   * Creates a function that invokes two functions and merges their return values.
+   *
+   * @param {function} one Function to invoke first.
+   * @param {function} two Function to invoke second.
+   * @return {function} Function that invokes the two argument functions.
+   * @private
+   */
+  function createMergedResultFunction(one, two) {
+    return function mergedResult() {
+      var a = one.apply(this, arguments);
+      var b = two.apply(this, arguments);
+      if (a == null) {
+        return b;
+      } else if (b == null) {
+        return a;
+      }
+      var c = {};
+      mergeIntoWithNoDuplicateKeys(c, a);
+      mergeIntoWithNoDuplicateKeys(c, b);
+      return c;
+    };
+  }
+
+  /**
+   * Creates a function that invokes two functions and ignores their return vales.
+   *
+   * @param {function} one Function to invoke first.
+   * @param {function} two Function to invoke second.
+   * @return {function} Function that invokes the two argument functions.
+   * @private
+   */
+  function createChainedFunction(one, two) {
+    return function chainedFunction() {
+      one.apply(this, arguments);
+      two.apply(this, arguments);
+    };
+  }
+
+  /**
+   * Binds a method to the component.
+   *
+   * @param {object} component Component whose method is going to be bound.
+   * @param {function} method Method to be bound.
+   * @return {function} The bound method.
+   */
+  function bindAutoBindMethod(component, method) {
+    var boundMethod = method.bind(component);
+    if (process.env.NODE_ENV !== 'production') {
+      boundMethod.__reactBoundContext = component;
+      boundMethod.__reactBoundMethod = method;
+      boundMethod.__reactBoundArguments = null;
+      var componentName = component.constructor.displayName;
+      var _bind = boundMethod.bind;
+      boundMethod.bind = function(newThis) {
+        for (
+          var _len = arguments.length,
+            args = Array(_len > 1 ? _len - 1 : 0),
+            _key = 1;
+          _key < _len;
+          _key++
+        ) {
+          args[_key - 1] = arguments[_key];
+        }
+
+        // User is trying to bind() an autobound method; we effectively will
+        // ignore the value of "this" that the user is trying to use, so
+        // let's warn.
+        if (newThis !== component && newThis !== null) {
+          if (process.env.NODE_ENV !== 'production') {
+            warning(
+              false,
+              'bind(): React component methods may only be bound to the ' +
+                'component instance. See %s',
+              componentName
+            );
+          }
+        } else if (!args.length) {
+          if (process.env.NODE_ENV !== 'production') {
+            warning(
+              false,
+              'bind(): You are binding a component method to the component. ' +
+                'React does this for you automatically in a high-performance ' +
+                'way, so you can safely remove this call. See %s',
+              componentName
+            );
+          }
+          return boundMethod;
+        }
+        var reboundMethod = _bind.apply(boundMethod, arguments);
+        reboundMethod.__reactBoundContext = component;
+        reboundMethod.__reactBoundMethod = method;
+        reboundMethod.__reactBoundArguments = args;
+        return reboundMethod;
+      };
+    }
+    return boundMethod;
+  }
+
+  /**
+   * Binds all auto-bound methods in a component.
+   *
+   * @param {object} component Component whose method is going to be bound.
+   */
+  function bindAutoBindMethods(component) {
+    var pairs = component.__reactAutoBindPairs;
+    for (var i = 0; i < pairs.length; i += 2) {
+      var autoBindKey = pairs[i];
+      var method = pairs[i + 1];
+      component[autoBindKey] = bindAutoBindMethod(component, method);
+    }
+  }
+
+  var IsMountedPreMixin = {
+    componentDidMount: function() {
+      this.__isMounted = true;
+    }
+  };
+
+  var IsMountedPostMixin = {
+    componentWillUnmount: function() {
+      this.__isMounted = false;
+    }
+  };
+
+  /**
+   * Add more to the ReactClass base class. These are all legacy features and
+   * therefore not already part of the modern ReactComponent.
+   */
+  var ReactClassMixin = {
+    /**
+     * TODO: This will be deprecated because state should always keep a consistent
+     * type signature and the only use case for this, is to avoid that.
+     */
+    replaceState: function(newState, callback) {
+      this.updater.enqueueReplaceState(this, newState, callback);
+    },
+
+    /**
+     * Checks whether or not this composite component is mounted.
+     * @return {boolean} True if mounted, false otherwise.
+     * @protected
+     * @final
+     */
+    isMounted: function() {
+      if (process.env.NODE_ENV !== 'production') {
+        warning(
+          this.__didWarnIsMounted,
+          '%s: isMounted is deprecated. Instead, make sure to clean up ' +
+            'subscriptions and pending requests in componentWillUnmount to ' +
+            'prevent memory leaks.',
+          (this.constructor && this.constructor.displayName) ||
+            this.name ||
+            'Component'
+        );
+        this.__didWarnIsMounted = true;
+      }
+      return !!this.__isMounted;
+    }
+  };
+
+  var ReactClassComponent = function() {};
+  _assign(
+    ReactClassComponent.prototype,
+    ReactComponent.prototype,
+    ReactClassMixin
+  );
+
+  /**
+   * Creates a composite component class given a class specification.
+   * See https://facebook.github.io/react/docs/top-level-api.html#react.createclass
+   *
+   * @param {object} spec Class specification (which must define `render`).
+   * @return {function} Component constructor function.
+   * @public
+   */
+  function createClass(spec) {
+    // To keep our warnings more understandable, we'll use a little hack here to
+    // ensure that Constructor.name !== 'Constructor'. This makes sure we don't
+    // unnecessarily identify a class without displayName as 'Constructor'.
+    var Constructor = identity(function(props, context, updater) {
+      // This constructor gets overridden by mocks. The argument is used
+      // by mocks to assert on what gets mounted.
+
+      if (process.env.NODE_ENV !== 'production') {
+        warning(
+          this instanceof Constructor,
+          'Something is calling a React component directly. Use a factory or ' +
+            'JSX instead. See: https://fb.me/react-legacyfactory'
+        );
+      }
+
+      // Wire up auto-binding
+      if (this.__reactAutoBindPairs.length) {
+        bindAutoBindMethods(this);
+      }
+
+      this.props = props;
+      this.context = context;
+      this.refs = emptyObject;
+      this.updater = updater || ReactNoopUpdateQueue;
+
+      this.state = null;
+
+      // ReactClasses doesn't have constructors. Instead, they use the
+      // getInitialState and componentWillMount methods for initialization.
+
+      var initialState = this.getInitialState ? this.getInitialState() : null;
+      if (process.env.NODE_ENV !== 'production') {
+        // We allow auto-mocks to proceed as if they're returning null.
+        if (
+          initialState === undefined &&
+          this.getInitialState._isMockFunction
+        ) {
+          // This is probably bad practice. Consider warning here and
+          // deprecating this convenience.
+          initialState = null;
+        }
+      }
+      _invariant(
+        typeof initialState === 'object' && !Array.isArray(initialState),
+        '%s.getInitialState(): must return an object or null',
+        Constructor.displayName || 'ReactCompositeComponent'
+      );
+
+      this.state = initialState;
+    });
+    Constructor.prototype = new ReactClassComponent();
+    Constructor.prototype.constructor = Constructor;
+    Constructor.prototype.__reactAutoBindPairs = [];
+
+    injectedMixins.forEach(mixSpecIntoComponent.bind(null, Constructor));
+
+    mixSpecIntoComponent(Constructor, IsMountedPreMixin);
+    mixSpecIntoComponent(Constructor, spec);
+    mixSpecIntoComponent(Constructor, IsMountedPostMixin);
+
+    // Initialize the defaultProps property after all mixins have been merged.
+    if (Constructor.getDefaultProps) {
+      Constructor.defaultProps = Constructor.getDefaultProps();
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      // This is a tag to indicate that the use of these method names is ok,
+      // since it's used with createClass. If it's not, then it's likely a
+      // mistake so we'll warn you to use the static property, property
+      // initializer or constructor respectively.
+      if (Constructor.getDefaultProps) {
+        Constructor.getDefaultProps.isReactClassApproved = {};
+      }
+      if (Constructor.prototype.getInitialState) {
+        Constructor.prototype.getInitialState.isReactClassApproved = {};
+      }
+    }
+
+    _invariant(
+      Constructor.prototype.render,
+      'createClass(...): Class specification must implement a `render` method.'
+    );
+
+    if (process.env.NODE_ENV !== 'production') {
+      warning(
+        !Constructor.prototype.componentShouldUpdate,
+        '%s has a method called ' +
+          'componentShouldUpdate(). Did you mean shouldComponentUpdate()? ' +
+          'The name is phrased as a question because the function is ' +
+          'expected to return a value.',
+        spec.displayName || 'A component'
+      );
+      warning(
+        !Constructor.prototype.componentWillRecieveProps,
+        '%s has a method called ' +
+          'componentWillRecieveProps(). Did you mean componentWillReceiveProps()?',
+        spec.displayName || 'A component'
+      );
+      warning(
+        !Constructor.prototype.UNSAFE_componentWillRecieveProps,
+        '%s has a method called UNSAFE_componentWillRecieveProps(). ' +
+          'Did you mean UNSAFE_componentWillReceiveProps()?',
+        spec.displayName || 'A component'
+      );
+    }
+
+    // Reduce time spent doing lookups by setting these on the prototype.
+    for (var methodName in ReactClassInterface) {
+      if (!Constructor.prototype[methodName]) {
+        Constructor.prototype[methodName] = null;
+      }
+    }
+
+    return Constructor;
+  }
+
+  return createClass;
+}
+
+module.exports = factory;
+
+}).call(this,require('_process'))
+},{"_process":26,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25}],2:[function(require,module,exports){
+(function (process){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+var emptyFunction = require('./emptyFunction');
+
+/**
+ * Upstream version of event listener. Does not take into account specific
+ * nature of platform.
+ */
+var EventListener = {
+  /**
+   * Listen to DOM events during the bubble phase.
+   *
+   * @param {DOMEventTarget} target DOM element to register listener on.
+   * @param {string} eventType Event type, e.g. 'click' or 'mouseover'.
+   * @param {function} callback Callback function.
+   * @return {object} Object with a `remove` method.
+   */
+  listen: function listen(target, eventType, callback) {
+    if (target.addEventListener) {
+      target.addEventListener(eventType, callback, false);
+      return {
+        remove: function remove() {
+          target.removeEventListener(eventType, callback, false);
+        }
+      };
+    } else if (target.attachEvent) {
+      target.attachEvent('on' + eventType, callback);
+      return {
+        remove: function remove() {
+          target.detachEvent('on' + eventType, callback);
+        }
+      };
+    }
+  },
+
+  /**
+   * Listen to DOM events during the capture phase.
+   *
+   * @param {DOMEventTarget} target DOM element to register listener on.
+   * @param {string} eventType Event type, e.g. 'click' or 'mouseover'.
+   * @param {function} callback Callback function.
+   * @return {object} Object with a `remove` method.
+   */
+  capture: function capture(target, eventType, callback) {
+    if (target.addEventListener) {
+      target.addEventListener(eventType, callback, true);
+      return {
+        remove: function remove() {
+          target.removeEventListener(eventType, callback, true);
+        }
+      };
+    } else {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Attempted to listen to events during the capture phase on a ' + 'browser that does not support the capture phase. Your application ' + 'will not receive some events.');
+      }
+      return {
+        remove: emptyFunction
+      };
+    }
+  },
+
+  registerDefault: function registerDefault() {}
+};
+
+module.exports = EventListener;
+}).call(this,require('_process'))
+},{"./emptyFunction":9,"_process":26}],3:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+var canUseDOM = !!(typeof window !== 'undefined' && window.document && window.document.createElement);
+
+/**
+ * Simple, lightweight module assisting with the detection and context of
+ * Worker. Helps avoid circular dependencies and allows code to reason about
+ * whether or not they are in a Worker, even if they never include the main
+ * `ReactWorker` dependency.
+ */
+var ExecutionEnvironment = {
+
+  canUseDOM: canUseDOM,
+
+  canUseWorkers: typeof Worker !== 'undefined',
+
+  canUseEventListeners: canUseDOM && !!(window.addEventListener || window.attachEvent),
+
+  canUseViewport: canUseDOM && !!window.screen,
+
+  isInWorker: !canUseDOM // For now, this is true - might change in the future.
+
+};
+
+module.exports = ExecutionEnvironment;
+},{}],4:[function(require,module,exports){
+"use strict";
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+var _hyphenPattern = /-(.)/g;
+
+/**
+ * Camelcases a hyphenated string, for example:
+ *
+ *   > camelize('background-color')
+ *   < "backgroundColor"
+ *
+ * @param {string} string
+ * @return {string}
+ */
+function camelize(string) {
+  return string.replace(_hyphenPattern, function (_, character) {
+    return character.toUpperCase();
+  });
+}
+
+module.exports = camelize;
+},{}],5:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+'use strict';
+
+var camelize = require('./camelize');
+
+var msPattern = /^-ms-/;
+
+/**
+ * Camelcases a hyphenated CSS property name, for example:
+ *
+ *   > camelizeStyleName('background-color')
+ *   < "backgroundColor"
+ *   > camelizeStyleName('-moz-transition')
+ *   < "MozTransition"
+ *   > camelizeStyleName('-ms-transition')
+ *   < "msTransition"
+ *
+ * As Andi Smith suggests
+ * (http://www.andismith.com/blog/2012/02/modernizr-prefixed/), an `-ms` prefix
+ * is converted to lowercase `ms`.
+ *
+ * @param {string} string
+ * @return {string}
+ */
+function camelizeStyleName(string) {
+  return camelize(string.replace(msPattern, 'ms-'));
+}
+
+module.exports = camelizeStyleName;
+},{"./camelize":4}],6:[function(require,module,exports){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * 
+ */
+
+var isTextNode = require('./isTextNode');
+
+/*eslint-disable no-bitwise */
+
+/**
+ * Checks if a given DOM node contains or is another DOM node.
+ */
+function containsNode(outerNode, innerNode) {
+  if (!outerNode || !innerNode) {
+    return false;
+  } else if (outerNode === innerNode) {
+    return true;
+  } else if (isTextNode(outerNode)) {
+    return false;
+  } else if (isTextNode(innerNode)) {
+    return containsNode(outerNode, innerNode.parentNode);
+  } else if ('contains' in outerNode) {
+    return outerNode.contains(innerNode);
+  } else if (outerNode.compareDocumentPosition) {
+    return !!(outerNode.compareDocumentPosition(innerNode) & 16);
+  } else {
+    return false;
+  }
+}
+
+module.exports = containsNode;
+},{"./isTextNode":19}],7:[function(require,module,exports){
+(function (process){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+var invariant = require('./invariant');
+
+/**
+ * Convert array-like objects to arrays.
+ *
+ * This API assumes the caller knows the contents of the data type. For less
+ * well defined inputs use createArrayFromMixed.
+ *
+ * @param {object|function|filelist} obj
+ * @return {array}
+ */
+function toArray(obj) {
+  var length = obj.length;
+
+  // Some browsers builtin objects can report typeof 'function' (e.g. NodeList
+  // in old versions of Safari).
+  !(!Array.isArray(obj) && (typeof obj === 'object' || typeof obj === 'function')) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Array-like object expected') : invariant(false) : void 0;
+
+  !(typeof length === 'number') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Object needs a length property') : invariant(false) : void 0;
+
+  !(length === 0 || length - 1 in obj) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Object should have keys for indices') : invariant(false) : void 0;
+
+  !(typeof obj.callee !== 'function') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Object can\'t be `arguments`. Use rest params ' + '(function(...args) {}) or Array.from() instead.') : invariant(false) : void 0;
+
+  // Old IE doesn't give collections access to hasOwnProperty. Assume inputs
+  // without method will throw during the slice call and skip straight to the
+  // fallback.
+  if (obj.hasOwnProperty) {
+    try {
+      return Array.prototype.slice.call(obj);
+    } catch (e) {
+      // IE < 9 does not support Array#slice on collections objects
+    }
+  }
+
+  // Fall back to copying key by key. This assumes all keys have a value,
+  // so will not preserve sparsely populated inputs.
+  var ret = Array(length);
+  for (var ii = 0; ii < length; ii++) {
+    ret[ii] = obj[ii];
+  }
+  return ret;
+}
+
+/**
+ * Perform a heuristic test to determine if an object is "array-like".
+ *
+ *   A monk asked Joshu, a Zen master, "Has a dog Buddha nature?"
+ *   Joshu replied: "Mu."
+ *
+ * This function determines if its argument has "array nature": it returns
+ * true if the argument is an actual array, an `arguments' object, or an
+ * HTMLCollection (e.g. node.childNodes or node.getElementsByTagName()).
+ *
+ * It will return false for other array-like objects like Filelist.
+ *
+ * @param {*} obj
+ * @return {boolean}
+ */
+function hasArrayNature(obj) {
+  return (
+    // not null/false
+    !!obj && (
+    // arrays are objects, NodeLists are functions in Safari
+    typeof obj == 'object' || typeof obj == 'function') &&
+    // quacks like an array
+    'length' in obj &&
+    // not window
+    !('setInterval' in obj) &&
+    // no DOM node should be considered an array-like
+    // a 'select' element has 'length' and 'item' properties on IE8
+    typeof obj.nodeType != 'number' && (
+    // a real array
+    Array.isArray(obj) ||
+    // arguments
+    'callee' in obj ||
+    // HTMLCollection/NodeList
+    'item' in obj)
+  );
+}
+
+/**
+ * Ensure that the argument is an array by wrapping it in an array if it is not.
+ * Creates a copy of the argument if it is already an array.
+ *
+ * This is mostly useful idiomatically:
+ *
+ *   var createArrayFromMixed = require('createArrayFromMixed');
+ *
+ *   function takesOneOrMoreThings(things) {
+ *     things = createArrayFromMixed(things);
+ *     ...
+ *   }
+ *
+ * This allows you to treat `things' as an array, but accept scalars in the API.
+ *
+ * If you need to convert an array-like object, like `arguments`, into an array
+ * use toArray instead.
+ *
+ * @param {*} obj
+ * @return {array}
+ */
+function createArrayFromMixed(obj) {
+  if (!hasArrayNature(obj)) {
+    return [obj];
+  } else if (Array.isArray(obj)) {
+    return obj.slice();
+  } else {
+    return toArray(obj);
+  }
+}
+
+module.exports = createArrayFromMixed;
+}).call(this,require('_process'))
+},{"./invariant":17,"_process":26}],8:[function(require,module,exports){
+(function (process){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+/*eslint-disable fb-www/unsafe-html*/
+
+var ExecutionEnvironment = require('./ExecutionEnvironment');
+
+var createArrayFromMixed = require('./createArrayFromMixed');
+var getMarkupWrap = require('./getMarkupWrap');
+var invariant = require('./invariant');
+
+/**
+ * Dummy container used to render all markup.
+ */
+var dummyNode = ExecutionEnvironment.canUseDOM ? document.createElement('div') : null;
+
+/**
+ * Pattern used by `getNodeName`.
+ */
+var nodeNamePattern = /^\s*<(\w+)/;
+
+/**
+ * Extracts the `nodeName` of the first element in a string of markup.
+ *
+ * @param {string} markup String of markup.
+ * @return {?string} Node name of the supplied markup.
+ */
+function getNodeName(markup) {
+  var nodeNameMatch = markup.match(nodeNamePattern);
+  return nodeNameMatch && nodeNameMatch[1].toLowerCase();
+}
+
+/**
+ * Creates an array containing the nodes rendered from the supplied markup. The
+ * optionally supplied `handleScript` function will be invoked once for each
+ * <script> element that is rendered. If no `handleScript` function is supplied,
+ * an exception is thrown if any <script> elements are rendered.
+ *
+ * @param {string} markup A string of valid HTML markup.
+ * @param {?function} handleScript Invoked once for each rendered <script>.
+ * @return {array<DOMElement|DOMTextNode>} An array of rendered nodes.
+ */
+function createNodesFromMarkup(markup, handleScript) {
+  var node = dummyNode;
+  !!!dummyNode ? process.env.NODE_ENV !== 'production' ? invariant(false, 'createNodesFromMarkup dummy not initialized') : invariant(false) : void 0;
+  var nodeName = getNodeName(markup);
+
+  var wrap = nodeName && getMarkupWrap(nodeName);
+  if (wrap) {
+    node.innerHTML = wrap[1] + markup + wrap[2];
+
+    var wrapDepth = wrap[0];
+    while (wrapDepth--) {
+      node = node.lastChild;
+    }
+  } else {
+    node.innerHTML = markup;
+  }
+
+  var scripts = node.getElementsByTagName('script');
+  if (scripts.length) {
+    !handleScript ? process.env.NODE_ENV !== 'production' ? invariant(false, 'createNodesFromMarkup(...): Unexpected <script> element rendered.') : invariant(false) : void 0;
+    createArrayFromMixed(scripts).forEach(handleScript);
+  }
+
+  var nodes = Array.from(node.childNodes);
+  while (node.lastChild) {
+    node.removeChild(node.lastChild);
+  }
+  return nodes;
+}
+
+module.exports = createNodesFromMarkup;
+}).call(this,require('_process'))
+},{"./ExecutionEnvironment":3,"./createArrayFromMixed":7,"./getMarkupWrap":13,"./invariant":17,"_process":26}],9:[function(require,module,exports){
+"use strict";
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * 
+ */
+
+function makeEmptyFunction(arg) {
+  return function () {
+    return arg;
+  };
+}
+
+/**
+ * This function accepts and discards inputs; it has no side effects. This is
+ * primarily useful idiomatically for overridable function endpoints which
+ * always need to be callable, since JS lacks a null-call idiom ala Cocoa.
+ */
+var emptyFunction = function emptyFunction() {};
+
+emptyFunction.thatReturns = makeEmptyFunction;
+emptyFunction.thatReturnsFalse = makeEmptyFunction(false);
+emptyFunction.thatReturnsTrue = makeEmptyFunction(true);
+emptyFunction.thatReturnsNull = makeEmptyFunction(null);
+emptyFunction.thatReturnsThis = function () {
+  return this;
+};
+emptyFunction.thatReturnsArgument = function (arg) {
+  return arg;
+};
+
+module.exports = emptyFunction;
+},{}],10:[function(require,module,exports){
+(function (process){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+var emptyObject = {};
+
+if (process.env.NODE_ENV !== 'production') {
+  Object.freeze(emptyObject);
+}
+
+module.exports = emptyObject;
+}).call(this,require('_process'))
+},{"_process":26}],11:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+/**
+ * @param {DOMElement} node input/textarea to focus
+ */
+
+function focusNode(node) {
+  // IE8 can throw "Can't move focus to the control because it is invisible,
+  // not enabled, or of a type that does not accept the focus." for all kinds of
+  // reasons that are too expensive and fragile to test.
+  try {
+    node.focus();
+  } catch (e) {}
+}
+
+module.exports = focusNode;
+},{}],12:[function(require,module,exports){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+/* eslint-disable fb-www/typeof-undefined */
+
+/**
+ * Same as document.activeElement but wraps in a try-catch block. In IE it is
+ * not safe to call document.activeElement if there is nothing focused.
+ *
+ * The activeElement will be null only if the document or document body is not
+ * yet defined.
+ *
+ * @param {?DOMDocument} doc Defaults to current document.
+ * @return {?DOMElement}
+ */
+function getActiveElement(doc) /*?DOMElement*/{
+  doc = doc || (typeof document !== 'undefined' ? document : undefined);
+  if (typeof doc === 'undefined') {
+    return null;
+  }
+  try {
+    return doc.activeElement || doc.body;
+  } catch (e) {
+    return doc.body;
+  }
+}
+
+module.exports = getActiveElement;
+},{}],13:[function(require,module,exports){
+(function (process){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+/*eslint-disable fb-www/unsafe-html */
+
+var ExecutionEnvironment = require('./ExecutionEnvironment');
+
+var invariant = require('./invariant');
+
+/**
+ * Dummy container used to detect which wraps are necessary.
+ */
+var dummyNode = ExecutionEnvironment.canUseDOM ? document.createElement('div') : null;
+
+/**
+ * Some browsers cannot use `innerHTML` to render certain elements standalone,
+ * so we wrap them, render the wrapped nodes, then extract the desired node.
+ *
+ * In IE8, certain elements cannot render alone, so wrap all elements ('*').
+ */
+
+var shouldWrap = {};
+
+var selectWrap = [1, '<select multiple="true">', '</select>'];
+var tableWrap = [1, '<table>', '</table>'];
+var trWrap = [3, '<table><tbody><tr>', '</tr></tbody></table>'];
+
+var svgWrap = [1, '<svg xmlns="http://www.w3.org/2000/svg">', '</svg>'];
+
+var markupWrap = {
+  '*': [1, '?<div>', '</div>'],
+
+  'area': [1, '<map>', '</map>'],
+  'col': [2, '<table><tbody></tbody><colgroup>', '</colgroup></table>'],
+  'legend': [1, '<fieldset>', '</fieldset>'],
+  'param': [1, '<object>', '</object>'],
+  'tr': [2, '<table><tbody>', '</tbody></table>'],
+
+  'optgroup': selectWrap,
+  'option': selectWrap,
+
+  'caption': tableWrap,
+  'colgroup': tableWrap,
+  'tbody': tableWrap,
+  'tfoot': tableWrap,
+  'thead': tableWrap,
+
+  'td': trWrap,
+  'th': trWrap
+};
+
+// Initialize the SVG elements since we know they'll always need to be wrapped
+// consistently. If they are created inside a <div> they will be initialized in
+// the wrong namespace (and will not display).
+var svgElements = ['circle', 'clipPath', 'defs', 'ellipse', 'g', 'image', 'line', 'linearGradient', 'mask', 'path', 'pattern', 'polygon', 'polyline', 'radialGradient', 'rect', 'stop', 'text', 'tspan'];
+svgElements.forEach(function (nodeName) {
+  markupWrap[nodeName] = svgWrap;
+  shouldWrap[nodeName] = true;
+});
+
+/**
+ * Gets the markup wrap configuration for the supplied `nodeName`.
+ *
+ * NOTE: This lazily detects which wraps are necessary for the current browser.
+ *
+ * @param {string} nodeName Lowercase `nodeName`.
+ * @return {?array} Markup wrap configuration, if applicable.
+ */
+function getMarkupWrap(nodeName) {
+  !!!dummyNode ? process.env.NODE_ENV !== 'production' ? invariant(false, 'Markup wrapping node not initialized') : invariant(false) : void 0;
+  if (!markupWrap.hasOwnProperty(nodeName)) {
+    nodeName = '*';
+  }
+  if (!shouldWrap.hasOwnProperty(nodeName)) {
+    if (nodeName === '*') {
+      dummyNode.innerHTML = '<link />';
+    } else {
+      dummyNode.innerHTML = '<' + nodeName + '></' + nodeName + '>';
+    }
+    shouldWrap[nodeName] = !dummyNode.firstChild;
+  }
+  return shouldWrap[nodeName] ? markupWrap[nodeName] : null;
+}
+
+module.exports = getMarkupWrap;
+}).call(this,require('_process'))
+},{"./ExecutionEnvironment":3,"./invariant":17,"_process":26}],14:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+'use strict';
+
+/**
+ * Gets the scroll position of the supplied element or window.
+ *
+ * The return values are unbounded, unlike `getScrollPosition`. This means they
+ * may be negative or exceed the element boundaries (which is possible using
+ * inertial scrolling).
+ *
+ * @param {DOMWindow|DOMElement} scrollable
+ * @return {object} Map with `x` and `y` keys.
+ */
+
+function getUnboundedScrollPosition(scrollable) {
+  if (scrollable.Window && scrollable instanceof scrollable.Window) {
+    return {
+      x: scrollable.pageXOffset || scrollable.document.documentElement.scrollLeft,
+      y: scrollable.pageYOffset || scrollable.document.documentElement.scrollTop
+    };
+  }
+  return {
+    x: scrollable.scrollLeft,
+    y: scrollable.scrollTop
+  };
+}
+
+module.exports = getUnboundedScrollPosition;
+},{}],15:[function(require,module,exports){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+var _uppercasePattern = /([A-Z])/g;
+
+/**
+ * Hyphenates a camelcased string, for example:
+ *
+ *   > hyphenate('backgroundColor')
+ *   < "background-color"
+ *
+ * For CSS style names, use `hyphenateStyleName` instead which works properly
+ * with all vendor prefixes, including `ms`.
+ *
+ * @param {string} string
+ * @return {string}
+ */
+function hyphenate(string) {
+  return string.replace(_uppercasePattern, '-$1').toLowerCase();
+}
+
+module.exports = hyphenate;
+},{}],16:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+'use strict';
+
+var hyphenate = require('./hyphenate');
+
+var msPattern = /^ms-/;
+
+/**
+ * Hyphenates a camelcased CSS property name, for example:
+ *
+ *   > hyphenateStyleName('backgroundColor')
+ *   < "background-color"
+ *   > hyphenateStyleName('MozTransition')
+ *   < "-moz-transition"
+ *   > hyphenateStyleName('msTransition')
+ *   < "-ms-transition"
+ *
+ * As Modernizr suggests (http://modernizr.com/docs/#prefixed), an `ms` prefix
+ * is converted to `-ms-`.
+ *
+ * @param {string} string
+ * @return {string}
+ */
+function hyphenateStyleName(string) {
+  return hyphenate(string).replace(msPattern, '-ms-');
+}
+
+module.exports = hyphenateStyleName;
+},{"./hyphenate":15}],17:[function(require,module,exports){
+(function (process){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+/**
+ * Use invariant() to assert state which your program assumes to be true.
+ *
+ * Provide sprintf-style format (only %s is supported) and arguments
+ * to provide information about what broke and what you were
+ * expecting.
+ *
+ * The invariant message will be stripped in production, but the invariant
+ * will remain to ensure logic does not differ in production.
+ */
+
+var validateFormat = function validateFormat(format) {};
+
+if (process.env.NODE_ENV !== 'production') {
+  validateFormat = function validateFormat(format) {
+    if (format === undefined) {
+      throw new Error('invariant requires an error message argument');
+    }
+  };
+}
+
+function invariant(condition, format, a, b, c, d, e, f) {
+  validateFormat(format);
+
+  if (!condition) {
+    var error;
+    if (format === undefined) {
+      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
+    } else {
+      var args = [a, b, c, d, e, f];
+      var argIndex = 0;
+      error = new Error(format.replace(/%s/g, function () {
+        return args[argIndex++];
+      }));
+      error.name = 'Invariant Violation';
+    }
+
+    error.framesToPop = 1; // we don't care about invariant's own frame
+    throw error;
+  }
+}
+
+module.exports = invariant;
+}).call(this,require('_process'))
+},{"_process":26}],18:[function(require,module,exports){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+/**
+ * @param {*} object The object to check.
+ * @return {boolean} Whether or not the object is a DOM node.
+ */
+function isNode(object) {
+  var doc = object ? object.ownerDocument || object : document;
+  var defaultView = doc.defaultView || window;
+  return !!(object && (typeof defaultView.Node === 'function' ? object instanceof defaultView.Node : typeof object === 'object' && typeof object.nodeType === 'number' && typeof object.nodeName === 'string'));
+}
+
+module.exports = isNode;
+},{}],19:[function(require,module,exports){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+var isNode = require('./isNode');
+
+/**
+ * @param {*} object The object to check.
+ * @return {boolean} Whether or not the object is a DOM text node.
+ */
+function isTextNode(object) {
+  return isNode(object) && object.nodeType == 3;
+}
+
+module.exports = isTextNode;
+},{"./isNode":18}],20:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * 
+ * @typechecks static-only
+ */
+
+'use strict';
+
+/**
+ * Memoizes the return value of a function that accepts one string argument.
+ */
+
+function memoizeStringOnly(callback) {
+  var cache = {};
+  return function (string) {
+    if (!cache.hasOwnProperty(string)) {
+      cache[string] = callback.call(this, string);
+    }
+    return cache[string];
+  };
+}
+
+module.exports = memoizeStringOnly;
+},{}],21:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+'use strict';
+
+var ExecutionEnvironment = require('./ExecutionEnvironment');
+
+var performance;
+
+if (ExecutionEnvironment.canUseDOM) {
+  performance = window.performance || window.msPerformance || window.webkitPerformance;
+}
+
+module.exports = performance || {};
+},{"./ExecutionEnvironment":3}],22:[function(require,module,exports){
+'use strict';
+
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ */
+
+var performance = require('./performance');
+
+var performanceNow;
+
+/**
+ * Detect if we can use `window.performance.now()` and gracefully fallback to
+ * `Date.now()` if it doesn't exist. We need to support Firefox < 15 for now
+ * because of Facebook's testing infrastructure.
+ */
+if (performance.now) {
+  performanceNow = function performanceNow() {
+    return performance.now();
+  };
+} else {
+  performanceNow = function performanceNow() {
+    return Date.now();
+  };
+}
+
+module.exports = performanceNow;
+},{"./performance":21}],23:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @typechecks
+ * 
+ */
+
+/*eslint-disable no-self-compare */
+
+'use strict';
+
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+
+/**
+ * inlined Object.is polyfill to avoid requiring consumers ship their own
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
+ */
+function is(x, y) {
+  // SameValue algorithm
+  if (x === y) {
+    // Steps 1-5, 7-10
+    // Steps 6.b-6.e: +0 != -0
+    // Added the nonzero y check to make Flow happy, but it is redundant
+    return x !== 0 || y !== 0 || 1 / x === 1 / y;
+  } else {
+    // Step 6.a: NaN == NaN
+    return x !== x && y !== y;
+  }
+}
+
+/**
+ * Performs equality by iterating through keys on an object and returning false
+ * when any key has values which are not strictly equal between the arguments.
+ * Returns true when the values of all keys are strictly equal.
+ */
+function shallowEqual(objA, objB) {
+  if (is(objA, objB)) {
+    return true;
+  }
+
+  if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
+    return false;
+  }
+
+  var keysA = Object.keys(objA);
+  var keysB = Object.keys(objB);
+
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+
+  // Test for A's keys different from B.
+  for (var i = 0; i < keysA.length; i++) {
+    if (!hasOwnProperty.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+module.exports = shallowEqual;
+},{}],24:[function(require,module,exports){
+(function (process){
+/**
+ * Copyright (c) 2014-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+var emptyFunction = require('./emptyFunction');
+
+/**
+ * Similar to invariant but only logs a warning if the condition is not met.
+ * This can be used to log issues in development environments in critical
+ * paths. Removing the logging code for production environments will keep the
+ * same logic and follow the same code paths.
+ */
+
+var warning = emptyFunction;
+
+if (process.env.NODE_ENV !== 'production') {
+  var printWarning = function printWarning(format) {
+    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+      args[_key - 1] = arguments[_key];
+    }
+
+    var argIndex = 0;
+    var message = 'Warning: ' + format.replace(/%s/g, function () {
+      return args[argIndex++];
+    });
+    if (typeof console !== 'undefined') {
+      console.error(message);
+    }
+    try {
+      // --- Welcome to debugging React ---
+      // This error was thrown as a convenience so that you can use this stack
+      // to find the callsite that caused this warning to fire.
+      throw new Error(message);
+    } catch (x) {}
+  };
+
+  warning = function warning(condition, format) {
+    if (format === undefined) {
+      throw new Error('`warning(condition, format, ...args)` requires a warning ' + 'message argument');
+    }
+
+    if (format.indexOf('Failed Composite propType: ') === 0) {
+      return; // Ignore CompositeComponent proptype check.
+    }
+
+    if (!condition) {
+      for (var _len2 = arguments.length, args = Array(_len2 > 2 ? _len2 - 2 : 0), _key2 = 2; _key2 < _len2; _key2++) {
+        args[_key2 - 2] = arguments[_key2];
+      }
+
+      printWarning.apply(undefined, [format].concat(args));
+    }
+  };
+}
+
+module.exports = warning;
+}).call(this,require('_process'))
+},{"./emptyFunction":9,"_process":26}],25:[function(require,module,exports){
+/*
+object-assign
+(c) Sindre Sorhus
+@license MIT
+*/
+
+'use strict';
+/* eslint-disable no-unused-vars */
+var getOwnPropertySymbols = Object.getOwnPropertySymbols;
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+var propIsEnumerable = Object.prototype.propertyIsEnumerable;
+
+function toObject(val) {
+	if (val === null || val === undefined) {
+		throw new TypeError('Object.assign cannot be called with null or undefined');
+	}
+
+	return Object(val);
+}
+
+function shouldUseNative() {
+	try {
+		if (!Object.assign) {
+			return false;
+		}
+
+		// Detect buggy property enumeration order in older V8 versions.
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
+		var test1 = new String('abc');  // eslint-disable-line no-new-wrappers
+		test1[5] = 'de';
+		if (Object.getOwnPropertyNames(test1)[0] === '5') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test2 = {};
+		for (var i = 0; i < 10; i++) {
+			test2['_' + String.fromCharCode(i)] = i;
+		}
+		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
+			return test2[n];
+		});
+		if (order2.join('') !== '0123456789') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test3 = {};
+		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
+			test3[letter] = letter;
+		});
+		if (Object.keys(Object.assign({}, test3)).join('') !==
+				'abcdefghijklmnopqrst') {
+			return false;
+		}
+
+		return true;
+	} catch (err) {
+		// We don't expect any of the above to throw, but better to be safe.
+		return false;
+	}
+}
+
+module.exports = shouldUseNative() ? Object.assign : function (target, source) {
+	var from;
+	var to = toObject(target);
+	var symbols;
+
+	for (var s = 1; s < arguments.length; s++) {
+		from = Object(arguments[s]);
+
+		for (var key in from) {
+			if (hasOwnProperty.call(from, key)) {
+				to[key] = from[key];
+			}
+		}
+
+		if (getOwnPropertySymbols) {
+			symbols = getOwnPropertySymbols(from);
+			for (var i = 0; i < symbols.length; i++) {
+				if (propIsEnumerable.call(from, symbols[i])) {
+					to[symbols[i]] = from[symbols[i]];
+				}
+			}
+		}
+	}
+
+	return to;
+};
+
+},{}],26:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -184,1232 +2267,35 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],2:[function(require,module,exports){
-(function (process){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * @typechecks
- */
-
-var emptyFunction = require('./emptyFunction');
-
-/**
- * Upstream version of event listener. Does not take into account specific
- * nature of platform.
- */
-var EventListener = {
-  /**
-   * Listen to DOM events during the bubble phase.
-   *
-   * @param {DOMEventTarget} target DOM element to register listener on.
-   * @param {string} eventType Event type, e.g. 'click' or 'mouseover'.
-   * @param {function} callback Callback function.
-   * @return {object} Object with a `remove` method.
-   */
-  listen: function listen(target, eventType, callback) {
-    if (target.addEventListener) {
-      target.addEventListener(eventType, callback, false);
-      return {
-        remove: function remove() {
-          target.removeEventListener(eventType, callback, false);
-        }
-      };
-    } else if (target.attachEvent) {
-      target.attachEvent('on' + eventType, callback);
-      return {
-        remove: function remove() {
-          target.detachEvent('on' + eventType, callback);
-        }
-      };
-    }
-  },
-
-  /**
-   * Listen to DOM events during the capture phase.
-   *
-   * @param {DOMEventTarget} target DOM element to register listener on.
-   * @param {string} eventType Event type, e.g. 'click' or 'mouseover'.
-   * @param {function} callback Callback function.
-   * @return {object} Object with a `remove` method.
-   */
-  capture: function capture(target, eventType, callback) {
-    if (target.addEventListener) {
-      target.addEventListener(eventType, callback, true);
-      return {
-        remove: function remove() {
-          target.removeEventListener(eventType, callback, true);
-        }
-      };
-    } else {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Attempted to listen to events during the capture phase on a ' + 'browser that does not support the capture phase. Your application ' + 'will not receive some events.');
-      }
-      return {
-        remove: emptyFunction
-      };
-    }
-  },
-
-  registerDefault: function registerDefault() {}
-};
-
-module.exports = EventListener;
-}).call(this,require('_process'))
-},{"./emptyFunction":9,"_process":1}],3:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-var canUseDOM = !!(typeof window !== 'undefined' && window.document && window.document.createElement);
-
-/**
- * Simple, lightweight module assisting with the detection and context of
- * Worker. Helps avoid circular dependencies and allows code to reason about
- * whether or not they are in a Worker, even if they never include the main
- * `ReactWorker` dependency.
- */
-var ExecutionEnvironment = {
-
-  canUseDOM: canUseDOM,
-
-  canUseWorkers: typeof Worker !== 'undefined',
-
-  canUseEventListeners: canUseDOM && !!(window.addEventListener || window.attachEvent),
-
-  canUseViewport: canUseDOM && !!window.screen,
-
-  isInWorker: !canUseDOM // For now, this is true - might change in the future.
-
-};
-
-module.exports = ExecutionEnvironment;
-},{}],4:[function(require,module,exports){
-"use strict";
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-var _hyphenPattern = /-(.)/g;
-
-/**
- * Camelcases a hyphenated string, for example:
- *
- *   > camelize('background-color')
- *   < "backgroundColor"
- *
- * @param {string} string
- * @return {string}
- */
-function camelize(string) {
-  return string.replace(_hyphenPattern, function (_, character) {
-    return character.toUpperCase();
-  });
-}
-
-module.exports = camelize;
-},{}],5:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-'use strict';
-
-var camelize = require('./camelize');
-
-var msPattern = /^-ms-/;
-
-/**
- * Camelcases a hyphenated CSS property name, for example:
- *
- *   > camelizeStyleName('background-color')
- *   < "backgroundColor"
- *   > camelizeStyleName('-moz-transition')
- *   < "MozTransition"
- *   > camelizeStyleName('-ms-transition')
- *   < "msTransition"
- *
- * As Andi Smith suggests
- * (http://www.andismith.com/blog/2012/02/modernizr-prefixed/), an `-ms` prefix
- * is converted to lowercase `ms`.
- *
- * @param {string} string
- * @return {string}
- */
-function camelizeStyleName(string) {
-  return camelize(string.replace(msPattern, 'ms-'));
-}
-
-module.exports = camelizeStyleName;
-},{"./camelize":4}],6:[function(require,module,exports){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * 
- */
-
-var isTextNode = require('./isTextNode');
-
-/*eslint-disable no-bitwise */
-
-/**
- * Checks if a given DOM node contains or is another DOM node.
- */
-function containsNode(outerNode, innerNode) {
-  if (!outerNode || !innerNode) {
-    return false;
-  } else if (outerNode === innerNode) {
-    return true;
-  } else if (isTextNode(outerNode)) {
-    return false;
-  } else if (isTextNode(innerNode)) {
-    return containsNode(outerNode, innerNode.parentNode);
-  } else if ('contains' in outerNode) {
-    return outerNode.contains(innerNode);
-  } else if (outerNode.compareDocumentPosition) {
-    return !!(outerNode.compareDocumentPosition(innerNode) & 16);
-  } else {
-    return false;
-  }
-}
-
-module.exports = containsNode;
-},{"./isTextNode":19}],7:[function(require,module,exports){
-(function (process){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-var invariant = require('./invariant');
-
-/**
- * Convert array-like objects to arrays.
- *
- * This API assumes the caller knows the contents of the data type. For less
- * well defined inputs use createArrayFromMixed.
- *
- * @param {object|function|filelist} obj
- * @return {array}
- */
-function toArray(obj) {
-  var length = obj.length;
-
-  // Some browsers builtin objects can report typeof 'function' (e.g. NodeList
-  // in old versions of Safari).
-  !(!Array.isArray(obj) && (typeof obj === 'object' || typeof obj === 'function')) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Array-like object expected') : invariant(false) : void 0;
-
-  !(typeof length === 'number') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Object needs a length property') : invariant(false) : void 0;
-
-  !(length === 0 || length - 1 in obj) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Object should have keys for indices') : invariant(false) : void 0;
-
-  !(typeof obj.callee !== 'function') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'toArray: Object can\'t be `arguments`. Use rest params ' + '(function(...args) {}) or Array.from() instead.') : invariant(false) : void 0;
-
-  // Old IE doesn't give collections access to hasOwnProperty. Assume inputs
-  // without method will throw during the slice call and skip straight to the
-  // fallback.
-  if (obj.hasOwnProperty) {
-    try {
-      return Array.prototype.slice.call(obj);
-    } catch (e) {
-      // IE < 9 does not support Array#slice on collections objects
-    }
-  }
-
-  // Fall back to copying key by key. This assumes all keys have a value,
-  // so will not preserve sparsely populated inputs.
-  var ret = Array(length);
-  for (var ii = 0; ii < length; ii++) {
-    ret[ii] = obj[ii];
-  }
-  return ret;
-}
-
-/**
- * Perform a heuristic test to determine if an object is "array-like".
- *
- *   A monk asked Joshu, a Zen master, "Has a dog Buddha nature?"
- *   Joshu replied: "Mu."
- *
- * This function determines if its argument has "array nature": it returns
- * true if the argument is an actual array, an `arguments' object, or an
- * HTMLCollection (e.g. node.childNodes or node.getElementsByTagName()).
- *
- * It will return false for other array-like objects like Filelist.
- *
- * @param {*} obj
- * @return {boolean}
- */
-function hasArrayNature(obj) {
-  return (
-    // not null/false
-    !!obj && (
-    // arrays are objects, NodeLists are functions in Safari
-    typeof obj == 'object' || typeof obj == 'function') &&
-    // quacks like an array
-    'length' in obj &&
-    // not window
-    !('setInterval' in obj) &&
-    // no DOM node should be considered an array-like
-    // a 'select' element has 'length' and 'item' properties on IE8
-    typeof obj.nodeType != 'number' && (
-    // a real array
-    Array.isArray(obj) ||
-    // arguments
-    'callee' in obj ||
-    // HTMLCollection/NodeList
-    'item' in obj)
-  );
-}
-
-/**
- * Ensure that the argument is an array by wrapping it in an array if it is not.
- * Creates a copy of the argument if it is already an array.
- *
- * This is mostly useful idiomatically:
- *
- *   var createArrayFromMixed = require('createArrayFromMixed');
- *
- *   function takesOneOrMoreThings(things) {
- *     things = createArrayFromMixed(things);
- *     ...
- *   }
- *
- * This allows you to treat `things' as an array, but accept scalars in the API.
- *
- * If you need to convert an array-like object, like `arguments`, into an array
- * use toArray instead.
- *
- * @param {*} obj
- * @return {array}
- */
-function createArrayFromMixed(obj) {
-  if (!hasArrayNature(obj)) {
-    return [obj];
-  } else if (Array.isArray(obj)) {
-    return obj.slice();
-  } else {
-    return toArray(obj);
-  }
-}
-
-module.exports = createArrayFromMixed;
-}).call(this,require('_process'))
-},{"./invariant":17,"_process":1}],8:[function(require,module,exports){
-(function (process){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-/*eslint-disable fb-www/unsafe-html*/
-
-var ExecutionEnvironment = require('./ExecutionEnvironment');
-
-var createArrayFromMixed = require('./createArrayFromMixed');
-var getMarkupWrap = require('./getMarkupWrap');
-var invariant = require('./invariant');
-
-/**
- * Dummy container used to render all markup.
- */
-var dummyNode = ExecutionEnvironment.canUseDOM ? document.createElement('div') : null;
-
-/**
- * Pattern used by `getNodeName`.
- */
-var nodeNamePattern = /^\s*<(\w+)/;
-
-/**
- * Extracts the `nodeName` of the first element in a string of markup.
- *
- * @param {string} markup String of markup.
- * @return {?string} Node name of the supplied markup.
- */
-function getNodeName(markup) {
-  var nodeNameMatch = markup.match(nodeNamePattern);
-  return nodeNameMatch && nodeNameMatch[1].toLowerCase();
-}
-
-/**
- * Creates an array containing the nodes rendered from the supplied markup. The
- * optionally supplied `handleScript` function will be invoked once for each
- * <script> element that is rendered. If no `handleScript` function is supplied,
- * an exception is thrown if any <script> elements are rendered.
- *
- * @param {string} markup A string of valid HTML markup.
- * @param {?function} handleScript Invoked once for each rendered <script>.
- * @return {array<DOMElement|DOMTextNode>} An array of rendered nodes.
- */
-function createNodesFromMarkup(markup, handleScript) {
-  var node = dummyNode;
-  !!!dummyNode ? process.env.NODE_ENV !== 'production' ? invariant(false, 'createNodesFromMarkup dummy not initialized') : invariant(false) : void 0;
-  var nodeName = getNodeName(markup);
-
-  var wrap = nodeName && getMarkupWrap(nodeName);
-  if (wrap) {
-    node.innerHTML = wrap[1] + markup + wrap[2];
-
-    var wrapDepth = wrap[0];
-    while (wrapDepth--) {
-      node = node.lastChild;
-    }
-  } else {
-    node.innerHTML = markup;
-  }
-
-  var scripts = node.getElementsByTagName('script');
-  if (scripts.length) {
-    !handleScript ? process.env.NODE_ENV !== 'production' ? invariant(false, 'createNodesFromMarkup(...): Unexpected <script> element rendered.') : invariant(false) : void 0;
-    createArrayFromMixed(scripts).forEach(handleScript);
-  }
-
-  var nodes = Array.from(node.childNodes);
-  while (node.lastChild) {
-    node.removeChild(node.lastChild);
-  }
-  return nodes;
-}
-
-module.exports = createNodesFromMarkup;
-}).call(this,require('_process'))
-},{"./ExecutionEnvironment":3,"./createArrayFromMixed":7,"./getMarkupWrap":13,"./invariant":17,"_process":1}],9:[function(require,module,exports){
-"use strict";
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * 
- */
-
-function makeEmptyFunction(arg) {
-  return function () {
-    return arg;
-  };
-}
-
-/**
- * This function accepts and discards inputs; it has no side effects. This is
- * primarily useful idiomatically for overridable function endpoints which
- * always need to be callable, since JS lacks a null-call idiom ala Cocoa.
- */
-var emptyFunction = function emptyFunction() {};
-
-emptyFunction.thatReturns = makeEmptyFunction;
-emptyFunction.thatReturnsFalse = makeEmptyFunction(false);
-emptyFunction.thatReturnsTrue = makeEmptyFunction(true);
-emptyFunction.thatReturnsNull = makeEmptyFunction(null);
-emptyFunction.thatReturnsThis = function () {
-  return this;
-};
-emptyFunction.thatReturnsArgument = function (arg) {
-  return arg;
-};
-
-module.exports = emptyFunction;
-},{}],10:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 (function (process){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
 'use strict';
 
-var emptyObject = {};
+var printWarning = function() {};
 
 if (process.env.NODE_ENV !== 'production') {
-  Object.freeze(emptyObject);
-}
-
-module.exports = emptyObject;
-}).call(this,require('_process'))
-},{"_process":1}],11:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-/**
- * @param {DOMElement} node input/textarea to focus
- */
-
-function focusNode(node) {
-  // IE8 can throw "Can't move focus to the control because it is invisible,
-  // not enabled, or of a type that does not accept the focus." for all kinds of
-  // reasons that are too expensive and fragile to test.
-  try {
-    node.focus();
-  } catch (e) {}
-}
-
-module.exports = focusNode;
-},{}],12:[function(require,module,exports){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-/* eslint-disable fb-www/typeof-undefined */
-
-/**
- * Same as document.activeElement but wraps in a try-catch block. In IE it is
- * not safe to call document.activeElement if there is nothing focused.
- *
- * The activeElement will be null only if the document or document body is not
- * yet defined.
- *
- * @param {?DOMDocument} doc Defaults to current document.
- * @return {?DOMElement}
- */
-function getActiveElement(doc) /*?DOMElement*/{
-  doc = doc || (typeof document !== 'undefined' ? document : undefined);
-  if (typeof doc === 'undefined') {
-    return null;
-  }
-  try {
-    return doc.activeElement || doc.body;
-  } catch (e) {
-    return doc.body;
-  }
-}
-
-module.exports = getActiveElement;
-},{}],13:[function(require,module,exports){
-(function (process){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-/*eslint-disable fb-www/unsafe-html */
-
-var ExecutionEnvironment = require('./ExecutionEnvironment');
-
-var invariant = require('./invariant');
-
-/**
- * Dummy container used to detect which wraps are necessary.
- */
-var dummyNode = ExecutionEnvironment.canUseDOM ? document.createElement('div') : null;
-
-/**
- * Some browsers cannot use `innerHTML` to render certain elements standalone,
- * so we wrap them, render the wrapped nodes, then extract the desired node.
- *
- * In IE8, certain elements cannot render alone, so wrap all elements ('*').
- */
-
-var shouldWrap = {};
-
-var selectWrap = [1, '<select multiple="true">', '</select>'];
-var tableWrap = [1, '<table>', '</table>'];
-var trWrap = [3, '<table><tbody><tr>', '</tr></tbody></table>'];
-
-var svgWrap = [1, '<svg xmlns="http://www.w3.org/2000/svg">', '</svg>'];
-
-var markupWrap = {
-  '*': [1, '?<div>', '</div>'],
-
-  'area': [1, '<map>', '</map>'],
-  'col': [2, '<table><tbody></tbody><colgroup>', '</colgroup></table>'],
-  'legend': [1, '<fieldset>', '</fieldset>'],
-  'param': [1, '<object>', '</object>'],
-  'tr': [2, '<table><tbody>', '</tbody></table>'],
-
-  'optgroup': selectWrap,
-  'option': selectWrap,
-
-  'caption': tableWrap,
-  'colgroup': tableWrap,
-  'tbody': tableWrap,
-  'tfoot': tableWrap,
-  'thead': tableWrap,
-
-  'td': trWrap,
-  'th': trWrap
-};
-
-// Initialize the SVG elements since we know they'll always need to be wrapped
-// consistently. If they are created inside a <div> they will be initialized in
-// the wrong namespace (and will not display).
-var svgElements = ['circle', 'clipPath', 'defs', 'ellipse', 'g', 'image', 'line', 'linearGradient', 'mask', 'path', 'pattern', 'polygon', 'polyline', 'radialGradient', 'rect', 'stop', 'text', 'tspan'];
-svgElements.forEach(function (nodeName) {
-  markupWrap[nodeName] = svgWrap;
-  shouldWrap[nodeName] = true;
-});
-
-/**
- * Gets the markup wrap configuration for the supplied `nodeName`.
- *
- * NOTE: This lazily detects which wraps are necessary for the current browser.
- *
- * @param {string} nodeName Lowercase `nodeName`.
- * @return {?array} Markup wrap configuration, if applicable.
- */
-function getMarkupWrap(nodeName) {
-  !!!dummyNode ? process.env.NODE_ENV !== 'production' ? invariant(false, 'Markup wrapping node not initialized') : invariant(false) : void 0;
-  if (!markupWrap.hasOwnProperty(nodeName)) {
-    nodeName = '*';
-  }
-  if (!shouldWrap.hasOwnProperty(nodeName)) {
-    if (nodeName === '*') {
-      dummyNode.innerHTML = '<link />';
-    } else {
-      dummyNode.innerHTML = '<' + nodeName + '></' + nodeName + '>';
-    }
-    shouldWrap[nodeName] = !dummyNode.firstChild;
-  }
-  return shouldWrap[nodeName] ? markupWrap[nodeName] : null;
-}
-
-module.exports = getMarkupWrap;
-}).call(this,require('_process'))
-},{"./ExecutionEnvironment":3,"./invariant":17,"_process":1}],14:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-'use strict';
-
-/**
- * Gets the scroll position of the supplied element or window.
- *
- * The return values are unbounded, unlike `getScrollPosition`. This means they
- * may be negative or exceed the element boundaries (which is possible using
- * inertial scrolling).
- *
- * @param {DOMWindow|DOMElement} scrollable
- * @return {object} Map with `x` and `y` keys.
- */
-
-function getUnboundedScrollPosition(scrollable) {
-  if (scrollable.Window && scrollable instanceof scrollable.Window) {
-    return {
-      x: scrollable.pageXOffset || scrollable.document.documentElement.scrollLeft,
-      y: scrollable.pageYOffset || scrollable.document.documentElement.scrollTop
-    };
-  }
-  return {
-    x: scrollable.scrollLeft,
-    y: scrollable.scrollTop
-  };
-}
-
-module.exports = getUnboundedScrollPosition;
-},{}],15:[function(require,module,exports){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-var _uppercasePattern = /([A-Z])/g;
-
-/**
- * Hyphenates a camelcased string, for example:
- *
- *   > hyphenate('backgroundColor')
- *   < "background-color"
- *
- * For CSS style names, use `hyphenateStyleName` instead which works properly
- * with all vendor prefixes, including `ms`.
- *
- * @param {string} string
- * @return {string}
- */
-function hyphenate(string) {
-  return string.replace(_uppercasePattern, '-$1').toLowerCase();
-}
-
-module.exports = hyphenate;
-},{}],16:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-'use strict';
-
-var hyphenate = require('./hyphenate');
-
-var msPattern = /^ms-/;
-
-/**
- * Hyphenates a camelcased CSS property name, for example:
- *
- *   > hyphenateStyleName('backgroundColor')
- *   < "background-color"
- *   > hyphenateStyleName('MozTransition')
- *   < "-moz-transition"
- *   > hyphenateStyleName('msTransition')
- *   < "-ms-transition"
- *
- * As Modernizr suggests (http://modernizr.com/docs/#prefixed), an `ms` prefix
- * is converted to `-ms-`.
- *
- * @param {string} string
- * @return {string}
- */
-function hyphenateStyleName(string) {
-  return hyphenate(string).replace(msPattern, '-ms-');
-}
-
-module.exports = hyphenateStyleName;
-},{"./hyphenate":15}],17:[function(require,module,exports){
-(function (process){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-/**
- * Use invariant() to assert state which your program assumes to be true.
- *
- * Provide sprintf-style format (only %s is supported) and arguments
- * to provide information about what broke and what you were
- * expecting.
- *
- * The invariant message will be stripped in production, but the invariant
- * will remain to ensure logic does not differ in production.
- */
-
-var validateFormat = function validateFormat(format) {};
-
-if (process.env.NODE_ENV !== 'production') {
-  validateFormat = function validateFormat(format) {
-    if (format === undefined) {
-      throw new Error('invariant requires an error message argument');
-    }
-  };
-}
-
-function invariant(condition, format, a, b, c, d, e, f) {
-  validateFormat(format);
-
-  if (!condition) {
-    var error;
-    if (format === undefined) {
-      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
-    } else {
-      var args = [a, b, c, d, e, f];
-      var argIndex = 0;
-      error = new Error(format.replace(/%s/g, function () {
-        return args[argIndex++];
-      }));
-      error.name = 'Invariant Violation';
-    }
-
-    error.framesToPop = 1; // we don't care about invariant's own frame
-    throw error;
-  }
-}
-
-module.exports = invariant;
-}).call(this,require('_process'))
-},{"_process":1}],18:[function(require,module,exports){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-/**
- * @param {*} object The object to check.
- * @return {boolean} Whether or not the object is a DOM node.
- */
-function isNode(object) {
-  var doc = object ? object.ownerDocument || object : document;
-  var defaultView = doc.defaultView || window;
-  return !!(object && (typeof defaultView.Node === 'function' ? object instanceof defaultView.Node : typeof object === 'object' && typeof object.nodeType === 'number' && typeof object.nodeName === 'string'));
-}
-
-module.exports = isNode;
-},{}],19:[function(require,module,exports){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-var isNode = require('./isNode');
-
-/**
- * @param {*} object The object to check.
- * @return {boolean} Whether or not the object is a DOM text node.
- */
-function isTextNode(object) {
-  return isNode(object) && object.nodeType == 3;
-}
-
-module.exports = isTextNode;
-},{"./isNode":18}],20:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * 
- * @typechecks static-only
- */
-
-'use strict';
-
-/**
- * Memoizes the return value of a function that accepts one string argument.
- */
-
-function memoizeStringOnly(callback) {
-  var cache = {};
-  return function (string) {
-    if (!cache.hasOwnProperty(string)) {
-      cache[string] = callback.call(this, string);
-    }
-    return cache[string];
-  };
-}
-
-module.exports = memoizeStringOnly;
-},{}],21:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-'use strict';
-
-var ExecutionEnvironment = require('./ExecutionEnvironment');
-
-var performance;
-
-if (ExecutionEnvironment.canUseDOM) {
-  performance = window.performance || window.msPerformance || window.webkitPerformance;
-}
-
-module.exports = performance || {};
-},{"./ExecutionEnvironment":3}],22:[function(require,module,exports){
-'use strict';
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- */
-
-var performance = require('./performance');
-
-var performanceNow;
-
-/**
- * Detect if we can use `window.performance.now()` and gracefully fallback to
- * `Date.now()` if it doesn't exist. We need to support Firefox < 15 for now
- * because of Facebook's testing infrastructure.
- */
-if (performance.now) {
-  performanceNow = function performanceNow() {
-    return performance.now();
-  };
-} else {
-  performanceNow = function performanceNow() {
-    return Date.now();
-  };
-}
-
-module.exports = performanceNow;
-},{"./performance":21}],23:[function(require,module,exports){
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @typechecks
- * 
- */
-
-/*eslint-disable no-self-compare */
-
-'use strict';
-
-var hasOwnProperty = Object.prototype.hasOwnProperty;
-
-/**
- * inlined Object.is polyfill to avoid requiring consumers ship their own
- * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
- */
-function is(x, y) {
-  // SameValue algorithm
-  if (x === y) {
-    // Steps 1-5, 7-10
-    // Steps 6.b-6.e: +0 != -0
-    // Added the nonzero y check to make Flow happy, but it is redundant
-    return x !== 0 || y !== 0 || 1 / x === 1 / y;
-  } else {
-    // Step 6.a: NaN == NaN
-    return x !== x && y !== y;
-  }
-}
-
-/**
- * Performs equality by iterating through keys on an object and returning false
- * when any key has values which are not strictly equal between the arguments.
- * Returns true when the values of all keys are strictly equal.
- */
-function shallowEqual(objA, objB) {
-  if (is(objA, objB)) {
-    return true;
-  }
-
-  if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
-    return false;
-  }
-
-  var keysA = Object.keys(objA);
-  var keysB = Object.keys(objB);
-
-  if (keysA.length !== keysB.length) {
-    return false;
-  }
-
-  // Test for A's keys different from B.
-  for (var i = 0; i < keysA.length; i++) {
-    if (!hasOwnProperty.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-module.exports = shallowEqual;
-},{}],24:[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2014-2015, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-var emptyFunction = require('./emptyFunction');
-
-/**
- * Similar to invariant but only logs a warning if the condition is not met.
- * This can be used to log issues in development environments in critical
- * paths. Removing the logging code for production environments will keep the
- * same logic and follow the same code paths.
- */
-
-var warning = emptyFunction;
-
-if (process.env.NODE_ENV !== 'production') {
-  (function () {
-    var printWarning = function printWarning(format) {
-      for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-        args[_key - 1] = arguments[_key];
-      }
-
-      var argIndex = 0;
-      var message = 'Warning: ' + format.replace(/%s/g, function () {
-        return args[argIndex++];
-      });
-      if (typeof console !== 'undefined') {
-        console.error(message);
-      }
-      try {
-        // --- Welcome to debugging React ---
-        // This error was thrown as a convenience so that you can use this stack
-        // to find the callsite that caused this warning to fire.
-        throw new Error(message);
-      } catch (x) {}
-    };
-
-    warning = function warning(condition, format) {
-      if (format === undefined) {
-        throw new Error('`warning(condition, format, ...args)` requires a warning ' + 'message argument');
-      }
-
-      if (format.indexOf('Failed Composite propType: ') === 0) {
-        return; // Ignore CompositeComponent proptype check.
-      }
-
-      if (!condition) {
-        for (var _len2 = arguments.length, args = Array(_len2 > 2 ? _len2 - 2 : 0), _key2 = 2; _key2 < _len2; _key2++) {
-          args[_key2 - 2] = arguments[_key2];
-        }
-
-        printWarning.apply(undefined, [format].concat(args));
-      }
-    };
-  })();
-}
-
-module.exports = warning;
-}).call(this,require('_process'))
-},{"./emptyFunction":9,"_process":1}],25:[function(require,module,exports){
-/*
-object-assign
-(c) Sindre Sorhus
-@license MIT
-*/
-
-'use strict';
-/* eslint-disable no-unused-vars */
-var getOwnPropertySymbols = Object.getOwnPropertySymbols;
-var hasOwnProperty = Object.prototype.hasOwnProperty;
-var propIsEnumerable = Object.prototype.propertyIsEnumerable;
-
-function toObject(val) {
-	if (val === null || val === undefined) {
-		throw new TypeError('Object.assign cannot be called with null or undefined');
-	}
-
-	return Object(val);
-}
-
-function shouldUseNative() {
-	try {
-		if (!Object.assign) {
-			return false;
-		}
-
-		// Detect buggy property enumeration order in older V8 versions.
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
-		var test1 = new String('abc');  // eslint-disable-line no-new-wrappers
-		test1[5] = 'de';
-		if (Object.getOwnPropertyNames(test1)[0] === '5') {
-			return false;
-		}
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-		var test2 = {};
-		for (var i = 0; i < 10; i++) {
-			test2['_' + String.fromCharCode(i)] = i;
-		}
-		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
-			return test2[n];
-		});
-		if (order2.join('') !== '0123456789') {
-			return false;
-		}
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-		var test3 = {};
-		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
-			test3[letter] = letter;
-		});
-		if (Object.keys(Object.assign({}, test3)).join('') !==
-				'abcdefghijklmnopqrst') {
-			return false;
-		}
-
-		return true;
-	} catch (err) {
-		// We don't expect any of the above to throw, but better to be safe.
-		return false;
-	}
-}
-
-module.exports = shouldUseNative() ? Object.assign : function (target, source) {
-	var from;
-	var to = toObject(target);
-	var symbols;
-
-	for (var s = 1; s < arguments.length; s++) {
-		from = Object(arguments[s]);
-
-		for (var key in from) {
-			if (hasOwnProperty.call(from, key)) {
-				to[key] = from[key];
-			}
-		}
-
-		if (getOwnPropertySymbols) {
-			symbols = getOwnPropertySymbols(from);
-			for (var i = 0; i < symbols.length; i++) {
-				if (propIsEnumerable.call(from, symbols[i])) {
-					to[symbols[i]] = from[symbols[i]];
-				}
-			}
-		}
-	}
-
-	return to;
-};
-
-},{}],26:[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- */
-
-'use strict';
-
-if (process.env.NODE_ENV !== 'production') {
-  var invariant = require('fbjs/lib/invariant');
-  var warning = require('fbjs/lib/warning');
   var ReactPropTypesSecret = require('./lib/ReactPropTypesSecret');
   var loggedTypeFailures = {};
+
+  printWarning = function(text) {
+    var message = 'Warning: ' + text;
+    if (typeof console !== 'undefined') {
+      console.error(message);
+    }
+    try {
+      // --- Welcome to debugging React ---
+      // This error was thrown as a convenience so that you can use this stack
+      // to find the callsite that caused this warning to fire.
+      throw new Error(message);
+    } catch (x) {}
+  };
 }
 
 /**
@@ -1434,12 +2320,29 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
         try {
           // This is intentionally an invariant that gets caught. It's the same
           // behavior as without this statement except with a better message.
-          invariant(typeof typeSpecs[typeSpecName] === 'function', '%s: %s type `%s` is invalid; it must be a function, usually from ' + 'React.PropTypes.', componentName || 'React class', location, typeSpecName);
+          if (typeof typeSpecs[typeSpecName] !== 'function') {
+            var err = Error(
+              (componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' +
+              'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.'
+            );
+            err.name = 'Invariant Violation';
+            throw err;
+          }
           error = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, ReactPropTypesSecret);
         } catch (ex) {
           error = ex;
         }
-        warning(!error || error instanceof Error, '%s: type specification of %s `%s` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a %s. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).', componentName || 'React class', location, typeSpecName, typeof error);
+        if (error && !(error instanceof Error)) {
+          printWarning(
+            (componentName || 'React class') + ': type specification of ' +
+            location + ' `' + typeSpecName + '` is invalid; the type checker ' +
+            'function must return `null` or an `Error` but returned a ' + typeof error + '. ' +
+            'You may have forgotten to pass an argument to the type checker ' +
+            'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' +
+            'shape all require an argument).'
+          )
+
+        }
         if (error instanceof Error && !(error.message in loggedTypeFailures)) {
           // Only monitor this failure once because there tends to be a lot of the
           // same error.
@@ -1447,7 +2350,9 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
 
           var stack = getStack ? getStack() : '';
 
-          warning(false, 'Failed %s type: %s%s', location, error.message, stack != null ? stack : '');
+          printWarning(
+            'Failed ' + location + ' type: ' + error.message + (stack != null ? stack : '')
+          );
         }
       }
     }
@@ -1457,14 +2362,12 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
 module.exports = checkPropTypes;
 
 }).call(this,require('_process'))
-},{"./lib/ReactPropTypesSecret":29,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],27:[function(require,module,exports){
+},{"./lib/ReactPropTypesSecret":30,"_process":26}],28:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
 'use strict';
@@ -1480,25 +2383,42 @@ module.exports = function(isValidElement) {
   return factory(isValidElement, throwOnDirectAccess);
 };
 
-},{"./factoryWithTypeCheckers":28}],28:[function(require,module,exports){
+},{"./factoryWithTypeCheckers":29}],29:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
 'use strict';
 
-var emptyFunction = require('fbjs/lib/emptyFunction');
-var invariant = require('fbjs/lib/invariant');
-var warning = require('fbjs/lib/warning');
+var assign = require('object-assign');
 
 var ReactPropTypesSecret = require('./lib/ReactPropTypesSecret');
 var checkPropTypes = require('./checkPropTypes');
+
+var printWarning = function() {};
+
+if (process.env.NODE_ENV !== 'production') {
+  printWarning = function(text) {
+    var message = 'Warning: ' + text;
+    if (typeof console !== 'undefined') {
+      console.error(message);
+    }
+    try {
+      // --- Welcome to debugging React ---
+      // This error was thrown as a convenience so that you can use this stack
+      // to find the callsite that caused this warning to fire.
+      throw new Error(message);
+    } catch (x) {}
+  };
+}
+
+function emptyFunctionThatReturnsNull() {
+  return null;
+}
 
 module.exports = function(isValidElement, throwOnDirectAccess) {
   /* global Symbol */
@@ -1594,7 +2514,8 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
     objectOf: createObjectOfTypeChecker,
     oneOf: createEnumTypeChecker,
     oneOfType: createUnionTypeChecker,
-    shape: createShapeTypeChecker
+    shape: createShapeTypeChecker,
+    exact: createStrictShapeTypeChecker,
   };
 
   /**
@@ -1641,12 +2562,13 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
       if (secret !== ReactPropTypesSecret) {
         if (throwOnDirectAccess) {
           // New behavior only for users of `prop-types` package
-          invariant(
-            false,
+          var err = new Error(
             'Calling PropTypes validators directly is not supported by the `prop-types` package. ' +
             'Use `PropTypes.checkPropTypes()` to call them. ' +
             'Read more at http://fb.me/use-check-prop-types'
           );
+          err.name = 'Invariant Violation';
+          throw err;
         } else if (process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
           // Old behavior for people using React.PropTypes
           var cacheKey = componentName + ':' + propName;
@@ -1655,15 +2577,12 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
             // Avoid spamming the console because they are often not actionable except for lib authors
             manualPropTypeWarningCount < 3
           ) {
-            warning(
-              false,
+            printWarning(
               'You are manually calling a React.PropTypes validation ' +
-              'function for the `%s` prop on `%s`. This is deprecated ' +
+              'function for the `' + propFullName + '` prop on `' + componentName  + '`. This is deprecated ' +
               'and will throw in the standalone `prop-types` package. ' +
               'You may be seeing this warning due to a third-party PropTypes ' +
-              'library. See https://fb.me/react-warning-dont-call-proptypes ' + 'for details.',
-              propFullName,
-              componentName
+              'library. See https://fb.me/react-warning-dont-call-proptypes ' + 'for details.'
             );
             manualPropTypeCallCache[cacheKey] = true;
             manualPropTypeWarningCount++;
@@ -1707,7 +2626,7 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
   }
 
   function createAnyTypeChecker() {
-    return createChainableTypeChecker(emptyFunction.thatReturnsNull);
+    return createChainableTypeChecker(emptyFunctionThatReturnsNull);
   }
 
   function createArrayOfTypeChecker(typeChecker) {
@@ -1757,8 +2676,8 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
 
   function createEnumTypeChecker(expectedValues) {
     if (!Array.isArray(expectedValues)) {
-      process.env.NODE_ENV !== 'production' ? warning(false, 'Invalid argument supplied to oneOf, expected an instance of array.') : void 0;
-      return emptyFunction.thatReturnsNull;
+      process.env.NODE_ENV !== 'production' ? printWarning('Invalid argument supplied to oneOf, expected an instance of array.') : void 0;
+      return emptyFunctionThatReturnsNull;
     }
 
     function validate(props, propName, componentName, location, propFullName) {
@@ -1800,21 +2719,18 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
 
   function createUnionTypeChecker(arrayOfTypeCheckers) {
     if (!Array.isArray(arrayOfTypeCheckers)) {
-      process.env.NODE_ENV !== 'production' ? warning(false, 'Invalid argument supplied to oneOfType, expected an instance of array.') : void 0;
-      return emptyFunction.thatReturnsNull;
+      process.env.NODE_ENV !== 'production' ? printWarning('Invalid argument supplied to oneOfType, expected an instance of array.') : void 0;
+      return emptyFunctionThatReturnsNull;
     }
 
     for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
       var checker = arrayOfTypeCheckers[i];
       if (typeof checker !== 'function') {
-        warning(
-          false,
-          'Invalid argument supplid to oneOfType. Expected an array of check functions, but ' +
-          'received %s at index %s.',
-          getPostfixForTypeWarning(checker),
-          i
+        printWarning(
+          'Invalid argument supplied to oneOfType. Expected an array of check functions, but ' +
+          'received ' + getPostfixForTypeWarning(checker) + ' at index ' + i + '.'
         );
-        return emptyFunction.thatReturnsNull;
+        return emptyFunctionThatReturnsNull;
       }
     }
 
@@ -1860,6 +2776,36 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
       }
       return null;
     }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createStrictShapeTypeChecker(shapeTypes) {
+    function validate(props, propName, componentName, location, propFullName) {
+      var propValue = props[propName];
+      var propType = getPropType(propValue);
+      if (propType !== 'object') {
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type `' + propType + '` ' + ('supplied to `' + componentName + '`, expected `object`.'));
+      }
+      // We need to check all keys in case some are required but missing from
+      // props.
+      var allKeys = assign({}, props[propName], shapeTypes);
+      for (var key in allKeys) {
+        var checker = shapeTypes[key];
+        if (!checker) {
+          return new PropTypeError(
+            'Invalid ' + location + ' `' + propFullName + '` key `' + key + '` supplied to `' + componentName + '`.' +
+            '\nBad object: ' + JSON.stringify(props[propName], null, '  ') +
+            '\nValid keys: ' +  JSON.stringify(Object.keys(shapeTypes), null, '  ')
+          );
+        }
+        var error = checker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
+        if (error) {
+          return error;
+        }
+      }
+      return null;
+    }
+
     return createChainableTypeChecker(validate);
   }
 
@@ -1996,14 +2942,12 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
 };
 
 }).call(this,require('_process'))
-},{"./checkPropTypes":26,"./lib/ReactPropTypesSecret":29,"_process":1,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],29:[function(require,module,exports){
+},{"./checkPropTypes":27,"./lib/ReactPropTypesSecret":30,"_process":26,"object-assign":25}],30:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
 'use strict';
@@ -2012,19 +2956,17 @@ var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
 
 module.exports = ReactPropTypesSecret;
 
-},{}],30:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib/ReactDOM');
 
-},{"./lib/ReactDOM":60}],31:[function(require,module,exports){
+},{"./lib/ReactDOM":61}],32:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -2091,14 +3033,12 @@ var ARIADOMPropertyConfig = {
 };
 
 module.exports = ARIADOMPropertyConfig;
-},{}],32:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -2115,14 +3055,12 @@ var AutoFocusUtils = {
 };
 
 module.exports = AutoFocusUtils;
-},{"./ReactDOMComponentTree":63,"fbjs/lib/focusNode":11}],33:[function(require,module,exports){
+},{"./ReactDOMComponentTree":64,"fbjs/lib/focusNode":11}],34:[function(require,module,exports){
 /**
- * Copyright 2013-present Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -2491,7 +3429,6 @@ function extractBeforeInputEvent(topLevelType, targetInst, nativeEvent, nativeEv
  * `composition` event types.
  */
 var BeforeInputEventPlugin = {
-
   eventTypes: eventTypes,
 
   extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
@@ -2500,14 +3437,12 @@ var BeforeInputEventPlugin = {
 };
 
 module.exports = BeforeInputEventPlugin;
-},{"./EventPropagators":49,"./FallbackCompositionState":50,"./SyntheticCompositionEvent":117,"./SyntheticInputEvent":121,"fbjs/lib/ExecutionEnvironment":3}],34:[function(require,module,exports){
+},{"./EventPropagators":50,"./FallbackCompositionState":51,"./SyntheticCompositionEvent":115,"./SyntheticInputEvent":119,"fbjs/lib/ExecutionEnvironment":3}],35:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -2526,6 +3461,7 @@ var isUnitlessNumber = {
   boxFlexGroup: true,
   boxOrdinalGroup: true,
   columnCount: true,
+  columns: true,
   flex: true,
   flexGrow: true,
   flexPositive: true,
@@ -2533,7 +3469,13 @@ var isUnitlessNumber = {
   flexNegative: true,
   flexOrder: true,
   gridRow: true,
+  gridRowEnd: true,
+  gridRowSpan: true,
+  gridRowStart: true,
   gridColumn: true,
+  gridColumnEnd: true,
+  gridColumnSpan: true,
+  gridColumnStart: true,
   fontWeight: true,
   lineClamp: true,
   lineHeight: true,
@@ -2648,15 +3590,13 @@ var CSSProperty = {
 };
 
 module.exports = CSSProperty;
-},{}],35:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -2727,7 +3667,7 @@ if (process.env.NODE_ENV !== 'production') {
     }
 
     warnedStyleValues[value] = true;
-    process.env.NODE_ENV !== 'production' ? warning(false, 'Style property values shouldn\'t contain a semicolon.%s ' + 'Try "%s: %s" instead.', checkRenderMessage(owner), name, value.replace(badStyleValueWithSemicolonPattern, '')) : void 0;
+    process.env.NODE_ENV !== 'production' ? warning(false, "Style property values shouldn't contain a semicolon.%s " + 'Try "%s: %s" instead.', checkRenderMessage(owner), name, value.replace(badStyleValueWithSemicolonPattern, '')) : void 0;
   };
 
   var warnStyleValueIsNaN = function (name, value, owner) {
@@ -2777,7 +3717,6 @@ if (process.env.NODE_ENV !== 'production') {
  * Operations for dealing with CSS properties.
  */
 var CSSPropertyOperations = {
-
   /**
    * Serializes a mapping of style properties for use as inline styles:
    *
@@ -2797,13 +3736,16 @@ var CSSPropertyOperations = {
       if (!styles.hasOwnProperty(styleName)) {
         continue;
       }
+      var isCustomProperty = styleName.indexOf('--') === 0;
       var styleValue = styles[styleName];
       if (process.env.NODE_ENV !== 'production') {
-        warnValidStyle(styleName, styleValue, component);
+        if (!isCustomProperty) {
+          warnValidStyle(styleName, styleValue, component);
+        }
       }
       if (styleValue != null) {
         serialized += processStyleName(styleName) + ':';
-        serialized += dangerousStyleValue(styleName, styleValue, component) + ';';
+        serialized += dangerousStyleValue(styleName, styleValue, component, isCustomProperty) + ';';
       }
     }
     return serialized || null;
@@ -2831,14 +3773,19 @@ var CSSPropertyOperations = {
       if (!styles.hasOwnProperty(styleName)) {
         continue;
       }
+      var isCustomProperty = styleName.indexOf('--') === 0;
       if (process.env.NODE_ENV !== 'production') {
-        warnValidStyle(styleName, styles[styleName], component);
+        if (!isCustomProperty) {
+          warnValidStyle(styleName, styles[styleName], component);
+        }
       }
-      var styleValue = dangerousStyleValue(styleName, styles[styleName], component);
+      var styleValue = dangerousStyleValue(styleName, styles[styleName], component, isCustomProperty);
       if (styleName === 'float' || styleName === 'cssFloat') {
         styleName = styleFloatAccessor;
       }
-      if (styleValue) {
+      if (isCustomProperty) {
+        style.setProperty(styleName, styleValue);
+      } else if (styleValue) {
         style[styleName] = styleValue;
       } else {
         var expansion = hasShorthandPropertyBug && CSSProperty.shorthandPropertyExpansions[styleName];
@@ -2854,20 +3801,17 @@ var CSSPropertyOperations = {
       }
     }
   }
-
 };
 
 module.exports = CSSPropertyOperations;
 }).call(this,require('_process'))
-},{"./CSSProperty":34,"./ReactInstrumentation":93,"./dangerousStyleValue":134,"_process":1,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/camelizeStyleName":5,"fbjs/lib/hyphenateStyleName":16,"fbjs/lib/memoizeStringOnly":20,"fbjs/lib/warning":24}],36:[function(require,module,exports){
+},{"./CSSProperty":35,"./ReactInstrumentation":93,"./dangerousStyleValue":132,"_process":26,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/camelizeStyleName":5,"fbjs/lib/hyphenateStyleName":16,"fbjs/lib/memoizeStringOnly":20,"fbjs/lib/warning":24}],37:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -2980,14 +3924,12 @@ var CallbackQueue = function () {
 
 module.exports = PooledClass.addPoolingTo(CallbackQueue);
 }).call(this,require('_process'))
-},{"./PooledClass":54,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],37:[function(require,module,exports){
+},{"./PooledClass":55,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],38:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -3000,6 +3942,7 @@ var ReactDOMComponentTree = require('./ReactDOMComponentTree');
 var ReactUpdates = require('./ReactUpdates');
 var SyntheticEvent = require('./SyntheticEvent');
 
+var inputValueTracking = require('./inputValueTracking');
 var getEventTarget = require('./getEventTarget');
 var isEventSupported = require('./isEventSupported');
 var isTextInputElement = require('./isTextInputElement');
@@ -3014,13 +3957,17 @@ var eventTypes = {
   }
 };
 
+function createAndAccumulateChangeEvent(inst, nativeEvent, target) {
+  var event = SyntheticEvent.getPooled(eventTypes.change, inst, nativeEvent, target);
+  event.type = 'change';
+  EventPropagators.accumulateTwoPhaseDispatches(event);
+  return event;
+}
 /**
  * For IE shims
  */
 var activeElement = null;
 var activeElementInst = null;
-var activeElementValue = null;
-var activeElementValueProp = null;
 
 /**
  * SECTION: handle `change` event
@@ -3037,8 +3984,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 function manualDispatchChangeEvent(nativeEvent) {
-  var event = SyntheticEvent.getPooled(eventTypes.change, activeElementInst, nativeEvent, getEventTarget(nativeEvent));
-  EventPropagators.accumulateTwoPhaseDispatches(event);
+  var event = createAndAccumulateChangeEvent(activeElementInst, nativeEvent, getEventTarget(nativeEvent));
 
   // If change and propertychange bubbled, we'd just bind to it like all the
   // other events and have it go through ReactBrowserEventEmitter. Since it
@@ -3074,11 +4020,21 @@ function stopWatchingForChangeEventIE8() {
   activeElementInst = null;
 }
 
+function getInstIfValueChanged(targetInst, nativeEvent) {
+  var updated = inputValueTracking.updateValueIfChanged(targetInst);
+  var simulated = nativeEvent.simulated === true && ChangeEventPlugin._allowSimulatedPassThrough;
+
+  if (updated || simulated) {
+    return targetInst;
+  }
+}
+
 function getTargetInstForChangeEvent(topLevelType, targetInst) {
   if (topLevelType === 'topChange') {
     return targetInst;
   }
 }
+
 function handleEventsForChangeEventIE8(topLevelType, target, targetInst) {
   if (topLevelType === 'topFocus') {
     // stopWatching() should be a noop here but we call it just in case we
@@ -3097,105 +4053,54 @@ var isInputEventSupported = false;
 if (ExecutionEnvironment.canUseDOM) {
   // IE9 claims to support the input event but fails to trigger it when
   // deleting text, so we ignore its input events.
-  // IE10+ fire input events to often, such when a placeholder
-  // changes or when an input with a placeholder is focused.
-  isInputEventSupported = isEventSupported('input') && (!document.documentMode || document.documentMode > 11);
+
+  isInputEventSupported = isEventSupported('input') && (!document.documentMode || document.documentMode > 9);
 }
 
 /**
- * (For IE <=11) Replacement getter/setter for the `value` property that gets
- * set on the active element.
- */
-var newValueProp = {
-  get: function () {
-    return activeElementValueProp.get.call(this);
-  },
-  set: function (val) {
-    // Cast to a string so we can do equality checks.
-    activeElementValue = '' + val;
-    activeElementValueProp.set.call(this, val);
-  }
-};
-
-/**
- * (For IE <=11) Starts tracking propertychange events on the passed-in element
+ * (For IE <=9) Starts tracking propertychange events on the passed-in element
  * and override the value property so that we can distinguish user events from
  * value changes in JS.
  */
 function startWatchingForValueChange(target, targetInst) {
   activeElement = target;
   activeElementInst = targetInst;
-  activeElementValue = target.value;
-  activeElementValueProp = Object.getOwnPropertyDescriptor(target.constructor.prototype, 'value');
-
-  // Not guarded in a canDefineProperty check: IE8 supports defineProperty only
-  // on DOM elements
-  Object.defineProperty(activeElement, 'value', newValueProp);
-  if (activeElement.attachEvent) {
-    activeElement.attachEvent('onpropertychange', handlePropertyChange);
-  } else {
-    activeElement.addEventListener('propertychange', handlePropertyChange, false);
-  }
+  activeElement.attachEvent('onpropertychange', handlePropertyChange);
 }
 
 /**
- * (For IE <=11) Removes the event listeners from the currently-tracked element,
+ * (For IE <=9) Removes the event listeners from the currently-tracked element,
  * if any exists.
  */
 function stopWatchingForValueChange() {
   if (!activeElement) {
     return;
   }
-
-  // delete restores the original property definition
-  delete activeElement.value;
-
-  if (activeElement.detachEvent) {
-    activeElement.detachEvent('onpropertychange', handlePropertyChange);
-  } else {
-    activeElement.removeEventListener('propertychange', handlePropertyChange, false);
-  }
+  activeElement.detachEvent('onpropertychange', handlePropertyChange);
 
   activeElement = null;
   activeElementInst = null;
-  activeElementValue = null;
-  activeElementValueProp = null;
 }
 
 /**
- * (For IE <=11) Handles a propertychange event, sending a `change` event if
+ * (For IE <=9) Handles a propertychange event, sending a `change` event if
  * the value of the active element has changed.
  */
 function handlePropertyChange(nativeEvent) {
   if (nativeEvent.propertyName !== 'value') {
     return;
   }
-  var value = nativeEvent.srcElement.value;
-  if (value === activeElementValue) {
-    return;
-  }
-  activeElementValue = value;
-
-  manualDispatchChangeEvent(nativeEvent);
-}
-
-/**
- * If a `change` event should be fired, returns the target's ID.
- */
-function getTargetInstForInputEvent(topLevelType, targetInst) {
-  if (topLevelType === 'topInput') {
-    // In modern browsers (i.e., not IE8 or IE9), the input event is exactly
-    // what we want so fall through here and trigger an abstract event
-    return targetInst;
+  if (getInstIfValueChanged(activeElementInst, nativeEvent)) {
+    manualDispatchChangeEvent(nativeEvent);
   }
 }
 
-function handleEventsForInputEventIE(topLevelType, target, targetInst) {
+function handleEventsForInputEventPolyfill(topLevelType, target, targetInst) {
   if (topLevelType === 'topFocus') {
     // In IE8, we can capture almost all .value changes by adding a
     // propertychange handler and looking for events with propertyName
     // equal to 'value'
-    // In IE9-11, propertychange fires for most input events but is buggy and
+    // In IE9, propertychange fires for most input events but is buggy and
     // doesn't fire when text is deleted, but conveniently, selectionchange
     // appears to fire in all of the remaining cases so we catch those and
     // forward the event if the value has changed
@@ -3213,7 +4118,7 @@ function handleEventsForInputEventIE(topLevelType, target, targetInst) {
 }
 
 // For IE8 and IE9.
-function getTargetInstForInputEventIE(topLevelType, targetInst) {
+function getTargetInstForInputEventPolyfill(topLevelType, targetInst, nativeEvent) {
   if (topLevelType === 'topSelectionChange' || topLevelType === 'topKeyUp' || topLevelType === 'topKeyDown') {
     // On the selectionchange event, the target is just document which isn't
     // helpful for us so just check activeElement instead.
@@ -3225,10 +4130,7 @@ function getTargetInstForInputEventIE(topLevelType, targetInst) {
     // keystroke if user does a key repeat (it'll be a little delayed: right
     // before the second keystroke). Other input methods (e.g., paste) seem to
     // fire selectionchange normally.
-    if (activeElement && activeElement.value !== activeElementValue) {
-      activeElementValue = activeElement.value;
-      return activeElementInst;
-    }
+    return getInstIfValueChanged(activeElementInst, nativeEvent);
   }
 }
 
@@ -3239,12 +4141,19 @@ function shouldUseClickEvent(elem) {
   // Use the `click` event to detect changes to checkbox and radio inputs.
   // This approach works across all browsers, whereas `change` does not fire
   // until `blur` in IE8.
-  return elem.nodeName && elem.nodeName.toLowerCase() === 'input' && (elem.type === 'checkbox' || elem.type === 'radio');
+  var nodeName = elem.nodeName;
+  return nodeName && nodeName.toLowerCase() === 'input' && (elem.type === 'checkbox' || elem.type === 'radio');
 }
 
-function getTargetInstForClickEvent(topLevelType, targetInst) {
+function getTargetInstForClickEvent(topLevelType, targetInst, nativeEvent) {
   if (topLevelType === 'topClick') {
-    return targetInst;
+    return getInstIfValueChanged(targetInst, nativeEvent);
+  }
+}
+
+function getTargetInstForInputOrChangeEvent(topLevelType, targetInst, nativeEvent) {
+  if (topLevelType === 'topInput' || topLevelType === 'topChange') {
+    return getInstIfValueChanged(targetInst, nativeEvent);
   }
 }
 
@@ -3279,8 +4188,10 @@ function handleControlledInputBlur(inst, node) {
  * - select
  */
 var ChangeEventPlugin = {
-
   eventTypes: eventTypes,
+
+  _allowSimulatedPassThrough: true,
+  _isInputEventSupported: isInputEventSupported,
 
   extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
     var targetNode = targetInst ? ReactDOMComponentTree.getNodeFromInstance(targetInst) : window;
@@ -3294,21 +4205,19 @@ var ChangeEventPlugin = {
       }
     } else if (isTextInputElement(targetNode)) {
       if (isInputEventSupported) {
-        getTargetInstFunc = getTargetInstForInputEvent;
+        getTargetInstFunc = getTargetInstForInputOrChangeEvent;
       } else {
-        getTargetInstFunc = getTargetInstForInputEventIE;
-        handleEventFunc = handleEventsForInputEventIE;
+        getTargetInstFunc = getTargetInstForInputEventPolyfill;
+        handleEventFunc = handleEventsForInputEventPolyfill;
       }
     } else if (shouldUseClickEvent(targetNode)) {
       getTargetInstFunc = getTargetInstForClickEvent;
     }
 
     if (getTargetInstFunc) {
-      var inst = getTargetInstFunc(topLevelType, targetInst);
+      var inst = getTargetInstFunc(topLevelType, targetInst, nativeEvent);
       if (inst) {
-        var event = SyntheticEvent.getPooled(eventTypes.change, inst, nativeEvent, nativeEventTarget);
-        event.type = 'change';
-        EventPropagators.accumulateTwoPhaseDispatches(event);
+        var event = createAndAccumulateChangeEvent(inst, nativeEvent, nativeEventTarget);
         return event;
       }
     }
@@ -3322,19 +4231,16 @@ var ChangeEventPlugin = {
       handleControlledInputBlur(targetInst, targetNode);
     }
   }
-
 };
 
 module.exports = ChangeEventPlugin;
-},{"./EventPluginHub":46,"./EventPropagators":49,"./ReactDOMComponentTree":63,"./ReactUpdates":110,"./SyntheticEvent":119,"./getEventTarget":142,"./isEventSupported":149,"./isTextInputElement":150,"fbjs/lib/ExecutionEnvironment":3}],38:[function(require,module,exports){
+},{"./EventPluginHub":47,"./EventPropagators":50,"./ReactDOMComponentTree":64,"./ReactUpdates":108,"./SyntheticEvent":117,"./getEventTarget":140,"./inputValueTracking":146,"./isEventSupported":148,"./isTextInputElement":149,"fbjs/lib/ExecutionEnvironment":3}],39:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -3475,7 +4381,6 @@ if (process.env.NODE_ENV !== 'production') {
  * Operations for updating with DOM children.
  */
 var DOMChildrenOperations = {
-
   dangerouslyReplaceNodeWithMarkup: dangerouslyReplaceNodeWithMarkup,
 
   replaceDelimitedText: replaceDelimitedText,
@@ -3501,7 +4406,10 @@ var DOMChildrenOperations = {
             ReactInstrumentation.debugTool.onHostOperation({
               instanceID: parentNodeDebugID,
               type: 'insert child',
-              payload: { toIndex: update.toIndex, content: update.content.toString() }
+              payload: {
+                toIndex: update.toIndex,
+                content: update.content.toString()
+              }
             });
           }
           break;
@@ -3548,19 +4456,16 @@ var DOMChildrenOperations = {
       }
     }
   }
-
 };
 
 module.exports = DOMChildrenOperations;
 }).call(this,require('_process'))
-},{"./DOMLazyTree":39,"./Danger":43,"./ReactDOMComponentTree":63,"./ReactInstrumentation":93,"./createMicrosoftUnsafeLocalFunction":133,"./setInnerHTML":154,"./setTextContent":155,"_process":1}],39:[function(require,module,exports){
+},{"./DOMLazyTree":40,"./Danger":44,"./ReactDOMComponentTree":64,"./ReactInstrumentation":93,"./createMicrosoftUnsafeLocalFunction":131,"./setInnerHTML":153,"./setTextContent":154,"_process":26}],40:[function(require,module,exports){
 /**
- * Copyright 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -3671,14 +4576,12 @@ DOMLazyTree.queueHTML = queueHTML;
 DOMLazyTree.queueText = queueText;
 
 module.exports = DOMLazyTree;
-},{"./DOMNamespaces":40,"./createMicrosoftUnsafeLocalFunction":133,"./setInnerHTML":154,"./setTextContent":155}],40:[function(require,module,exports){
+},{"./DOMNamespaces":41,"./createMicrosoftUnsafeLocalFunction":131,"./setInnerHTML":153,"./setTextContent":154}],41:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -3691,15 +4594,13 @@ var DOMNamespaces = {
 };
 
 module.exports = DOMNamespaces;
-},{}],41:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -3831,7 +4732,6 @@ var ATTRIBUTE_NAME_START_CHAR = ':A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\
  * @see http://jsperf.com/key-missing
  */
 var DOMProperty = {
-
   ID_ATTRIBUTE_NAME: 'data-reactid',
   ROOT_ATTRIBUTE_NAME: 'data-reactroot',
 
@@ -3903,15 +4803,13 @@ var DOMProperty = {
 
 module.exports = DOMProperty;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],42:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],43:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -3952,7 +4850,6 @@ function shouldIgnoreValue(propertyInfo, value) {
  * Operations for dealing with DOM properties.
  */
 var DOMPropertyOperations = {
-
   /**
    * Creates markup for the ID property.
    *
@@ -4137,20 +5034,17 @@ var DOMPropertyOperations = {
       });
     }
   }
-
 };
 
 module.exports = DOMPropertyOperations;
 }).call(this,require('_process'))
-},{"./DOMProperty":41,"./ReactDOMComponentTree":63,"./ReactInstrumentation":93,"./quoteAttributeValueForBrowser":151,"_process":1,"fbjs/lib/warning":24}],43:[function(require,module,exports){
+},{"./DOMProperty":42,"./ReactDOMComponentTree":64,"./ReactInstrumentation":93,"./quoteAttributeValueForBrowser":150,"_process":26,"fbjs/lib/warning":24}],44:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -4166,7 +5060,6 @@ var emptyFunction = require('fbjs/lib/emptyFunction');
 var invariant = require('fbjs/lib/invariant');
 
 var Danger = {
-
   /**
    * Replaces a node with a string of markup at its current position within its
    * parent. The markup must render into a single root node.
@@ -4187,19 +5080,16 @@ var Danger = {
       DOMLazyTree.replaceChildWithTree(oldChild, markup);
     }
   }
-
 };
 
 module.exports = Danger;
 }).call(this,require('_process'))
-},{"./DOMLazyTree":39,"./reactProdInvariant":152,"_process":1,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/createNodesFromMarkup":8,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17}],44:[function(require,module,exports){
+},{"./DOMLazyTree":40,"./reactProdInvariant":151,"_process":26,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/createNodesFromMarkup":8,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17}],45:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -4218,14 +5108,12 @@ module.exports = Danger;
 var DefaultEventPluginOrder = ['ResponderEventPlugin', 'SimpleEventPlugin', 'TapEventPlugin', 'EnterLeaveEventPlugin', 'ChangeEventPlugin', 'SelectEventPlugin', 'BeforeInputEventPlugin'];
 
 module.exports = DefaultEventPluginOrder;
-},{}],45:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -4247,7 +5135,6 @@ var eventTypes = {
 };
 
 var EnterLeaveEventPlugin = {
-
   eventTypes: eventTypes,
 
   /**
@@ -4314,19 +5201,16 @@ var EnterLeaveEventPlugin = {
 
     return [leave, enter];
   }
-
 };
 
 module.exports = EnterLeaveEventPlugin;
-},{"./EventPropagators":49,"./ReactDOMComponentTree":63,"./SyntheticMouseEvent":123}],46:[function(require,module,exports){
+},{"./EventPropagators":50,"./ReactDOMComponentTree":64,"./SyntheticMouseEvent":121}],47:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -4427,12 +5311,10 @@ function shouldPreventMouseEvent(name, type, props) {
  * @public
  */
 var EventPluginHub = {
-
   /**
    * Methods for injecting dependencies.
    */
   injection: {
-
     /**
      * @param {array} InjectedEventPluginOrder
      * @public
@@ -4443,7 +5325,6 @@ var EventPluginHub = {
      * @param {object} injectedNamesToPlugins Map from names to plugin modules.
      */
     injectEventPluginsByName: EventPluginRegistry.injectEventPluginsByName
-
   },
 
   /**
@@ -4593,20 +5474,17 @@ var EventPluginHub = {
   __getListenerBank: function () {
     return listenerBank;
   }
-
 };
 
 module.exports = EventPluginHub;
 }).call(this,require('_process'))
-},{"./EventPluginRegistry":47,"./EventPluginUtils":48,"./ReactErrorUtils":84,"./accumulateInto":130,"./forEachAccumulated":138,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],47:[function(require,module,exports){
+},{"./EventPluginRegistry":48,"./EventPluginUtils":49,"./ReactErrorUtils":84,"./accumulateInto":128,"./forEachAccumulated":136,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],48:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -4710,7 +5588,6 @@ function publishRegistrationName(registrationName, pluginModule, eventName) {
  * @see {EventPluginHub}
  */
 var EventPluginRegistry = {
-
   /**
    * Ordered list of injected plugins.
    */
@@ -4850,20 +5727,17 @@ var EventPluginRegistry = {
       }
     }
   }
-
 };
 
 module.exports = EventPluginRegistry;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],48:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],49:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -5083,15 +5957,13 @@ var EventPluginUtils = {
 
 module.exports = EventPluginUtils;
 }).call(this,require('_process'))
-},{"./ReactErrorUtils":84,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],49:[function(require,module,exports){
+},{"./ReactErrorUtils":84,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],50:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -5219,14 +6091,12 @@ var EventPropagators = {
 
 module.exports = EventPropagators;
 }).call(this,require('_process'))
-},{"./EventPluginHub":46,"./EventPluginUtils":48,"./accumulateInto":130,"./forEachAccumulated":138,"_process":1,"fbjs/lib/warning":24}],50:[function(require,module,exports){
+},{"./EventPluginHub":47,"./EventPluginUtils":49,"./accumulateInto":128,"./forEachAccumulated":136,"_process":26,"fbjs/lib/warning":24}],51:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -5314,14 +6184,12 @@ _assign(FallbackCompositionState.prototype, {
 PooledClass.addPoolingTo(FallbackCompositionState);
 
 module.exports = FallbackCompositionState;
-},{"./PooledClass":54,"./getTextContentAccessor":146,"object-assign":25}],51:[function(require,module,exports){
+},{"./PooledClass":55,"./getTextContentAccessor":144,"object-assign":25}],52:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -5370,6 +6238,7 @@ var HTMLDOMPropertyConfig = {
     contentEditable: 0,
     contextMenu: 0,
     controls: HAS_BOOLEAN_VALUE,
+    controlsList: 0,
     coords: 0,
     crossOrigin: 0,
     data: 0, // For `<object />` acts as `src`.
@@ -5550,14 +6419,12 @@ var HTMLDOMPropertyConfig = {
 };
 
 module.exports = HTMLDOMPropertyConfig;
-},{"./DOMProperty":41}],52:[function(require,module,exports){
+},{"./DOMProperty":42}],53:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -5609,15 +6476,13 @@ var KeyEscapeUtils = {
 };
 
 module.exports = KeyEscapeUtils;
-},{}],53:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -5635,13 +6500,13 @@ var invariant = require('fbjs/lib/invariant');
 var warning = require('fbjs/lib/warning');
 
 var hasReadOnlyValue = {
-  'button': true,
-  'checkbox': true,
-  'image': true,
-  'hidden': true,
-  'radio': true,
-  'reset': true,
-  'submit': true
+  button: true,
+  checkbox: true,
+  image: true,
+  hidden: true,
+  radio: true,
+  reset: true,
+  submit: true
 };
 
 function _assertSingleLink(inputProps) {
@@ -5749,15 +6614,13 @@ var LinkedValueUtils = {
 
 module.exports = LinkedValueUtils;
 }).call(this,require('_process'))
-},{"./ReactPropTypesSecret":101,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"prop-types/factory":27,"react/lib/React":162}],54:[function(require,module,exports){
+},{"./ReactPropTypesSecret":101,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"prop-types/factory":28,"react/lib/React":160}],55:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -5863,14 +6726,12 @@ var PooledClass = {
 
 module.exports = PooledClass;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],55:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],56:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -6041,7 +6902,6 @@ function getListeningForDocument(mountAt) {
  * @internal
  */
 var ReactBrowserEventEmitter = _assign({}, ReactEventEmitterMixin, {
-
   /**
    * Injectable event backend
    */
@@ -6115,14 +6975,12 @@ var ReactBrowserEventEmitter = _assign({}, ReactEventEmitterMixin, {
             ReactBrowserEventEmitter.ReactEventListener.trapBubbledEvent('topWheel', 'DOMMouseScroll', mountAt);
           }
         } else if (dependency === 'topScroll') {
-
           if (isEventSupported('scroll', true)) {
             ReactBrowserEventEmitter.ReactEventListener.trapCapturedEvent('topScroll', 'scroll', mountAt);
           } else {
             ReactBrowserEventEmitter.ReactEventListener.trapBubbledEvent('topScroll', 'scroll', ReactBrowserEventEmitter.ReactEventListener.WINDOW_HANDLE);
           }
         } else if (dependency === 'topFocus' || dependency === 'topBlur') {
-
           if (isEventSupported('focus', true)) {
             ReactBrowserEventEmitter.ReactEventListener.trapCapturedEvent('topFocus', 'focus', mountAt);
             ReactBrowserEventEmitter.ReactEventListener.trapCapturedEvent('topBlur', 'blur', mountAt);
@@ -6187,19 +7045,16 @@ var ReactBrowserEventEmitter = _assign({}, ReactEventEmitterMixin, {
       isMonitoringScrollValue = true;
     }
   }
-
 });
 
 module.exports = ReactBrowserEventEmitter;
-},{"./EventPluginRegistry":47,"./ReactEventEmitterMixin":85,"./ViewportMetrics":129,"./getVendorPrefixedEventName":147,"./isEventSupported":149,"object-assign":25}],56:[function(require,module,exports){
+},{"./EventPluginRegistry":48,"./ReactEventEmitterMixin":85,"./ViewportMetrics":127,"./getVendorPrefixedEventName":145,"./isEventSupported":148,"object-assign":25}],57:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -6254,8 +7109,8 @@ var ReactChildReconciler = {
    * @return {?object} A set of child instances.
    * @internal
    */
-  instantiateChildren: function (nestedChildNodes, transaction, context, selfDebugID // 0 in production and for roots
-  ) {
+  instantiateChildren: function (nestedChildNodes, transaction, context, selfDebugID) // 0 in production and for roots
+  {
     if (nestedChildNodes == null) {
       return null;
     }
@@ -6281,8 +7136,8 @@ var ReactChildReconciler = {
    * @return {?object} A new set of child instances.
    * @internal
    */
-  updateChildren: function (prevChildren, nextChildren, mountImages, removedNodes, transaction, hostParent, hostContainerInfo, context, selfDebugID // 0 in production and for roots
-  ) {
+  updateChildren: function (prevChildren, nextChildren, mountImages, removedNodes, transaction, hostParent, hostContainerInfo, context, selfDebugID) // 0 in production and for roots
+  {
     // We currently don't have a way to track moves here but if we use iterators
     // instead of for..in we can zip the iterators and check if an item has
     // moved.
@@ -6342,19 +7197,16 @@ var ReactChildReconciler = {
       }
     }
   }
-
 };
 
 module.exports = ReactChildReconciler;
 }).call(this,require('_process'))
-},{"./KeyEscapeUtils":52,"./ReactReconciler":103,"./instantiateReactComponent":148,"./shouldUpdateReactComponent":156,"./traverseAllChildren":157,"_process":1,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":166}],57:[function(require,module,exports){
+},{"./KeyEscapeUtils":53,"./ReactReconciler":103,"./instantiateReactComponent":147,"./shouldUpdateReactComponent":155,"./traverseAllChildren":156,"_process":26,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":163}],58:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -6369,23 +7221,19 @@ var ReactDOMIDOperations = require('./ReactDOMIDOperations');
  * need for this injection.
  */
 var ReactComponentBrowserEnvironment = {
-
   processChildrenUpdates: ReactDOMIDOperations.dangerouslyProcessChildrenUpdates,
 
   replaceNodeWithMarkup: DOMChildrenOperations.dangerouslyReplaceNodeWithMarkup
-
 };
 
 module.exports = ReactComponentBrowserEnvironment;
-},{"./DOMChildrenOperations":38,"./ReactDOMIDOperations":67}],58:[function(require,module,exports){
+},{"./DOMChildrenOperations":39,"./ReactDOMIDOperations":68}],59:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -6399,7 +7247,6 @@ var invariant = require('fbjs/lib/invariant');
 var injected = false;
 
 var ReactComponentEnvironment = {
-
   /**
    * Optionally injectable hook for swapping out mount images in the middle of
    * the tree.
@@ -6420,20 +7267,17 @@ var ReactComponentEnvironment = {
       injected = true;
     }
   }
-
 };
 
 module.exports = ReactComponentEnvironment;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],59:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],60:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -6546,7 +7390,6 @@ var nextMountID = 1;
  * @lends {ReactCompositeComponent.prototype}
  */
 var ReactCompositeComponent = {
-
   /**
    * Base constructor for all composite component.
    *
@@ -6642,7 +7485,7 @@ var ReactCompositeComponent = {
       var propsMutated = inst.props !== publicProps;
       var componentName = Component.displayName || Component.name || 'Component';
 
-      process.env.NODE_ENV !== 'production' ? warning(inst.props === undefined || !propsMutated, '%s(...): When calling super() in `%s`, make sure to pass ' + 'up the same props that your component\'s constructor was passed.', componentName, componentName) : void 0;
+      process.env.NODE_ENV !== 'production' ? warning(inst.props === undefined || !propsMutated, '%s(...): When calling super() in `%s`, make sure to pass ' + "up the same props that your component's constructor was passed.", componentName, componentName) : void 0;
     }
 
     // These should be set up in the constructor, but as a convenience for
@@ -6703,7 +7546,7 @@ var ReactCompositeComponent = {
   },
 
   _constructComponent: function (doConstruct, publicProps, publicContext, updateQueue) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && !doConstruct) {
       ReactCurrentOwner.current = this;
       try {
         return this._constructComponentWithoutOwner(doConstruct, publicProps, publicContext, updateQueue);
@@ -7324,20 +8167,17 @@ var ReactCompositeComponent = {
 
   // Stub
   _instantiateReactComponent: null
-
 };
 
 module.exports = ReactCompositeComponent;
 }).call(this,require('_process'))
-},{"./ReactComponentEnvironment":58,"./ReactErrorUtils":84,"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactNodeTypes":98,"./ReactReconciler":103,"./checkReactTypeSpec":132,"./reactProdInvariant":152,"./shouldUpdateReactComponent":156,"_process":1,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"fbjs/lib/shallowEqual":23,"fbjs/lib/warning":24,"object-assign":25,"react/lib/React":162,"react/lib/ReactCurrentOwner":167}],60:[function(require,module,exports){
+},{"./ReactComponentEnvironment":59,"./ReactErrorUtils":84,"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactNodeTypes":98,"./ReactReconciler":103,"./checkReactTypeSpec":130,"./reactProdInvariant":151,"./shouldUpdateReactComponent":155,"_process":26,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"fbjs/lib/shallowEqual":23,"fbjs/lib/warning":24,"object-assign":25,"react/lib/React":160,"react/lib/ReactCurrentOwner":164}],61:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -7368,6 +8208,7 @@ var ReactDOM = {
   /* eslint-disable camelcase */
   unstable_batchedUpdates: ReactUpdates.batchedUpdates,
   unstable_renderSubtreeIntoContainer: renderSubtreeIntoContainer
+  /* eslint-enable camelcase */
 };
 
 // Inject the runtime into a devtools global hook regardless of browser.
@@ -7396,7 +8237,6 @@ if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined' && typeof __REACT_DEVT
 if (process.env.NODE_ENV !== 'production') {
   var ExecutionEnvironment = require('fbjs/lib/ExecutionEnvironment');
   if (ExecutionEnvironment.canUseDOM && window.top === window.self) {
-
     // First check if devtools is not installed
     if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === 'undefined') {
       // If we're in Chrome or Firefox, provide a download link if not installed.
@@ -7408,7 +8248,7 @@ if (process.env.NODE_ENV !== 'production') {
     }
 
     var testFunc = function testFn() {};
-    process.env.NODE_ENV !== 'production' ? warning((testFunc.name || testFunc.toString()).indexOf('testFn') !== -1, 'It looks like you\'re using a minified copy of the development build ' + 'of React. When deploying React apps to production, make sure to use ' + 'the production build which skips development warnings and is faster. ' + 'See https://fb.me/react-minification for more details.') : void 0;
+    process.env.NODE_ENV !== 'production' ? warning((testFunc.name || testFunc.toString()).indexOf('testFn') !== -1, "It looks like you're using a minified copy of the development build " + 'of React. When deploying React apps to production, make sure to use ' + 'the production build which skips development warnings and is faster. ' + 'See https://fb.me/react-minification for more details.') : void 0;
 
     // If we're in IE8, check to see if we are in compatibility mode and provide
     // information on preventing compatibility mode
@@ -7442,15 +8282,13 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactDOM;
 }).call(this,require('_process'))
-},{"./ReactDOMComponentTree":63,"./ReactDOMInvalidARIAHook":69,"./ReactDOMNullInputValuePropHook":70,"./ReactDOMUnknownPropertyHook":78,"./ReactDefaultInjection":81,"./ReactInstrumentation":93,"./ReactMount":96,"./ReactReconciler":103,"./ReactUpdates":110,"./ReactVersion":111,"./findDOMNode":136,"./getHostComponentFromComposite":143,"./renderSubtreeIntoContainer":153,"_process":1,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/warning":24}],61:[function(require,module,exports){
+},{"./ReactDOMComponentTree":64,"./ReactDOMInvalidARIAHook":70,"./ReactDOMNullInputValuePropHook":71,"./ReactDOMUnknownPropertyHook":78,"./ReactDefaultInjection":81,"./ReactInstrumentation":93,"./ReactMount":96,"./ReactReconciler":103,"./ReactUpdates":108,"./ReactVersion":109,"./findDOMNode":134,"./getHostComponentFromComposite":141,"./renderSubtreeIntoContainer":152,"_process":26,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/warning":24}],62:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -7485,6 +8323,7 @@ var escapeTextContentForBrowser = require('./escapeTextContentForBrowser');
 var invariant = require('fbjs/lib/invariant');
 var isEventSupported = require('./isEventSupported');
 var shallowEqual = require('fbjs/lib/shallowEqual');
+var inputValueTracking = require('./inputValueTracking');
 var validateDOMNesting = require('./validateDOMNesting');
 var warning = require('fbjs/lib/warning');
 
@@ -7495,7 +8334,7 @@ var listenTo = ReactBrowserEventEmitter.listenTo;
 var registrationNameModules = EventPluginRegistry.registrationNameModules;
 
 // For quickly matching children type, to test if can be treated as content.
-var CONTENT_TYPES = { 'string': true, 'number': true };
+var CONTENT_TYPES = { string: true, number: true };
 
 var STYLE = 'style';
 var HTML = '__html';
@@ -7604,7 +8443,7 @@ function enqueuePutListener(inst, registrationName, listener, transaction) {
   if (process.env.NODE_ENV !== 'production') {
     // IE8 has no API for event capturing and the `onScroll` event doesn't
     // bubble.
-    process.env.NODE_ENV !== 'production' ? warning(registrationName !== 'onScroll' || isEventSupported('scroll', true), 'This browser doesn\'t support the `onScroll` event') : void 0;
+    process.env.NODE_ENV !== 'production' ? warning(registrationName !== 'onScroll' || isEventSupported('scroll', true), "This browser doesn't support the `onScroll` event") : void 0;
   }
   var containerInfo = inst._hostContainerInfo;
   var isDocumentFragment = containerInfo._node && containerInfo._node.nodeType === DOC_FRAGMENT_TYPE;
@@ -7694,6 +8533,10 @@ var mediaEvents = {
   topWaiting: 'waiting'
 };
 
+function trackInputValue() {
+  inputValueTracking.track(this);
+}
+
 function trapBubbledEventsLocal() {
   var inst = this;
   // If a component renders to null or if another component fatals and causes
@@ -7709,7 +8552,6 @@ function trapBubbledEventsLocal() {
       break;
     case 'video':
     case 'audio':
-
       inst._wrapperState.listeners = [];
       // Create listener for each media event
       for (var event in mediaEvents) {
@@ -7743,34 +8585,35 @@ function postUpdateSelectWrapper() {
 // those special-case tags.
 
 var omittedCloseTags = {
-  'area': true,
-  'base': true,
-  'br': true,
-  'col': true,
-  'embed': true,
-  'hr': true,
-  'img': true,
-  'input': true,
-  'keygen': true,
-  'link': true,
-  'meta': true,
-  'param': true,
-  'source': true,
-  'track': true,
-  'wbr': true
+  area: true,
+  base: true,
+  br: true,
+  col: true,
+  embed: true,
+  hr: true,
+  img: true,
+  input: true,
+  keygen: true,
+  link: true,
+  meta: true,
+  param: true,
+  source: true,
+  track: true,
+  wbr: true
+  // NOTE: menuitem's close tag should be omitted, but that causes problems.
 };
 
 var newlineEatingTags = {
-  'listing': true,
-  'pre': true,
-  'textarea': true
+  listing: true,
+  pre: true,
+  textarea: true
 };
 
 // For HTML, certain tags cannot have children. This has the same purpose as
 // `omittedCloseTags` except that `menuitem` should still have its closing tag.
 
 var voidElementTags = _assign({
-  'menuitem': true
+  menuitem: true
 }, omittedCloseTags);
 
 // We accept any tag to be rendered but since this gets injected into arbitrary
@@ -7834,7 +8677,6 @@ function ReactDOMComponent(element) {
 ReactDOMComponent.displayName = 'ReactDOMComponent';
 
 ReactDOMComponent.Mixin = {
-
   /**
    * Generates root tag markup then recurses. This method has side effects and
    * is not idempotent.
@@ -7871,6 +8713,7 @@ ReactDOMComponent.Mixin = {
       case 'input':
         ReactDOMInput.mountWrapper(this, props, hostParent);
         props = ReactDOMInput.getHostProps(this, props);
+        transaction.getReactMountReady().enqueue(trackInputValue, this);
         transaction.getReactMountReady().enqueue(trapBubbledEventsLocal, this);
         break;
       case 'option':
@@ -7885,6 +8728,7 @@ ReactDOMComponent.Mixin = {
       case 'textarea':
         ReactDOMTextarea.mountWrapper(this, props, hostParent);
         props = ReactDOMTextarea.getHostProps(this, props);
+        transaction.getReactMountReady().enqueue(trackInputValue, this);
         transaction.getReactMountReady().enqueue(trapBubbledEventsLocal, this);
         break;
     }
@@ -8205,6 +9049,10 @@ ReactDOMComponent.Mixin = {
         // happen after `_updateDOMProperties`. Otherwise HTML5 input validations
         // raise warnings and prevent the new value from being assigned.
         ReactDOMInput.updateWrapper(this);
+
+        // We also check that we haven't missed a value update, such as a
+        // Radio group shifting the checked value to another named radio input.
+        inputValueTracking.updateValueIfChanged(this);
         break;
       case 'textarea':
         ReactDOMTextarea.updateWrapper(this);
@@ -8410,6 +9258,10 @@ ReactDOMComponent.Mixin = {
           }
         }
         break;
+      case 'input':
+      case 'textarea':
+        inputValueTracking.stopTracking(this);
+        break;
       case 'html':
       case 'head':
       case 'body':
@@ -8438,21 +9290,18 @@ ReactDOMComponent.Mixin = {
   getPublicInstance: function () {
     return getNode(this);
   }
-
 };
 
 _assign(ReactDOMComponent.prototype, ReactDOMComponent.Mixin, ReactMultiChild.Mixin);
 
 module.exports = ReactDOMComponent;
 }).call(this,require('_process'))
-},{"./AutoFocusUtils":32,"./CSSPropertyOperations":35,"./DOMLazyTree":39,"./DOMNamespaces":40,"./DOMProperty":41,"./DOMPropertyOperations":42,"./EventPluginHub":46,"./EventPluginRegistry":47,"./ReactBrowserEventEmitter":55,"./ReactDOMComponentFlags":62,"./ReactDOMComponentTree":63,"./ReactDOMInput":68,"./ReactDOMOption":71,"./ReactDOMSelect":72,"./ReactDOMTextarea":76,"./ReactInstrumentation":93,"./ReactMultiChild":97,"./ReactServerRenderingTransaction":107,"./escapeTextContentForBrowser":135,"./isEventSupported":149,"./reactProdInvariant":152,"./validateDOMNesting":158,"_process":1,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17,"fbjs/lib/shallowEqual":23,"fbjs/lib/warning":24,"object-assign":25}],62:[function(require,module,exports){
+},{"./AutoFocusUtils":33,"./CSSPropertyOperations":36,"./DOMLazyTree":40,"./DOMNamespaces":41,"./DOMProperty":42,"./DOMPropertyOperations":43,"./EventPluginHub":47,"./EventPluginRegistry":48,"./ReactBrowserEventEmitter":56,"./ReactDOMComponentFlags":63,"./ReactDOMComponentTree":64,"./ReactDOMInput":69,"./ReactDOMOption":72,"./ReactDOMSelect":73,"./ReactDOMTextarea":76,"./ReactInstrumentation":93,"./ReactMultiChild":97,"./ReactServerRenderingTransaction":105,"./escapeTextContentForBrowser":133,"./inputValueTracking":146,"./isEventSupported":148,"./reactProdInvariant":151,"./validateDOMNesting":157,"_process":26,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17,"fbjs/lib/shallowEqual":23,"fbjs/lib/warning":24,"object-assign":25}],63:[function(require,module,exports){
 /**
- * Copyright 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -8463,15 +9312,13 @@ var ReactDOMComponentFlags = {
 };
 
 module.exports = ReactDOMComponentFlags;
-},{}],63:[function(require,module,exports){
+},{}],64:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -8660,15 +9507,13 @@ var ReactDOMComponentTree = {
 
 module.exports = ReactDOMComponentTree;
 }).call(this,require('_process'))
-},{"./DOMProperty":41,"./ReactDOMComponentFlags":62,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],64:[function(require,module,exports){
+},{"./DOMProperty":42,"./ReactDOMComponentFlags":63,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],65:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -8695,14 +9540,12 @@ function ReactDOMContainerInfo(topLevelWrapper, node) {
 
 module.exports = ReactDOMContainerInfo;
 }).call(this,require('_process'))
-},{"./validateDOMNesting":158,"_process":1}],65:[function(require,module,exports){
+},{"./validateDOMNesting":157,"_process":26}],66:[function(require,module,exports){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -8755,14 +9598,12 @@ _assign(ReactDOMEmptyComponent.prototype, {
 });
 
 module.exports = ReactDOMEmptyComponent;
-},{"./DOMLazyTree":39,"./ReactDOMComponentTree":63,"object-assign":25}],66:[function(require,module,exports){
+},{"./DOMLazyTree":40,"./ReactDOMComponentTree":64,"object-assign":25}],67:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -8774,14 +9615,12 @@ var ReactDOMFeatureFlags = {
 };
 
 module.exports = ReactDOMFeatureFlags;
-},{}],67:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -8794,7 +9633,6 @@ var ReactDOMComponentTree = require('./ReactDOMComponentTree');
  * Operations used to process updates to DOM nodes.
  */
 var ReactDOMIDOperations = {
-
   /**
    * Updates a component's children by processing a series of updates.
    *
@@ -8808,15 +9646,13 @@ var ReactDOMIDOperations = {
 };
 
 module.exports = ReactDOMIDOperations;
-},{"./DOMChildrenOperations":38,"./ReactDOMComponentTree":63}],68:[function(require,module,exports){
+},{"./DOMChildrenOperations":39,"./ReactDOMComponentTree":64}],69:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -8962,14 +9798,16 @@ var ReactDOMInput = {
         // Simulate `input.valueAsNumber`. IE9 does not support it
         var valueAsNumber = parseFloat(node.value, 10) || 0;
 
+        if (
         // eslint-disable-next-line
-        if (value != valueAsNumber) {
+        value != valueAsNumber ||
+        // eslint-disable-next-line
+        value == valueAsNumber && node.value != value) {
           // Cast `value` to a string to ensure the value is set correctly. While
           // browsers typically do this as necessary, jsdom doesn't.
           node.value = '' + value;
         }
-        // eslint-disable-next-line
-      } else if (value != node.value) {
+      } else if (node.value !== '' + value) {
         // Cast `value` to a string to ensure the value is set correctly. While
         // browsers typically do this as necessary, jsdom doesn't.
         node.value = '' + value;
@@ -9095,15 +9933,13 @@ function _handleChange(event) {
 
 module.exports = ReactDOMInput;
 }).call(this,require('_process'))
-},{"./DOMPropertyOperations":42,"./LinkedValueUtils":53,"./ReactDOMComponentTree":63,"./ReactUpdates":110,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25}],69:[function(require,module,exports){
+},{"./DOMPropertyOperations":43,"./LinkedValueUtils":54,"./ReactDOMComponentTree":64,"./ReactUpdates":108,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25}],70:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -9190,15 +10026,13 @@ var ReactDOMInvalidARIAHook = {
 
 module.exports = ReactDOMInvalidARIAHook;
 }).call(this,require('_process'))
-},{"./DOMProperty":41,"_process":1,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":166}],70:[function(require,module,exports){
+},{"./DOMProperty":42,"_process":26,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":163}],71:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -9235,15 +10069,13 @@ var ReactDOMNullInputValuePropHook = {
 
 module.exports = ReactDOMNullInputValuePropHook;
 }).call(this,require('_process'))
-},{"_process":1,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":166}],71:[function(require,module,exports){
+},{"_process":26,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":163}],72:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -9355,20 +10187,17 @@ var ReactDOMOption = {
 
     return hostProps;
   }
-
 };
 
 module.exports = ReactDOMOption;
 }).call(this,require('_process'))
-},{"./ReactDOMComponentTree":63,"./ReactDOMSelect":72,"_process":1,"fbjs/lib/warning":24,"object-assign":25,"react/lib/React":162}],72:[function(require,module,exports){
+},{"./ReactDOMComponentTree":64,"./ReactDOMSelect":73,"_process":26,"fbjs/lib/warning":24,"object-assign":25,"react/lib/React":160}],73:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -9562,14 +10391,12 @@ function _handleChange(event) {
 
 module.exports = ReactDOMSelect;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":53,"./ReactDOMComponentTree":63,"./ReactUpdates":110,"_process":1,"fbjs/lib/warning":24,"object-assign":25}],73:[function(require,module,exports){
+},{"./LinkedValueUtils":54,"./ReactDOMComponentTree":64,"./ReactUpdates":108,"_process":26,"fbjs/lib/warning":24,"object-assign":25}],74:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -9774,41 +10601,13 @@ var ReactDOMSelection = {
 };
 
 module.exports = ReactDOMSelection;
-},{"./getNodeForCharacterOffset":145,"./getTextContentAccessor":146,"fbjs/lib/ExecutionEnvironment":3}],74:[function(require,module,exports){
-/**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-var ReactDefaultInjection = require('./ReactDefaultInjection');
-var ReactServerRendering = require('./ReactServerRendering');
-var ReactVersion = require('./ReactVersion');
-
-ReactDefaultInjection.inject();
-
-var ReactDOMServer = {
-  renderToString: ReactServerRendering.renderToString,
-  renderToStaticMarkup: ReactServerRendering.renderToStaticMarkup,
-  version: ReactVersion
-};
-
-module.exports = ReactDOMServer;
-},{"./ReactDefaultInjection":81,"./ReactServerRendering":106,"./ReactVersion":111}],75:[function(require,module,exports){
+},{"./getNodeForCharacterOffset":143,"./getTextContentAccessor":144,"fbjs/lib/ExecutionEnvironment":3}],75:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -9856,7 +10655,6 @@ var ReactDOMTextComponent = function (text) {
 };
 
 _assign(ReactDOMTextComponent.prototype, {
-
   /**
    * Creates the markup for this text node. This node is not intended to have
    * any features besides containing text content.
@@ -9961,20 +10759,17 @@ _assign(ReactDOMTextComponent.prototype, {
     this._commentNodes = null;
     ReactDOMComponentTree.uncacheNode(this);
   }
-
 });
 
 module.exports = ReactDOMTextComponent;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":38,"./DOMLazyTree":39,"./ReactDOMComponentTree":63,"./escapeTextContentForBrowser":135,"./reactProdInvariant":152,"./validateDOMNesting":158,"_process":1,"fbjs/lib/invariant":17,"object-assign":25}],76:[function(require,module,exports){
+},{"./DOMChildrenOperations":39,"./DOMLazyTree":40,"./ReactDOMComponentTree":64,"./escapeTextContentForBrowser":133,"./reactProdInvariant":151,"./validateDOMNesting":157,"_process":26,"fbjs/lib/invariant":17,"object-assign":25}],76:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -10128,15 +10923,13 @@ function _handleChange(event) {
 
 module.exports = ReactDOMTextarea;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":53,"./ReactDOMComponentTree":63,"./ReactUpdates":110,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25}],77:[function(require,module,exports){
+},{"./LinkedValueUtils":54,"./ReactDOMComponentTree":64,"./ReactUpdates":108,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25}],77:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -10266,15 +11059,13 @@ module.exports = {
   traverseEnterLeave: traverseEnterLeave
 };
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],78:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],78:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -10380,15 +11171,13 @@ var ReactDOMUnknownPropertyHook = {
 
 module.exports = ReactDOMUnknownPropertyHook;
 }).call(this,require('_process'))
-},{"./DOMProperty":41,"./EventPluginRegistry":47,"_process":1,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":166}],79:[function(require,module,exports){
+},{"./DOMProperty":42,"./EventPluginRegistry":48,"_process":26,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":163}],79:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2016-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2016-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -10610,7 +11399,9 @@ function markEnd(debugID, markType) {
   }
 
   performance.clearMarks(markName);
-  performance.clearMeasures(measurementName);
+  if (measurementName) {
+    performance.clearMeasures(measurementName);
+  }
 }
 
 var ReactDebugTool = {
@@ -10741,14 +11532,12 @@ if (/[?&]react_perf\b/.test(url)) {
 
 module.exports = ReactDebugTool;
 }).call(this,require('_process'))
-},{"./ReactHostOperationHistoryHook":89,"./ReactInvalidSetStateWarningHook":94,"_process":1,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/performanceNow":22,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":166}],80:[function(require,module,exports){
+},{"./ReactHostOperationHistoryHook":89,"./ReactInvalidSetStateWarningHook":94,"_process":26,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/performanceNow":22,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":163}],80:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -10809,14 +11598,12 @@ var ReactDefaultBatchingStrategy = {
 };
 
 module.exports = ReactDefaultBatchingStrategy;
-},{"./ReactUpdates":110,"./Transaction":128,"fbjs/lib/emptyFunction":9,"object-assign":25}],81:[function(require,module,exports){
+},{"./ReactUpdates":108,"./Transaction":126,"fbjs/lib/emptyFunction":9,"object-assign":25}],81:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -10895,14 +11682,12 @@ function inject() {
 module.exports = {
   inject: inject
 };
-},{"./ARIADOMPropertyConfig":31,"./BeforeInputEventPlugin":33,"./ChangeEventPlugin":37,"./DefaultEventPluginOrder":44,"./EnterLeaveEventPlugin":45,"./HTMLDOMPropertyConfig":51,"./ReactComponentBrowserEnvironment":57,"./ReactDOMComponent":61,"./ReactDOMComponentTree":63,"./ReactDOMEmptyComponent":65,"./ReactDOMTextComponent":75,"./ReactDOMTreeTraversal":77,"./ReactDefaultBatchingStrategy":80,"./ReactEventListener":86,"./ReactInjection":90,"./ReactReconcileTransaction":102,"./SVGDOMPropertyConfig":112,"./SelectEventPlugin":113,"./SimpleEventPlugin":114}],82:[function(require,module,exports){
+},{"./ARIADOMPropertyConfig":32,"./BeforeInputEventPlugin":34,"./ChangeEventPlugin":38,"./DefaultEventPluginOrder":45,"./EnterLeaveEventPlugin":46,"./HTMLDOMPropertyConfig":52,"./ReactComponentBrowserEnvironment":58,"./ReactDOMComponent":62,"./ReactDOMComponentTree":64,"./ReactDOMEmptyComponent":66,"./ReactDOMTextComponent":75,"./ReactDOMTreeTraversal":77,"./ReactDefaultBatchingStrategy":80,"./ReactEventListener":86,"./ReactInjection":90,"./ReactReconcileTransaction":102,"./SVGDOMPropertyConfig":110,"./SelectEventPlugin":111,"./SimpleEventPlugin":112}],82:[function(require,module,exports){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -10917,12 +11702,10 @@ var REACT_ELEMENT_TYPE = typeof Symbol === 'function' && Symbol['for'] && Symbol
 module.exports = REACT_ELEMENT_TYPE;
 },{}],83:[function(require,module,exports){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -10948,12 +11731,10 @@ module.exports = ReactEmptyComponent;
 },{}],84:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -11010,7 +11791,9 @@ if (process.env.NODE_ENV !== 'production') {
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof document !== 'undefined' && typeof document.createEvent === 'function') {
     var fakeNode = document.createElement('react');
     ReactErrorUtils.invokeGuardedCallback = function (name, func, a) {
-      var boundFunc = func.bind(null, a);
+      var boundFunc = function () {
+        func(a);
+      };
       var evtType = 'react-' + name;
       fakeNode.addEventListener(evtType, boundFunc, false);
       var evt = document.createEvent('Event');
@@ -11023,14 +11806,12 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactErrorUtils;
 }).call(this,require('_process'))
-},{"_process":1}],85:[function(require,module,exports){
+},{"_process":26}],85:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11044,7 +11825,6 @@ function runEventQueueInBatch(events) {
 }
 
 var ReactEventEmitterMixin = {
-
   /**
    * Streams a fired top-level event to `EventPluginHub` where plugins have the
    * opportunity to create `ReactEvent`s to be dispatched.
@@ -11056,14 +11836,12 @@ var ReactEventEmitterMixin = {
 };
 
 module.exports = ReactEventEmitterMixin;
-},{"./EventPluginHub":46}],86:[function(require,module,exports){
+},{"./EventPluginHub":47}],86:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11211,14 +11989,12 @@ var ReactEventListener = {
 };
 
 module.exports = ReactEventListener;
-},{"./PooledClass":54,"./ReactDOMComponentTree":63,"./ReactUpdates":110,"./getEventTarget":142,"fbjs/lib/EventListener":2,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/getUnboundedScrollPosition":14,"object-assign":25}],87:[function(require,module,exports){
+},{"./PooledClass":55,"./ReactDOMComponentTree":64,"./ReactUpdates":108,"./getEventTarget":140,"fbjs/lib/EventListener":2,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/getUnboundedScrollPosition":14,"object-assign":25}],87:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -11236,12 +12012,10 @@ module.exports = ReactFeatureFlags;
 },{}],88:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11303,14 +12077,12 @@ var ReactHostComponent = {
 
 module.exports = ReactHostComponent;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],89:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],89:[function(require,module,exports){
 /**
- * Copyright 2016-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2016-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -11339,12 +12111,10 @@ var ReactHostOperationHistoryHook = {
 module.exports = ReactHostOperationHistoryHook;
 },{}],90:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11371,14 +12141,12 @@ var ReactInjection = {
 };
 
 module.exports = ReactInjection;
-},{"./DOMProperty":41,"./EventPluginHub":46,"./EventPluginUtils":48,"./ReactBrowserEventEmitter":55,"./ReactComponentEnvironment":58,"./ReactEmptyComponent":83,"./ReactHostComponent":88,"./ReactUpdates":110}],91:[function(require,module,exports){
+},{"./DOMProperty":42,"./EventPluginHub":47,"./EventPluginUtils":49,"./ReactBrowserEventEmitter":56,"./ReactComponentEnvironment":59,"./ReactEmptyComponent":83,"./ReactHostComponent":88,"./ReactUpdates":108}],91:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11401,7 +12169,6 @@ function isInDocument(node) {
  * Input selection module for React.
  */
 var ReactInputSelection = {
-
   hasSelectionCapabilities: function (elem) {
     var nodeName = elem && elem.nodeName && elem.nodeName.toLowerCase();
     return nodeName && (nodeName === 'input' && elem.type === 'text' || nodeName === 'textarea' || elem.contentEditable === 'true');
@@ -11495,14 +12262,12 @@ var ReactInputSelection = {
 };
 
 module.exports = ReactInputSelection;
-},{"./ReactDOMSelection":73,"fbjs/lib/containsNode":6,"fbjs/lib/focusNode":11,"fbjs/lib/getActiveElement":12}],92:[function(require,module,exports){
+},{"./ReactDOMSelection":74,"fbjs/lib/containsNode":6,"fbjs/lib/focusNode":11,"fbjs/lib/getActiveElement":12}],92:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11518,7 +12283,6 @@ module.exports = ReactInputSelection;
 // TODO: Replace this with ES6: var ReactInstanceMap = new Map();
 
 var ReactInstanceMap = {
-
   /**
    * This API should be called `delete` but we'd have to make sure to always
    * transform these to strings for IE support. When this transform is fully
@@ -11539,19 +12303,16 @@ var ReactInstanceMap = {
   set: function (key, value) {
     key._reactInternalInstance = value;
   }
-
 };
 
 module.exports = ReactInstanceMap;
 },{}],93:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2016-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2016-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -11569,15 +12330,13 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = { debugTool: debugTool };
 }).call(this,require('_process'))
-},{"./ReactDebugTool":79,"_process":1}],94:[function(require,module,exports){
+},{"./ReactDebugTool":79,"_process":26}],94:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2016-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2016-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -11608,14 +12367,12 @@ var ReactInvalidSetStateWarningHook = {
 
 module.exports = ReactInvalidSetStateWarningHook;
 }).call(this,require('_process'))
-},{"_process":1,"fbjs/lib/warning":24}],95:[function(require,module,exports){
+},{"_process":26,"fbjs/lib/warning":24}],95:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11658,15 +12415,13 @@ var ReactMarkupChecksum = {
 };
 
 module.exports = ReactMarkupChecksum;
-},{"./adler32":131}],96:[function(require,module,exports){
+},{"./adler32":129}],96:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -11918,7 +12673,6 @@ TopLevelWrapper.isReactTopLevelWrapper = true;
  * Inside of `container`, the first element rendered is the "reactRoot".
  */
 var ReactMount = {
-
   TopLevelWrapper: TopLevelWrapper,
 
   /**
@@ -12007,13 +12761,14 @@ var ReactMount = {
 
   _renderSubtreeIntoContainer: function (parentComponent, nextElement, container, callback) {
     ReactUpdateQueue.validateCallback(callback, 'ReactDOM.render');
-    !React.isValidElement(nextElement) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactDOM.render(): Invalid component element.%s', typeof nextElement === 'string' ? ' Instead of passing a string like \'div\', pass ' + 'React.createElement(\'div\') or <div />.' : typeof nextElement === 'function' ? ' Instead of passing a class like Foo, pass ' + 'React.createElement(Foo) or <Foo />.' :
-    // Check if it quacks like an element
-    nextElement != null && nextElement.props !== undefined ? ' This may be caused by unintentionally loading two independent ' + 'copies of React.' : '') : _prodInvariant('39', typeof nextElement === 'string' ? ' Instead of passing a string like \'div\', pass ' + 'React.createElement(\'div\') or <div />.' : typeof nextElement === 'function' ? ' Instead of passing a class like Foo, pass ' + 'React.createElement(Foo) or <Foo />.' : nextElement != null && nextElement.props !== undefined ? ' This may be caused by unintentionally loading two independent ' + 'copies of React.' : '') : void 0;
+    !React.isValidElement(nextElement) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactDOM.render(): Invalid component element.%s', typeof nextElement === 'string' ? " Instead of passing a string like 'div', pass " + "React.createElement('div') or <div />." : typeof nextElement === 'function' ? ' Instead of passing a class like Foo, pass ' + 'React.createElement(Foo) or <Foo />.' : // Check if it quacks like an element
+    nextElement != null && nextElement.props !== undefined ? ' This may be caused by unintentionally loading two independent ' + 'copies of React.' : '') : _prodInvariant('39', typeof nextElement === 'string' ? " Instead of passing a string like 'div', pass " + "React.createElement('div') or <div />." : typeof nextElement === 'function' ? ' Instead of passing a class like Foo, pass ' + 'React.createElement(Foo) or <Foo />.' : nextElement != null && nextElement.props !== undefined ? ' This may be caused by unintentionally loading two independent ' + 'copies of React.' : '') : void 0;
 
     process.env.NODE_ENV !== 'production' ? warning(!container || !container.tagName || container.tagName.toUpperCase() !== 'BODY', 'render(): Rendering components directly into document.body is ' + 'discouraged, since its children are often manipulated by third-party ' + 'scripts and browser extensions. This may lead to subtle ' + 'reconciliation issues. Try rendering into a container element created ' + 'for your app.') : void 0;
 
-    var nextWrappedElement = React.createElement(TopLevelWrapper, { child: nextElement });
+    var nextWrappedElement = React.createElement(TopLevelWrapper, {
+      child: nextElement
+    });
 
     var nextContext;
     if (parentComponent) {
@@ -12102,7 +12857,7 @@ var ReactMount = {
     !isValidContainer(container) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'unmountComponentAtNode(...): Target container is not a DOM element.') : _prodInvariant('40') : void 0;
 
     if (process.env.NODE_ENV !== 'production') {
-      process.env.NODE_ENV !== 'production' ? warning(!nodeIsRenderedByOtherInstance(container), 'unmountComponentAtNode(): The node you\'re attempting to unmount ' + 'was rendered by another copy of React.') : void 0;
+      process.env.NODE_ENV !== 'production' ? warning(!nodeIsRenderedByOtherInstance(container), "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by another copy of React.') : void 0;
     }
 
     var prevComponent = getTopLevelWrapperInContainer(container);
@@ -12115,7 +12870,7 @@ var ReactMount = {
       var isContainerReactRoot = container.nodeType === 1 && container.hasAttribute(ROOT_ATTR_NAME);
 
       if (process.env.NODE_ENV !== 'production') {
-        process.env.NODE_ENV !== 'production' ? warning(!containerHasNonRootReactChild, 'unmountComponentAtNode(): The node you\'re attempting to unmount ' + 'was rendered by React and is not a top-level container. %s', isContainerReactRoot ? 'You may have accidentally passed in a React root node instead ' + 'of its container.' : 'Instead, have the parent component update its state and ' + 'rerender in order to remove this component.') : void 0;
+        process.env.NODE_ENV !== 'production' ? warning(!containerHasNonRootReactChild, "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by React and is not a top-level container. %s', isContainerReactRoot ? 'You may have accidentally passed in a React root node instead ' + 'of its container.' : 'Instead, have the parent component update its state and ' + 'rerender in order to remove this component.') : void 0;
       }
 
       return false;
@@ -12198,15 +12953,13 @@ var ReactMount = {
 
 module.exports = ReactMount;
 }).call(this,require('_process'))
-},{"./DOMLazyTree":39,"./DOMProperty":41,"./ReactBrowserEventEmitter":55,"./ReactDOMComponentTree":63,"./ReactDOMContainerInfo":64,"./ReactDOMFeatureFlags":66,"./ReactFeatureFlags":87,"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactMarkupChecksum":95,"./ReactReconciler":103,"./ReactUpdateQueue":109,"./ReactUpdates":110,"./instantiateReactComponent":148,"./reactProdInvariant":152,"./setInnerHTML":154,"./shouldUpdateReactComponent":156,"_process":1,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/React":162,"react/lib/ReactCurrentOwner":167}],97:[function(require,module,exports){
+},{"./DOMLazyTree":40,"./DOMProperty":42,"./ReactBrowserEventEmitter":56,"./ReactDOMComponentTree":64,"./ReactDOMContainerInfo":65,"./ReactDOMFeatureFlags":67,"./ReactFeatureFlags":87,"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactMarkupChecksum":95,"./ReactReconciler":103,"./ReactUpdateQueue":107,"./ReactUpdates":108,"./instantiateReactComponent":147,"./reactProdInvariant":151,"./setInnerHTML":153,"./shouldUpdateReactComponent":155,"_process":26,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/React":160,"react/lib/ReactCurrentOwner":164}],97:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -12370,7 +13123,6 @@ if (process.env.NODE_ENV !== 'production') {
  * @internal
  */
 var ReactMultiChild = {
-
   /**
    * Provides common functionality for components that must reconcile multiple
    * children. This is used by `ReactDOMComponent` to mount, update, and
@@ -12379,7 +13131,6 @@ var ReactMultiChild = {
    * @lends {ReactMultiChild.prototype}
    */
   Mixin: {
-
     _reconcilerInstantiateChildren: function (nestedChildren, transaction, context) {
       if (process.env.NODE_ENV !== 'production') {
         var selfDebugID = getDebugID(this);
@@ -12643,22 +13394,18 @@ var ReactMultiChild = {
       child._mountIndex = null;
       return update;
     }
-
   }
-
 };
 
 module.exports = ReactMultiChild;
 }).call(this,require('_process'))
-},{"./ReactChildReconciler":56,"./ReactComponentEnvironment":58,"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactReconciler":103,"./flattenChildren":137,"./reactProdInvariant":152,"_process":1,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17,"react/lib/ReactCurrentOwner":167}],98:[function(require,module,exports){
+},{"./ReactChildReconciler":57,"./ReactComponentEnvironment":59,"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactReconciler":103,"./flattenChildren":135,"./reactProdInvariant":151,"_process":26,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17,"react/lib/ReactCurrentOwner":164}],98:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -12692,15 +13439,13 @@ var ReactNodeTypes = {
 
 module.exports = ReactNodeTypes;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"react/lib/React":162}],99:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"react/lib/React":160}],99:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -12783,20 +13528,17 @@ var ReactOwner = {
       owner.detachRef(ref);
     }
   }
-
 };
 
 module.exports = ReactOwner;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],100:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],100:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -12815,14 +13557,12 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactPropTypeLocationNames;
 }).call(this,require('_process'))
-},{"_process":1}],101:[function(require,module,exports){
+},{"_process":26}],101:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -12835,12 +13575,10 @@ module.exports = ReactPropTypesSecret;
 },{}],102:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -13012,15 +13750,13 @@ PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
 }).call(this,require('_process'))
-},{"./CallbackQueue":36,"./PooledClass":54,"./ReactBrowserEventEmitter":55,"./ReactInputSelection":91,"./ReactInstrumentation":93,"./ReactUpdateQueue":109,"./Transaction":128,"_process":1,"object-assign":25}],103:[function(require,module,exports){
+},{"./CallbackQueue":37,"./PooledClass":55,"./ReactBrowserEventEmitter":56,"./ReactInputSelection":91,"./ReactInstrumentation":93,"./ReactUpdateQueue":107,"./Transaction":126,"_process":26,"object-assign":25}],103:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -13040,7 +13776,6 @@ function attachRefs() {
 }
 
 var ReactReconciler = {
-
   /**
    * Initializes the component, renders markup, and registers event listeners.
    *
@@ -13052,8 +13787,8 @@ var ReactReconciler = {
    * @final
    * @internal
    */
-  mountComponent: function (internalInstance, transaction, hostParent, hostContainerInfo, context, parentDebugID // 0 in production and for roots
-  ) {
+  mountComponent: function (internalInstance, transaction, hostParent, hostContainerInfo, context, parentDebugID) // 0 in production and for roots
+  {
     if (process.env.NODE_ENV !== 'production') {
       if (internalInstance._debugID !== 0) {
         ReactInstrumentation.debugTool.onBeforeMountComponent(internalInstance._debugID, internalInstance._currentElement, parentDebugID);
@@ -13177,19 +13912,16 @@ var ReactReconciler = {
       }
     }
   }
-
 };
 
 module.exports = ReactReconciler;
 }).call(this,require('_process'))
-},{"./ReactInstrumentation":93,"./ReactRef":104,"_process":1,"fbjs/lib/warning":24}],104:[function(require,module,exports){
+},{"./ReactInstrumentation":93,"./ReactRef":104,"_process":26,"fbjs/lib/warning":24}],104:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -13272,128 +14004,12 @@ ReactRef.detachRefs = function (instance, element) {
 
 module.exports = ReactRef;
 },{"./ReactOwner":99}],105:[function(require,module,exports){
-/**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-var ReactServerBatchingStrategy = {
-  isBatchingUpdates: false,
-  batchedUpdates: function (callback) {
-    // Don't do anything here. During the server rendering we don't want to
-    // schedule any updates. We will simply ignore them.
-  }
-};
-
-module.exports = ReactServerBatchingStrategy;
-},{}],106:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-'use strict';
-
-var _prodInvariant = require('./reactProdInvariant');
-
-var React = require('react/lib/React');
-var ReactDOMContainerInfo = require('./ReactDOMContainerInfo');
-var ReactDefaultBatchingStrategy = require('./ReactDefaultBatchingStrategy');
-var ReactInstrumentation = require('./ReactInstrumentation');
-var ReactMarkupChecksum = require('./ReactMarkupChecksum');
-var ReactReconciler = require('./ReactReconciler');
-var ReactServerBatchingStrategy = require('./ReactServerBatchingStrategy');
-var ReactServerRenderingTransaction = require('./ReactServerRenderingTransaction');
-var ReactUpdates = require('./ReactUpdates');
-
-var emptyObject = require('fbjs/lib/emptyObject');
-var instantiateReactComponent = require('./instantiateReactComponent');
-var invariant = require('fbjs/lib/invariant');
-
-var pendingTransactions = 0;
-
-/**
- * @param {ReactElement} element
- * @return {string} the HTML markup
- */
-function renderToStringImpl(element, makeStaticMarkup) {
-  var transaction;
-  try {
-    ReactUpdates.injection.injectBatchingStrategy(ReactServerBatchingStrategy);
-
-    transaction = ReactServerRenderingTransaction.getPooled(makeStaticMarkup);
-
-    pendingTransactions++;
-
-    return transaction.perform(function () {
-      var componentInstance = instantiateReactComponent(element, true);
-      var markup = ReactReconciler.mountComponent(componentInstance, transaction, null, ReactDOMContainerInfo(), emptyObject, 0 /* parentDebugID */
-      );
-      if (process.env.NODE_ENV !== 'production') {
-        ReactInstrumentation.debugTool.onUnmountComponent(componentInstance._debugID);
-      }
-      if (!makeStaticMarkup) {
-        markup = ReactMarkupChecksum.addChecksumToMarkup(markup);
-      }
-      return markup;
-    }, null);
-  } finally {
-    pendingTransactions--;
-    ReactServerRenderingTransaction.release(transaction);
-    // Revert to the DOM batching strategy since these two renderers
-    // currently share these stateful modules.
-    if (!pendingTransactions) {
-      ReactUpdates.injection.injectBatchingStrategy(ReactDefaultBatchingStrategy);
-    }
-  }
-}
-
-/**
- * Render a ReactElement to its initial HTML. This should only be used on the
- * server.
- * See https://facebook.github.io/react/docs/top-level-api.html#reactdomserver.rendertostring
- */
-function renderToString(element) {
-  !React.isValidElement(element) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'renderToString(): You must pass a valid ReactElement.') : _prodInvariant('46') : void 0;
-  return renderToStringImpl(element, false);
-}
-
-/**
- * Similar to renderToString, except this doesn't create extra DOM attributes
- * such as data-react-id that React uses internally.
- * See https://facebook.github.io/react/docs/top-level-api.html#reactdomserver.rendertostaticmarkup
- */
-function renderToStaticMarkup(element) {
-  !React.isValidElement(element) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'renderToStaticMarkup(): You must pass a valid ReactElement.') : _prodInvariant('47') : void 0;
-  return renderToStringImpl(element, true);
-}
-
-module.exports = {
-  renderToString: renderToString,
-  renderToStaticMarkup: renderToStaticMarkup
-};
-}).call(this,require('_process'))
-},{"./ReactDOMContainerInfo":64,"./ReactDefaultBatchingStrategy":80,"./ReactInstrumentation":93,"./ReactMarkupChecksum":95,"./ReactReconciler":103,"./ReactServerBatchingStrategy":105,"./ReactServerRenderingTransaction":107,"./ReactUpdates":110,"./instantiateReactComponent":148,"./reactProdInvariant":152,"_process":1,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"react/lib/React":162}],107:[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -13477,15 +14093,13 @@ PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
 }).call(this,require('_process'))
-},{"./PooledClass":54,"./ReactInstrumentation":93,"./ReactServerUpdateQueue":108,"./Transaction":128,"_process":1,"object-assign":25}],108:[function(require,module,exports){
+},{"./PooledClass":55,"./ReactInstrumentation":93,"./ReactServerUpdateQueue":106,"./Transaction":126,"_process":26,"object-assign":25}],106:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -13618,15 +14232,13 @@ var ReactServerUpdateQueue = function () {
 
 module.exports = ReactServerUpdateQueue;
 }).call(this,require('_process'))
-},{"./ReactUpdateQueue":109,"_process":1,"fbjs/lib/warning":24}],109:[function(require,module,exports){
+},{"./ReactUpdateQueue":107,"_process":26,"fbjs/lib/warning":24}],107:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -13673,7 +14285,7 @@ function getInternalInstanceReadyForUpdate(publicInstance, callerName) {
   }
 
   if (process.env.NODE_ENV !== 'production') {
-    process.env.NODE_ENV !== 'production' ? warning(ReactCurrentOwner.current == null, '%s(...): Cannot update during an existing state transition (such as ' + 'within `render` or another component\'s constructor). Render methods ' + 'should be a pure function of props and state; constructor ' + 'side-effects are an anti-pattern, but can be moved to ' + '`componentWillMount`.', callerName) : void 0;
+    process.env.NODE_ENV !== 'production' ? warning(ReactCurrentOwner.current == null, '%s(...): Cannot update during an existing state transition (such as ' + "within `render` or another component's constructor). Render methods " + 'should be a pure function of props and state; constructor ' + 'side-effects are an anti-pattern, but can be moved to ' + '`componentWillMount`.', callerName) : void 0;
   }
 
   return internalInstance;
@@ -13684,7 +14296,6 @@ function getInternalInstanceReadyForUpdate(publicInstance, callerName) {
  * reconciliation step.
  */
 var ReactUpdateQueue = {
-
   /**
    * Checks whether or not this composite component is mounted.
    * @param {ReactClass} publicInstance The instance we want to test.
@@ -13851,20 +14462,17 @@ var ReactUpdateQueue = {
   validateCallback: function (callback, callerName) {
     !(!callback || typeof callback === 'function') ? process.env.NODE_ENV !== 'production' ? invariant(false, '%s(...): Expected the last optional `callback` argument to be a function. Instead received: %s.', callerName, formatUnexpectedArgument(callback)) : _prodInvariant('122', callerName, formatUnexpectedArgument(callback)) : void 0;
   }
-
 };
 
 module.exports = ReactUpdateQueue;
 }).call(this,require('_process'))
-},{"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactUpdates":110,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactCurrentOwner":167}],110:[function(require,module,exports){
+},{"./ReactInstanceMap":92,"./ReactInstrumentation":93,"./ReactUpdates":108,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactCurrentOwner":164}],108:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -14072,7 +14680,7 @@ function enqueueUpdate(component) {
  * if no updates are currently being performed.
  */
 function asap(callback, context) {
-  !batchingStrategy.isBatchingUpdates ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactUpdates.asap: Can\'t enqueue an asap callback in a context whereupdates are not being batched.') : _prodInvariant('125') : void 0;
+  invariant(batchingStrategy.isBatchingUpdates, "ReactUpdates.asap: Can't enqueue an asap callback in a context where" + 'updates are not being batched.');
   asapCallbackQueue.enqueue(callback, context);
   asapEnqueued = true;
 }
@@ -14109,28 +14717,24 @@ var ReactUpdates = {
 
 module.exports = ReactUpdates;
 }).call(this,require('_process'))
-},{"./CallbackQueue":36,"./PooledClass":54,"./ReactFeatureFlags":87,"./ReactReconciler":103,"./Transaction":128,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"object-assign":25}],111:[function(require,module,exports){
+},{"./CallbackQueue":37,"./PooledClass":55,"./ReactFeatureFlags":87,"./ReactReconciler":103,"./Transaction":126,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"object-assign":25}],109:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
 'use strict';
 
-module.exports = '15.5.4';
-},{}],112:[function(require,module,exports){
+module.exports = '15.6.2';
+},{}],110:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -14425,14 +15029,12 @@ Object.keys(ATTRS).forEach(function (key) {
 });
 
 module.exports = SVGDOMPropertyConfig;
-},{}],113:[function(require,module,exports){
+},{}],111:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -14551,7 +15153,6 @@ function constructSelectEvent(nativeEvent, nativeEventTarget) {
  * - Fires after user input.
  */
 var SelectEventPlugin = {
-
   eventTypes: eventTypes,
 
   extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
@@ -14575,7 +15176,6 @@ var SelectEventPlugin = {
         activeElementInst = null;
         lastSelection = null;
         break;
-
       // Don't fire the event while the user is dragging. This matches the
       // semantics of the native select event.
       case 'topMouseDown':
@@ -14585,7 +15185,6 @@ var SelectEventPlugin = {
       case 'topMouseUp':
         mouseDown = false;
         return constructSelectEvent(nativeEvent, nativeEventTarget);
-
       // Chrome and IE fire non-standard event when selection is changed (and
       // sometimes when it hasn't). IE's event fires out of order with respect
       // to key and input events on deletion, so we discard it.
@@ -14616,15 +15215,13 @@ var SelectEventPlugin = {
 };
 
 module.exports = SelectEventPlugin;
-},{"./EventPropagators":49,"./ReactDOMComponentTree":63,"./ReactInputSelection":91,"./SyntheticEvent":119,"./isTextInputElement":150,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/getActiveElement":12,"fbjs/lib/shallowEqual":23}],114:[function(require,module,exports){
+},{"./EventPropagators":50,"./ReactDOMComponentTree":64,"./ReactInputSelection":91,"./SyntheticEvent":117,"./isTextInputElement":149,"fbjs/lib/ExecutionEnvironment":3,"fbjs/lib/getActiveElement":12,"fbjs/lib/shallowEqual":23}],112:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -14701,7 +15298,6 @@ function isInteractive(tag) {
 }
 
 var SimpleEventPlugin = {
-
   eventTypes: eventTypes,
 
   extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
@@ -14841,19 +15437,16 @@ var SimpleEventPlugin = {
       delete onClickListeners[key];
     }
   }
-
 };
 
 module.exports = SimpleEventPlugin;
 }).call(this,require('_process'))
-},{"./EventPropagators":49,"./ReactDOMComponentTree":63,"./SyntheticAnimationEvent":115,"./SyntheticClipboardEvent":116,"./SyntheticDragEvent":118,"./SyntheticEvent":119,"./SyntheticFocusEvent":120,"./SyntheticKeyboardEvent":122,"./SyntheticMouseEvent":123,"./SyntheticTouchEvent":124,"./SyntheticTransitionEvent":125,"./SyntheticUIEvent":126,"./SyntheticWheelEvent":127,"./getEventCharCode":139,"./reactProdInvariant":152,"_process":1,"fbjs/lib/EventListener":2,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17}],115:[function(require,module,exports){
+},{"./EventPropagators":50,"./ReactDOMComponentTree":64,"./SyntheticAnimationEvent":113,"./SyntheticClipboardEvent":114,"./SyntheticDragEvent":116,"./SyntheticEvent":117,"./SyntheticFocusEvent":118,"./SyntheticKeyboardEvent":120,"./SyntheticMouseEvent":121,"./SyntheticTouchEvent":122,"./SyntheticTransitionEvent":123,"./SyntheticUIEvent":124,"./SyntheticWheelEvent":125,"./getEventCharCode":137,"./reactProdInvariant":151,"_process":26,"fbjs/lib/EventListener":2,"fbjs/lib/emptyFunction":9,"fbjs/lib/invariant":17}],113:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -14885,14 +15478,12 @@ function SyntheticAnimationEvent(dispatchConfig, dispatchMarker, nativeEvent, na
 SyntheticEvent.augmentClass(SyntheticAnimationEvent, AnimationEventInterface);
 
 module.exports = SyntheticAnimationEvent;
-},{"./SyntheticEvent":119}],116:[function(require,module,exports){
+},{"./SyntheticEvent":117}],114:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -14923,14 +15514,12 @@ function SyntheticClipboardEvent(dispatchConfig, dispatchMarker, nativeEvent, na
 SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
-},{"./SyntheticEvent":119}],117:[function(require,module,exports){
+},{"./SyntheticEvent":117}],115:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -14959,14 +15548,12 @@ function SyntheticCompositionEvent(dispatchConfig, dispatchMarker, nativeEvent, 
 SyntheticEvent.augmentClass(SyntheticCompositionEvent, CompositionEventInterface);
 
 module.exports = SyntheticCompositionEvent;
-},{"./SyntheticEvent":119}],118:[function(require,module,exports){
+},{"./SyntheticEvent":117}],116:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -14995,15 +15582,13 @@ function SyntheticDragEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeE
 SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
-},{"./SyntheticMouseEvent":123}],119:[function(require,module,exports){
+},{"./SyntheticMouseEvent":121}],117:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15101,7 +15686,6 @@ function SyntheticEvent(dispatchConfig, targetInst, nativeEvent, nativeEventTarg
 }
 
 _assign(SyntheticEvent.prototype, {
-
   preventDefault: function () {
     this.defaultPrevented = true;
     var event = this.nativeEvent;
@@ -15111,8 +15695,8 @@ _assign(SyntheticEvent.prototype, {
 
     if (event.preventDefault) {
       event.preventDefault();
+      // eslint-disable-next-line valid-typeof
     } else if (typeof event.returnValue !== 'unknown') {
-      // eslint-disable-line valid-typeof
       event.returnValue = false;
     }
     this.isDefaultPrevented = emptyFunction.thatReturnsTrue;
@@ -15126,8 +15710,8 @@ _assign(SyntheticEvent.prototype, {
 
     if (event.stopPropagation) {
       event.stopPropagation();
+      // eslint-disable-next-line valid-typeof
     } else if (typeof event.cancelBubble !== 'unknown') {
-      // eslint-disable-line valid-typeof
       // The ChangeEventPlugin registers a "propertychange" event for
       // IE. This event does not support bubbling or cancelling, and
       // any references to cancelBubble throw "Member not found".  A
@@ -15176,34 +15760,10 @@ _assign(SyntheticEvent.prototype, {
       Object.defineProperty(this, 'stopPropagation', getPooledWarningPropertyDefinition('stopPropagation', emptyFunction));
     }
   }
-
 });
 
 SyntheticEvent.Interface = EventInterface;
 
-if (process.env.NODE_ENV !== 'production') {
-  if (isProxySupported) {
-    /*eslint-disable no-func-assign */
-    SyntheticEvent = new Proxy(SyntheticEvent, {
-      construct: function (target, args) {
-        return this.apply(target, Object.create(target.prototype), args);
-      },
-      apply: function (constructor, that, args) {
-        return new Proxy(constructor.apply(that, args), {
-          set: function (target, prop, value) {
-            if (prop !== 'isPersistent' && !target.constructor.Interface.hasOwnProperty(prop) && shouldBeReleasedProperties.indexOf(prop) === -1) {
-              process.env.NODE_ENV !== 'production' ? warning(didWarnForAddedNewProperty || target.isPersistent(), 'This synthetic event is reused for performance reasons. If you\'re ' + 'seeing this, you\'re adding a new property in the synthetic event object. ' + 'The property is never released. See ' + 'https://fb.me/react-event-pooling for more information.') : void 0;
-              didWarnForAddedNewProperty = true;
-            }
-            target[prop] = value;
-            return true;
-          }
-        });
-      }
-    });
-    /*eslint-enable no-func-assign */
-  }
-}
 /**
  * Helper to reduce boilerplate when creating subclasses.
  *
@@ -15226,6 +15786,34 @@ SyntheticEvent.augmentClass = function (Class, Interface) {
 
   PooledClass.addPoolingTo(Class, PooledClass.fourArgumentPooler);
 };
+
+/** Proxying after everything set on SyntheticEvent
+  * to resolve Proxy issue on some WebKit browsers
+  * in which some Event properties are set to undefined (GH#10010)
+  */
+if (process.env.NODE_ENV !== 'production') {
+  if (isProxySupported) {
+    /*eslint-disable no-func-assign */
+    SyntheticEvent = new Proxy(SyntheticEvent, {
+      construct: function (target, args) {
+        return this.apply(target, Object.create(target.prototype), args);
+      },
+      apply: function (constructor, that, args) {
+        return new Proxy(constructor.apply(that, args), {
+          set: function (target, prop, value) {
+            if (prop !== 'isPersistent' && !target.constructor.Interface.hasOwnProperty(prop) && shouldBeReleasedProperties.indexOf(prop) === -1) {
+              process.env.NODE_ENV !== 'production' ? warning(didWarnForAddedNewProperty || target.isPersistent(), "This synthetic event is reused for performance reasons. If you're " + "seeing this, you're adding a new property in the synthetic event object. " + 'The property is never released. See ' + 'https://fb.me/react-event-pooling for more information.') : void 0;
+              didWarnForAddedNewProperty = true;
+            }
+            target[prop] = value;
+            return true;
+          }
+        });
+      }
+    });
+    /*eslint-enable no-func-assign */
+  }
+}
 
 PooledClass.addPoolingTo(SyntheticEvent, PooledClass.fourArgumentPooler);
 
@@ -15261,18 +15849,16 @@ function getPooledWarningPropertyDefinition(propName, getVal) {
 
   function warn(action, result) {
     var warningCondition = false;
-    process.env.NODE_ENV !== 'production' ? warning(warningCondition, 'This synthetic event is reused for performance reasons. If you\'re seeing this, ' + 'you\'re %s `%s` on a released/nullified synthetic event. %s. ' + 'If you must keep the original synthetic event around, use event.persist(). ' + 'See https://fb.me/react-event-pooling for more information.', action, propName, result) : void 0;
+    process.env.NODE_ENV !== 'production' ? warning(warningCondition, "This synthetic event is reused for performance reasons. If you're seeing this, " + "you're %s `%s` on a released/nullified synthetic event. %s. " + 'If you must keep the original synthetic event around, use event.persist(). ' + 'See https://fb.me/react-event-pooling for more information.', action, propName, result) : void 0;
   }
 }
 }).call(this,require('_process'))
-},{"./PooledClass":54,"_process":1,"fbjs/lib/emptyFunction":9,"fbjs/lib/warning":24,"object-assign":25}],120:[function(require,module,exports){
+},{"./PooledClass":55,"_process":26,"fbjs/lib/emptyFunction":9,"fbjs/lib/warning":24,"object-assign":25}],118:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15301,14 +15887,12 @@ function SyntheticFocusEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
-},{"./SyntheticUIEvent":126}],121:[function(require,module,exports){
+},{"./SyntheticUIEvent":124}],119:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15338,14 +15922,12 @@ function SyntheticInputEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticEvent.augmentClass(SyntheticInputEvent, InputEventInterface);
 
 module.exports = SyntheticInputEvent;
-},{"./SyntheticEvent":119}],122:[function(require,module,exports){
+},{"./SyntheticEvent":117}],120:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15422,14 +16004,12 @@ function SyntheticKeyboardEvent(dispatchConfig, dispatchMarker, nativeEvent, nat
 SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
-},{"./SyntheticUIEvent":126,"./getEventCharCode":139,"./getEventKey":140,"./getEventModifierState":141}],123:[function(require,module,exports){
+},{"./SyntheticUIEvent":124,"./getEventCharCode":137,"./getEventKey":138,"./getEventModifierState":139}],121:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15494,14 +16074,12 @@ function SyntheticMouseEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
-},{"./SyntheticUIEvent":126,"./ViewportMetrics":129,"./getEventModifierState":141}],124:[function(require,module,exports){
+},{"./SyntheticUIEvent":124,"./ViewportMetrics":127,"./getEventModifierState":139}],122:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15539,14 +16117,12 @@ function SyntheticTouchEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
-},{"./SyntheticUIEvent":126,"./getEventModifierState":141}],125:[function(require,module,exports){
+},{"./SyntheticUIEvent":124,"./getEventModifierState":139}],123:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15578,14 +16154,12 @@ function SyntheticTransitionEvent(dispatchConfig, dispatchMarker, nativeEvent, n
 SyntheticEvent.augmentClass(SyntheticTransitionEvent, TransitionEventInterface);
 
 module.exports = SyntheticTransitionEvent;
-},{"./SyntheticEvent":119}],126:[function(require,module,exports){
+},{"./SyntheticEvent":117}],124:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15637,14 +16211,12 @@ function SyntheticUIEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeEve
 SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
-},{"./SyntheticEvent":119,"./getEventTarget":142}],127:[function(require,module,exports){
+},{"./SyntheticEvent":117,"./getEventTarget":140}],125:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -15658,15 +16230,12 @@ var SyntheticMouseEvent = require('./SyntheticMouseEvent');
  */
 var WheelEventInterface = {
   deltaX: function (event) {
-    return 'deltaX' in event ? event.deltaX :
-    // Fallback to `wheelDeltaX` for Webkit and normalize (right is positive).
+    return 'deltaX' in event ? event.deltaX : // Fallback to `wheelDeltaX` for Webkit and normalize (right is positive).
     'wheelDeltaX' in event ? -event.wheelDeltaX : 0;
   },
   deltaY: function (event) {
-    return 'deltaY' in event ? event.deltaY :
-    // Fallback to `wheelDeltaY` for Webkit and normalize (down is positive).
-    'wheelDeltaY' in event ? -event.wheelDeltaY :
-    // Fallback to `wheelDelta` for IE<9 and normalize (down is positive).
+    return 'deltaY' in event ? event.deltaY : // Fallback to `wheelDeltaY` for Webkit and normalize (down is positive).
+    'wheelDeltaY' in event ? -event.wheelDeltaY : // Fallback to `wheelDelta` for IE<9 and normalize (down is positive).
     'wheelDelta' in event ? -event.wheelDelta : 0;
   },
   deltaZ: null,
@@ -15691,15 +16260,13 @@ function SyntheticWheelEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
-},{"./SyntheticMouseEvent":123}],128:[function(require,module,exports){
+},{"./SyntheticMouseEvent":121}],126:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -15803,6 +16370,8 @@ var TransactionImpl = {
     return !!this._isInTransaction;
   },
 
+  /* eslint-disable space-before-function-paren */
+
   /**
    * Executes the function within a safety window. Use this for the top level
    * methods that result in large amounts of computation/mutations that would
@@ -15821,6 +16390,7 @@ var TransactionImpl = {
    * @return {*} Return value from `method`.
    */
   perform: function (method, scope, a, b, c, d, e, f) {
+    /* eslint-enable space-before-function-paren */
     !!this.isInTransaction() ? process.env.NODE_ENV !== 'production' ? invariant(false, 'Transaction.perform(...): Cannot initialize a transaction when there is already an outstanding transaction.') : _prodInvariant('27') : void 0;
     var errorThrown;
     var ret;
@@ -15918,21 +16488,18 @@ var TransactionImpl = {
 
 module.exports = TransactionImpl;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],129:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],127:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
 'use strict';
 
 var ViewportMetrics = {
-
   currentScrollLeft: 0,
 
   currentScrollTop: 0,
@@ -15941,19 +16508,16 @@ var ViewportMetrics = {
     ViewportMetrics.currentScrollLeft = scrollPosition.x;
     ViewportMetrics.currentScrollTop = scrollPosition.y;
   }
-
 };
 
 module.exports = ViewportMetrics;
-},{}],130:[function(require,module,exports){
+},{}],128:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -16005,14 +16569,12 @@ function accumulateInto(current, next) {
 
 module.exports = accumulateInto;
 }).call(this,require('_process'))
-},{"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17}],131:[function(require,module,exports){
+},{"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17}],129:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -16049,15 +16611,13 @@ function adler32(data) {
 }
 
 module.exports = adler32;
-},{}],132:[function(require,module,exports){
+},{}],130:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16138,14 +16698,12 @@ function checkReactTypeSpec(typeSpecs, values, location, componentName, element,
 
 module.exports = checkReactTypeSpec;
 }).call(this,require('_process'))
-},{"./ReactPropTypeLocationNames":100,"./ReactPropTypesSecret":101,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":166}],133:[function(require,module,exports){
+},{"./ReactPropTypeLocationNames":100,"./ReactPropTypesSecret":101,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":163}],131:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16170,15 +16728,13 @@ var createMicrosoftUnsafeLocalFunction = function (func) {
 };
 
 module.exports = createMicrosoftUnsafeLocalFunction;
-},{}],134:[function(require,module,exports){
+},{}],132:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16200,7 +16756,7 @@ var styleWarnings = {};
  * @param {ReactDOMComponent} component
  * @return {string} Normalized style value with dimensions applied.
  */
-function dangerousStyleValue(name, value, component) {
+function dangerousStyleValue(name, value, component, isCustomProperty) {
   // Note that we've removed escapeTextForBrowser() calls here since the
   // whole string will be escaped when the attribute is injected into
   // the markup. If you provide unsafe user data here they can inject
@@ -16217,7 +16773,7 @@ function dangerousStyleValue(name, value, component) {
   }
 
   var isNonNumeric = isNaN(value);
-  if (isNonNumeric || value === 0 || isUnitlessNumber.hasOwnProperty(name) && isUnitlessNumber[name]) {
+  if (isCustomProperty || isNonNumeric || value === 0 || isUnitlessNumber.hasOwnProperty(name) && isUnitlessNumber[name]) {
     return '' + value; // cast to string
   }
 
@@ -16251,14 +16807,12 @@ function dangerousStyleValue(name, value, component) {
 
 module.exports = dangerousStyleValue;
 }).call(this,require('_process'))
-},{"./CSSProperty":34,"_process":1,"fbjs/lib/warning":24}],135:[function(require,module,exports){
+},{"./CSSProperty":35,"_process":26,"fbjs/lib/warning":24}],133:[function(require,module,exports){
 /**
- * Copyright 2016-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2016-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * Based on the escape-html library, which is used under the MIT License below:
  *
@@ -16356,7 +16910,6 @@ function escapeHtml(string) {
 }
 // end code copied and modified from escape-html
 
-
 /**
  * Escapes text to prevent scripting attacks.
  *
@@ -16374,15 +16927,13 @@ function escapeTextContentForBrowser(text) {
 }
 
 module.exports = escapeTextContentForBrowser;
-},{}],136:[function(require,module,exports){
+},{}],134:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16436,15 +16987,13 @@ function findDOMNode(componentOrElement) {
 
 module.exports = findDOMNode;
 }).call(this,require('_process'))
-},{"./ReactDOMComponentTree":63,"./ReactInstanceMap":92,"./getHostComponentFromComposite":143,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactCurrentOwner":167}],137:[function(require,module,exports){
+},{"./ReactDOMComponentTree":64,"./ReactInstanceMap":92,"./getHostComponentFromComposite":141,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactCurrentOwner":164}],135:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -16514,14 +17063,12 @@ function flattenChildren(children, selfDebugID) {
 
 module.exports = flattenChildren;
 }).call(this,require('_process'))
-},{"./KeyEscapeUtils":52,"./traverseAllChildren":157,"_process":1,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":166}],138:[function(require,module,exports){
+},{"./KeyEscapeUtils":53,"./traverseAllChildren":156,"_process":26,"fbjs/lib/warning":24,"react/lib/ReactComponentTreeHook":163}],136:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -16545,14 +17092,12 @@ function forEachAccumulated(arr, cb, scope) {
 }
 
 module.exports = forEachAccumulated;
-},{}],139:[function(require,module,exports){
+},{}],137:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16595,14 +17140,12 @@ function getEventCharCode(nativeEvent) {
 }
 
 module.exports = getEventCharCode;
-},{}],140:[function(require,module,exports){
+},{}],138:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16615,18 +17158,18 @@ var getEventCharCode = require('./getEventCharCode');
  * @see https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent#Key_names
  */
 var normalizeKey = {
-  'Esc': 'Escape',
-  'Spacebar': ' ',
-  'Left': 'ArrowLeft',
-  'Up': 'ArrowUp',
-  'Right': 'ArrowRight',
-  'Down': 'ArrowDown',
-  'Del': 'Delete',
-  'Win': 'OS',
-  'Menu': 'ContextMenu',
-  'Apps': 'ContextMenu',
-  'Scroll': 'ScrollLock',
-  'MozPrintableKey': 'Unidentified'
+  Esc: 'Escape',
+  Spacebar: ' ',
+  Left: 'ArrowLeft',
+  Up: 'ArrowUp',
+  Right: 'ArrowRight',
+  Down: 'ArrowDown',
+  Del: 'Delete',
+  Win: 'OS',
+  Menu: 'ContextMenu',
+  Apps: 'ContextMenu',
+  Scroll: 'ScrollLock',
+  MozPrintableKey: 'Unidentified'
 };
 
 /**
@@ -16656,8 +17199,18 @@ var translateToKey = {
   40: 'ArrowDown',
   45: 'Insert',
   46: 'Delete',
-  112: 'F1', 113: 'F2', 114: 'F3', 115: 'F4', 116: 'F5', 117: 'F6',
-  118: 'F7', 119: 'F8', 120: 'F9', 121: 'F10', 122: 'F11', 123: 'F12',
+  112: 'F1',
+  113: 'F2',
+  114: 'F3',
+  115: 'F4',
+  116: 'F5',
+  117: 'F6',
+  118: 'F7',
+  119: 'F8',
+  120: 'F9',
+  121: 'F10',
+  122: 'F11',
+  123: 'F12',
   144: 'NumLock',
   145: 'ScrollLock',
   224: 'Meta'
@@ -16697,14 +17250,12 @@ function getEventKey(nativeEvent) {
 }
 
 module.exports = getEventKey;
-},{"./getEventCharCode":139}],141:[function(require,module,exports){
+},{"./getEventCharCode":137}],139:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16716,10 +17267,10 @@ module.exports = getEventKey;
  */
 
 var modifierKeyToProp = {
-  'Alt': 'altKey',
-  'Control': 'ctrlKey',
-  'Meta': 'metaKey',
-  'Shift': 'shiftKey'
+  Alt: 'altKey',
+  Control: 'ctrlKey',
+  Meta: 'metaKey',
+  Shift: 'shiftKey'
 };
 
 // IE8 does not implement getModifierState so we simply map it to the only
@@ -16740,14 +17291,12 @@ function getEventModifierState(nativeEvent) {
 }
 
 module.exports = getEventModifierState;
-},{}],142:[function(require,module,exports){
+},{}],140:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16775,14 +17324,12 @@ function getEventTarget(nativeEvent) {
 }
 
 module.exports = getEventTarget;
-},{}],143:[function(require,module,exports){
+},{}],141:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16805,14 +17352,12 @@ function getHostComponentFromComposite(inst) {
 }
 
 module.exports = getHostComponentFromComposite;
-},{"./ReactNodeTypes":98}],144:[function(require,module,exports){
+},{"./ReactNodeTypes":98}],142:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -16846,14 +17391,12 @@ function getIteratorFn(maybeIterable) {
 }
 
 module.exports = getIteratorFn;
-},{}],145:[function(require,module,exports){
+},{}],143:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16920,14 +17463,12 @@ function getNodeForCharacterOffset(root, offset) {
 }
 
 module.exports = getNodeForCharacterOffset;
-},{}],146:[function(require,module,exports){
+},{}],144:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -16953,14 +17494,12 @@ function getTextContentAccessor() {
 }
 
 module.exports = getTextContentAccessor;
-},{"fbjs/lib/ExecutionEnvironment":3}],147:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":3}],145:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17054,15 +17593,134 @@ function getVendorPrefixedEventName(eventName) {
 }
 
 module.exports = getVendorPrefixedEventName;
-},{"fbjs/lib/ExecutionEnvironment":3}],148:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":3}],146:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+var ReactDOMComponentTree = require('./ReactDOMComponentTree');
+
+function isCheckable(elem) {
+  var type = elem.type;
+  var nodeName = elem.nodeName;
+  return nodeName && nodeName.toLowerCase() === 'input' && (type === 'checkbox' || type === 'radio');
+}
+
+function getTracker(inst) {
+  return inst._wrapperState.valueTracker;
+}
+
+function attachTracker(inst, tracker) {
+  inst._wrapperState.valueTracker = tracker;
+}
+
+function detachTracker(inst) {
+  inst._wrapperState.valueTracker = null;
+}
+
+function getValueFromNode(node) {
+  var value;
+  if (node) {
+    value = isCheckable(node) ? '' + node.checked : node.value;
+  }
+  return value;
+}
+
+var inputValueTracking = {
+  // exposed for testing
+  _getTrackerFromNode: function (node) {
+    return getTracker(ReactDOMComponentTree.getInstanceFromNode(node));
+  },
+
+
+  track: function (inst) {
+    if (getTracker(inst)) {
+      return;
+    }
+
+    var node = ReactDOMComponentTree.getNodeFromInstance(inst);
+    var valueField = isCheckable(node) ? 'checked' : 'value';
+    var descriptor = Object.getOwnPropertyDescriptor(node.constructor.prototype, valueField);
+
+    var currentValue = '' + node[valueField];
+
+    // if someone has already defined a value or Safari, then bail
+    // and don't track value will cause over reporting of changes,
+    // but it's better then a hard failure
+    // (needed for certain tests that spyOn input values and Safari)
+    if (node.hasOwnProperty(valueField) || typeof descriptor.get !== 'function' || typeof descriptor.set !== 'function') {
+      return;
+    }
+
+    Object.defineProperty(node, valueField, {
+      enumerable: descriptor.enumerable,
+      configurable: true,
+      get: function () {
+        return descriptor.get.call(this);
+      },
+      set: function (value) {
+        currentValue = '' + value;
+        descriptor.set.call(this, value);
+      }
+    });
+
+    attachTracker(inst, {
+      getValue: function () {
+        return currentValue;
+      },
+      setValue: function (value) {
+        currentValue = '' + value;
+      },
+      stopTracking: function () {
+        detachTracker(inst);
+        delete node[valueField];
+      }
+    });
+  },
+
+  updateValueIfChanged: function (inst) {
+    if (!inst) {
+      return false;
+    }
+    var tracker = getTracker(inst);
+
+    if (!tracker) {
+      inputValueTracking.track(inst);
+      return true;
+    }
+
+    var lastValue = tracker.getValue();
+    var nextValue = getValueFromNode(ReactDOMComponentTree.getNodeFromInstance(inst));
+
+    if (nextValue !== lastValue) {
+      tracker.setValue(nextValue);
+      return true;
+    }
+
+    return false;
+  },
+  stopTracking: function (inst) {
+    var tracker = getTracker(inst);
+    if (tracker) {
+      tracker.stopTracking();
+    }
+  }
+};
+
+module.exports = inputValueTracking;
+},{"./ReactDOMComponentTree":64}],147:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17125,7 +17783,7 @@ function instantiateReactComponent(node, shouldHaveDebugID) {
       var info = '';
       if (process.env.NODE_ENV !== 'production') {
         if (type === undefined || typeof type === 'object' && type !== null && Object.keys(type).length === 0) {
-          info += ' You likely forgot to export your component from the file ' + 'it\'s defined in.';
+          info += ' You likely forgot to export your component from the file ' + "it's defined in.";
         }
       }
       info += getDeclarationErrorAddendum(element._owner);
@@ -17185,14 +17843,12 @@ _assign(ReactCompositeComponentWrapper.prototype, ReactCompositeComponent, {
 
 module.exports = instantiateReactComponent;
 }).call(this,require('_process'))
-},{"./ReactCompositeComponent":59,"./ReactEmptyComponent":83,"./ReactHostComponent":88,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25,"react/lib/getNextDebugID":181}],149:[function(require,module,exports){
+},{"./ReactCompositeComponent":60,"./ReactEmptyComponent":83,"./ReactHostComponent":88,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25,"react/lib/getNextDebugID":178}],148:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17245,14 +17901,12 @@ function isEventSupported(eventNameSuffix, capture) {
 }
 
 module.exports = isEventSupported;
-},{"fbjs/lib/ExecutionEnvironment":3}],150:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":3}],149:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -17264,21 +17918,21 @@ module.exports = isEventSupported;
  */
 
 var supportedInputTypes = {
-  'color': true,
-  'date': true,
-  'datetime': true,
+  color: true,
+  date: true,
+  datetime: true,
   'datetime-local': true,
-  'email': true,
-  'month': true,
-  'number': true,
-  'password': true,
-  'range': true,
-  'search': true,
-  'tel': true,
-  'text': true,
-  'time': true,
-  'url': true,
-  'week': true
+  email: true,
+  month: true,
+  number: true,
+  password: true,
+  range: true,
+  search: true,
+  tel: true,
+  text: true,
+  time: true,
+  url: true,
+  week: true
 };
 
 function isTextInputElement(elem) {
@@ -17296,14 +17950,12 @@ function isTextInputElement(elem) {
 }
 
 module.exports = isTextInputElement;
-},{}],151:[function(require,module,exports){
+},{}],150:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17322,14 +17974,12 @@ function quoteAttributeValueForBrowser(value) {
 }
 
 module.exports = quoteAttributeValueForBrowser;
-},{"./escapeTextContentForBrowser":135}],152:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":133}],151:[function(require,module,exports){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
- * All rights reserved.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -17361,14 +18011,12 @@ function reactProdInvariant(code) {
 }
 
 module.exports = reactProdInvariant;
-},{}],153:[function(require,module,exports){
+},{}],152:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17377,14 +18025,12 @@ module.exports = reactProdInvariant;
 var ReactMount = require('./ReactMount');
 
 module.exports = ReactMount.renderSubtreeIntoContainer;
-},{"./ReactMount":96}],154:[function(require,module,exports){
+},{"./ReactMount":96}],153:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17456,7 +18102,7 @@ if (ExecutionEnvironment.canUseDOM) {
         // in hopes that this is preserved even if "\uFEFF" is transformed to
         // the actual Unicode character (by Babel, for example).
         // https://github.com/mishoo/UglifyJS2/blob/v2.4.20/lib/parse.js#L216
-        node.innerHTML = String.fromCharCode(0xFEFF) + html;
+        node.innerHTML = String.fromCharCode(0xfeff) + html;
 
         // deleteData leaves an empty `TextNode` which offsets the index of all
         // children. Definitely want to avoid this.
@@ -17475,14 +18121,12 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setInnerHTML;
-},{"./DOMNamespaces":40,"./createMicrosoftUnsafeLocalFunction":133,"fbjs/lib/ExecutionEnvironment":3}],155:[function(require,module,exports){
+},{"./DOMNamespaces":41,"./createMicrosoftUnsafeLocalFunction":131,"fbjs/lib/ExecutionEnvironment":3}],154:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17527,14 +18171,12 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setTextContent;
-},{"./escapeTextContentForBrowser":135,"./setInnerHTML":154,"fbjs/lib/ExecutionEnvironment":3}],156:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":133,"./setInnerHTML":153,"fbjs/lib/ExecutionEnvironment":3}],155:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17569,15 +18211,13 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 }
 
 module.exports = shouldUpdateReactComponent;
-},{}],157:[function(require,module,exports){
+},{}],156:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17704,7 +18344,7 @@ function traverseAllChildrenImpl(children, nameSoFar, callback, traverseContext)
       if (process.env.NODE_ENV !== 'production') {
         addendum = ' If you meant to render a collection of children, use an array ' + 'instead or wrap the object using createFragment(object) from the ' + 'React add-ons.';
         if (children._isReactElement) {
-          addendum = ' It looks like you\'re using an element created by a different ' + 'version of React. Make sure to use only one copy of React.';
+          addendum = " It looks like you're using an element created by a different " + 'version of React. Make sure to use only one copy of React.';
         }
         if (ReactCurrentOwner.current) {
           var name = ReactCurrentOwner.current.getName();
@@ -17747,15 +18387,13 @@ function traverseAllChildren(children, callback, traverseContext) {
 
 module.exports = traverseAllChildren;
 }).call(this,require('_process'))
-},{"./KeyEscapeUtils":52,"./ReactElementSymbol":82,"./getIteratorFn":144,"./reactProdInvariant":152,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactCurrentOwner":167}],158:[function(require,module,exports){
+},{"./KeyEscapeUtils":53,"./ReactElementSymbol":82,"./getIteratorFn":142,"./reactProdInvariant":151,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"react/lib/ReactCurrentOwner":164}],157:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -17872,7 +18510,6 @@ if (process.env.NODE_ENV !== 'production') {
       // but
       case 'option':
         return tag === '#text';
-
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-intd
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-incaption
       // No special behavior since these rules fall back to "in body" mode for
@@ -17881,25 +18518,20 @@ if (process.env.NODE_ENV !== 'production') {
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-intr
       case 'tr':
         return tag === 'th' || tag === 'td' || tag === 'style' || tag === 'script' || tag === 'template';
-
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-intbody
       case 'tbody':
       case 'thead':
       case 'tfoot':
         return tag === 'tr' || tag === 'style' || tag === 'script' || tag === 'template';
-
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-incolgroup
       case 'colgroup':
         return tag === 'col' || tag === 'template';
-
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-intable
       case 'table':
         return tag === 'caption' || tag === 'colgroup' || tag === 'tbody' || tag === 'tfoot' || tag === 'thead' || tag === 'style' || tag === 'script' || tag === 'template';
-
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inhead
       case 'head':
         return tag === 'base' || tag === 'basefont' || tag === 'bgsound' || tag === 'link' || tag === 'meta' || tag === 'title' || tag === 'noscript' || tag === 'noframes' || tag === 'style' || tag === 'script' || tag === 'template';
-
       // https://html.spec.whatwg.org/multipage/semantics.html#the-html-element
       case 'html':
         return tag === 'head' || tag === 'body';
@@ -18095,7 +18727,7 @@ if (process.env.NODE_ENV !== 'production') {
           tagDisplayName = 'Text nodes';
         } else {
           tagDisplayName = 'Whitespace text nodes';
-          whitespaceInfo = ' Make sure you don\'t have any extra whitespace between tags on ' + 'each line of your source code.';
+          whitespaceInfo = " Make sure you don't have any extra whitespace between tags on " + 'each line of your source code.';
         }
       } else {
         tagDisplayName = '<' + childTag + '>';
@@ -18126,24 +18758,17 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = validateDOMNesting;
 }).call(this,require('_process'))
-},{"_process":1,"fbjs/lib/emptyFunction":9,"fbjs/lib/warning":24,"object-assign":25}],159:[function(require,module,exports){
-'use strict';
-
-module.exports = require('./lib/ReactDOMServer');
-
-},{"./lib/ReactDOMServer":74}],160:[function(require,module,exports){
-arguments[4][52][0].apply(exports,arguments)
-},{"dup":52}],161:[function(require,module,exports){
-arguments[4][54][0].apply(exports,arguments)
-},{"./reactProdInvariant":183,"_process":1,"dup":54,"fbjs/lib/invariant":17}],162:[function(require,module,exports){
+},{"_process":26,"fbjs/lib/emptyFunction":9,"fbjs/lib/warning":24,"object-assign":25}],158:[function(require,module,exports){
+arguments[4][53][0].apply(exports,arguments)
+},{"dup":53}],159:[function(require,module,exports){
+arguments[4][55][0].apply(exports,arguments)
+},{"./reactProdInvariant":181,"_process":26,"dup":55,"fbjs/lib/invariant":17}],160:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -18151,23 +18776,22 @@ arguments[4][54][0].apply(exports,arguments)
 
 var _assign = require('object-assign');
 
+var ReactBaseClasses = require('./ReactBaseClasses');
 var ReactChildren = require('./ReactChildren');
-var ReactComponent = require('./ReactComponent');
-var ReactPureComponent = require('./ReactPureComponent');
-var ReactClass = require('./ReactClass');
 var ReactDOMFactories = require('./ReactDOMFactories');
 var ReactElement = require('./ReactElement');
 var ReactPropTypes = require('./ReactPropTypes');
 var ReactVersion = require('./ReactVersion');
 
+var createReactClass = require('./createClass');
 var onlyChild = require('./onlyChild');
-var warning = require('fbjs/lib/warning');
 
 var createElement = ReactElement.createElement;
 var createFactory = ReactElement.createFactory;
 var cloneElement = ReactElement.cloneElement;
 
 if (process.env.NODE_ENV !== 'production') {
+  var lowPriorityWarning = require('./lowPriorityWarning');
   var canDefineProperty = require('./canDefineProperty');
   var ReactElementValidator = require('./ReactElementValidator');
   var didWarnPropTypesDeprecated = false;
@@ -18177,18 +18801,27 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 var __spread = _assign;
+var createMixin = function (mixin) {
+  return mixin;
+};
 
 if (process.env.NODE_ENV !== 'production') {
-  var warned = false;
+  var warnedForSpread = false;
+  var warnedForCreateMixin = false;
   __spread = function () {
-    process.env.NODE_ENV !== 'production' ? warning(warned, 'React.__spread is deprecated and should not be used. Use ' + 'Object.assign directly or another helper function with similar ' + 'semantics. You may be seeing this warning due to your compiler. ' + 'See https://fb.me/react-spread-deprecation for more details.') : void 0;
-    warned = true;
+    lowPriorityWarning(warnedForSpread, 'React.__spread is deprecated and should not be used. Use ' + 'Object.assign directly or another helper function with similar ' + 'semantics. You may be seeing this warning due to your compiler. ' + 'See https://fb.me/react-spread-deprecation for more details.');
+    warnedForSpread = true;
     return _assign.apply(null, arguments);
+  };
+
+  createMixin = function (mixin) {
+    lowPriorityWarning(warnedForCreateMixin, 'React.createMixin is deprecated and should not be used. ' + 'In React v16.0, it will be removed. ' + 'You can use this mixin directly instead. ' + 'See https://fb.me/createmixin-was-never-implemented for more info.');
+    warnedForCreateMixin = true;
+    return mixin;
   };
 }
 
 var React = {
-
   // Modern
 
   Children: {
@@ -18199,8 +18832,8 @@ var React = {
     only: onlyChild
   },
 
-  Component: ReactComponent,
-  PureComponent: ReactPureComponent,
+  Component: ReactBaseClasses.Component,
+  PureComponent: ReactBaseClasses.PureComponent,
 
   createElement: createElement,
   cloneElement: cloneElement,
@@ -18209,12 +18842,9 @@ var React = {
   // Classic
 
   PropTypes: ReactPropTypes,
-  createClass: ReactClass.createClass,
+  createClass: createReactClass,
   createFactory: createFactory,
-  createMixin: function (mixin) {
-    // Currently a noop. Will be used to validate and trace mixins.
-    return mixin;
-  },
+  createMixin: createMixin,
 
   // This looks DOM specific but these are actually isomorphic helpers
   // since they are just generating DOM strings.
@@ -18226,29 +18856,193 @@ var React = {
   __spread: __spread
 };
 
-// TODO: Fix tests so that this deprecation warning doesn't cause failures.
 if (process.env.NODE_ENV !== 'production') {
+  var warnedForCreateClass = false;
   if (canDefineProperty) {
     Object.defineProperty(React, 'PropTypes', {
       get: function () {
-        process.env.NODE_ENV !== 'production' ? warning(didWarnPropTypesDeprecated, 'Accessing PropTypes via the main React package is deprecated. Use ' + 'the prop-types package from npm instead.') : void 0;
+        lowPriorityWarning(didWarnPropTypesDeprecated, 'Accessing PropTypes via the main React package is deprecated,' + ' and will be removed in  React v16.0.' + ' Use the latest available v15.* prop-types package from npm instead.' + ' For info on usage, compatibility, migration and more, see ' + 'https://fb.me/prop-types-docs');
         didWarnPropTypesDeprecated = true;
         return ReactPropTypes;
       }
     });
+
+    Object.defineProperty(React, 'createClass', {
+      get: function () {
+        lowPriorityWarning(warnedForCreateClass, 'Accessing createClass via the main React package is deprecated,' + ' and will be removed in React v16.0.' + " Use a plain JavaScript class instead. If you're not yet " + 'ready to migrate, create-react-class v15.* is available ' + 'on npm as a temporary, drop-in replacement. ' + 'For more info see https://fb.me/react-create-class');
+        warnedForCreateClass = true;
+        return createReactClass;
+      }
+    });
   }
+
+  // React.DOM factories are deprecated. Wrap these methods so that
+  // invocations of the React.DOM namespace and alert users to switch
+  // to the `react-dom-factories` package.
+  React.DOM = {};
+  var warnedForFactories = false;
+  Object.keys(ReactDOMFactories).forEach(function (factory) {
+    React.DOM[factory] = function () {
+      if (!warnedForFactories) {
+        lowPriorityWarning(false, 'Accessing factories like React.DOM.%s has been deprecated ' + 'and will be removed in v16.0+. Use the ' + 'react-dom-factories package instead. ' + ' Version 1.0 provides a drop-in replacement.' + ' For more info, see https://fb.me/react-dom-factories', factory);
+        warnedForFactories = true;
+      }
+      return ReactDOMFactories[factory].apply(ReactDOMFactories, arguments);
+    };
+  });
 }
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./ReactChildren":163,"./ReactClass":164,"./ReactComponent":165,"./ReactDOMFactories":168,"./ReactElement":169,"./ReactElementValidator":171,"./ReactPropTypes":174,"./ReactPureComponent":176,"./ReactVersion":177,"./canDefineProperty":178,"./onlyChild":182,"_process":1,"fbjs/lib/warning":24,"object-assign":25}],163:[function(require,module,exports){
+},{"./ReactBaseClasses":161,"./ReactChildren":162,"./ReactDOMFactories":165,"./ReactElement":166,"./ReactElementValidator":168,"./ReactPropTypes":171,"./ReactVersion":173,"./canDefineProperty":174,"./createClass":176,"./lowPriorityWarning":179,"./onlyChild":180,"_process":26,"object-assign":25}],161:[function(require,module,exports){
+(function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+var _prodInvariant = require('./reactProdInvariant'),
+    _assign = require('object-assign');
+
+var ReactNoopUpdateQueue = require('./ReactNoopUpdateQueue');
+
+var canDefineProperty = require('./canDefineProperty');
+var emptyObject = require('fbjs/lib/emptyObject');
+var invariant = require('fbjs/lib/invariant');
+var lowPriorityWarning = require('./lowPriorityWarning');
+
+/**
+ * Base class helpers for the updating state of a component.
+ */
+function ReactComponent(props, context, updater) {
+  this.props = props;
+  this.context = context;
+  this.refs = emptyObject;
+  // We initialize the default updater but the real one gets injected by the
+  // renderer.
+  this.updater = updater || ReactNoopUpdateQueue;
+}
+
+ReactComponent.prototype.isReactComponent = {};
+
+/**
+ * Sets a subset of the state. Always use this to mutate
+ * state. You should treat `this.state` as immutable.
+ *
+ * There is no guarantee that `this.state` will be immediately updated, so
+ * accessing `this.state` after calling this method may return the old value.
+ *
+ * There is no guarantee that calls to `setState` will run synchronously,
+ * as they may eventually be batched together.  You can provide an optional
+ * callback that will be executed when the call to setState is actually
+ * completed.
+ *
+ * When a function is provided to setState, it will be called at some point in
+ * the future (not synchronously). It will be called with the up to date
+ * component arguments (state, props, context). These values can be different
+ * from this.* because your function may be called after receiveProps but before
+ * shouldComponentUpdate, and this new state, props, and context will not yet be
+ * assigned to this.
+ *
+ * @param {object|function} partialState Next partial state or function to
+ *        produce next partial state to be merged with current state.
+ * @param {?function} callback Called after state is updated.
+ * @final
+ * @protected
+ */
+ReactComponent.prototype.setState = function (partialState, callback) {
+  !(typeof partialState === 'object' || typeof partialState === 'function' || partialState == null) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'setState(...): takes an object of state variables to update or a function which returns an object of state variables.') : _prodInvariant('85') : void 0;
+  this.updater.enqueueSetState(this, partialState);
+  if (callback) {
+    this.updater.enqueueCallback(this, callback, 'setState');
+  }
+};
+
+/**
+ * Forces an update. This should only be invoked when it is known with
+ * certainty that we are **not** in a DOM transaction.
+ *
+ * You may want to call this when you know that some deeper aspect of the
+ * component's state has changed but `setState` was not called.
+ *
+ * This will not invoke `shouldComponentUpdate`, but it will invoke
+ * `componentWillUpdate` and `componentDidUpdate`.
+ *
+ * @param {?function} callback Called after update is complete.
+ * @final
+ * @protected
+ */
+ReactComponent.prototype.forceUpdate = function (callback) {
+  this.updater.enqueueForceUpdate(this);
+  if (callback) {
+    this.updater.enqueueCallback(this, callback, 'forceUpdate');
+  }
+};
+
+/**
+ * Deprecated APIs. These APIs used to exist on classic React classes but since
+ * we would like to deprecate them, we're not going to move them over to this
+ * modern base class. Instead, we define a getter that warns if it's accessed.
+ */
+if (process.env.NODE_ENV !== 'production') {
+  var deprecatedAPIs = {
+    isMounted: ['isMounted', 'Instead, make sure to clean up subscriptions and pending requests in ' + 'componentWillUnmount to prevent memory leaks.'],
+    replaceState: ['replaceState', 'Refactor your code to use setState instead (see ' + 'https://github.com/facebook/react/issues/3236).']
+  };
+  var defineDeprecationWarning = function (methodName, info) {
+    if (canDefineProperty) {
+      Object.defineProperty(ReactComponent.prototype, methodName, {
+        get: function () {
+          lowPriorityWarning(false, '%s(...) is deprecated in plain JavaScript React classes. %s', info[0], info[1]);
+          return undefined;
+        }
+      });
+    }
+  };
+  for (var fnName in deprecatedAPIs) {
+    if (deprecatedAPIs.hasOwnProperty(fnName)) {
+      defineDeprecationWarning(fnName, deprecatedAPIs[fnName]);
+    }
+  }
+}
+
+/**
+ * Base class helpers for the updating state of a component.
+ */
+function ReactPureComponent(props, context, updater) {
+  // Duplicated from ReactComponent.
+  this.props = props;
+  this.context = context;
+  this.refs = emptyObject;
+  // We initialize the default updater but the real one gets injected by the
+  // renderer.
+  this.updater = updater || ReactNoopUpdateQueue;
+}
+
+function ComponentDummy() {}
+ComponentDummy.prototype = ReactComponent.prototype;
+ReactPureComponent.prototype = new ComponentDummy();
+ReactPureComponent.prototype.constructor = ReactPureComponent;
+// Avoid an extra prototype jump for these methods.
+_assign(ReactPureComponent.prototype, ReactComponent.prototype);
+ReactPureComponent.prototype.isPureReactComponent = true;
+
+module.exports = {
+  Component: ReactComponent,
+  PureComponent: ReactPureComponent
+};
+}).call(this,require('_process'))
+},{"./ReactNoopUpdateQueue":169,"./canDefineProperty":174,"./lowPriorityWarning":179,"./reactProdInvariant":181,"_process":26,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"object-assign":25}],162:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -18432,860 +19226,13 @@ var ReactChildren = {
 };
 
 module.exports = ReactChildren;
-},{"./PooledClass":161,"./ReactElement":169,"./traverseAllChildren":184,"fbjs/lib/emptyFunction":9}],164:[function(require,module,exports){
+},{"./PooledClass":159,"./ReactElement":166,"./traverseAllChildren":182,"fbjs/lib/emptyFunction":9}],163:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2016-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-var _prodInvariant = require('./reactProdInvariant'),
-    _assign = require('object-assign');
-
-var ReactComponent = require('./ReactComponent');
-var ReactElement = require('./ReactElement');
-var ReactPropTypeLocationNames = require('./ReactPropTypeLocationNames');
-var ReactNoopUpdateQueue = require('./ReactNoopUpdateQueue');
-
-var emptyObject = require('fbjs/lib/emptyObject');
-var invariant = require('fbjs/lib/invariant');
-var warning = require('fbjs/lib/warning');
-
-var MIXINS_KEY = 'mixins';
-
-// Helper function to allow the creation of anonymous functions which do not
-// have .name set to the name of the variable being assigned to.
-function identity(fn) {
-  return fn;
-}
-
-/**
- * Policies that describe methods in `ReactClassInterface`.
- */
-
-
-var injectedMixins = [];
-
-/**
- * Composite components are higher-level components that compose other composite
- * or host components.
- *
- * To create a new type of `ReactClass`, pass a specification of
- * your new class to `React.createClass`. The only requirement of your class
- * specification is that you implement a `render` method.
- *
- *   var MyComponent = React.createClass({
- *     render: function() {
- *       return <div>Hello World</div>;
- *     }
- *   });
- *
- * The class specification supports a specific protocol of methods that have
- * special meaning (e.g. `render`). See `ReactClassInterface` for
- * more the comprehensive protocol. Any other properties and methods in the
- * class specification will be available on the prototype.
- *
- * @interface ReactClassInterface
- * @internal
- */
-var ReactClassInterface = {
-
-  /**
-   * An array of Mixin objects to include when defining your component.
-   *
-   * @type {array}
-   * @optional
-   */
-  mixins: 'DEFINE_MANY',
-
-  /**
-   * An object containing properties and methods that should be defined on
-   * the component's constructor instead of its prototype (static methods).
-   *
-   * @type {object}
-   * @optional
-   */
-  statics: 'DEFINE_MANY',
-
-  /**
-   * Definition of prop types for this component.
-   *
-   * @type {object}
-   * @optional
-   */
-  propTypes: 'DEFINE_MANY',
-
-  /**
-   * Definition of context types for this component.
-   *
-   * @type {object}
-   * @optional
-   */
-  contextTypes: 'DEFINE_MANY',
-
-  /**
-   * Definition of context types this component sets for its children.
-   *
-   * @type {object}
-   * @optional
-   */
-  childContextTypes: 'DEFINE_MANY',
-
-  // ==== Definition methods ====
-
-  /**
-   * Invoked when the component is mounted. Values in the mapping will be set on
-   * `this.props` if that prop is not specified (i.e. using an `in` check).
-   *
-   * This method is invoked before `getInitialState` and therefore cannot rely
-   * on `this.state` or use `this.setState`.
-   *
-   * @return {object}
-   * @optional
-   */
-  getDefaultProps: 'DEFINE_MANY_MERGED',
-
-  /**
-   * Invoked once before the component is mounted. The return value will be used
-   * as the initial value of `this.state`.
-   *
-   *   getInitialState: function() {
-   *     return {
-   *       isOn: false,
-   *       fooBaz: new BazFoo()
-   *     }
-   *   }
-   *
-   * @return {object}
-   * @optional
-   */
-  getInitialState: 'DEFINE_MANY_MERGED',
-
-  /**
-   * @return {object}
-   * @optional
-   */
-  getChildContext: 'DEFINE_MANY_MERGED',
-
-  /**
-   * Uses props from `this.props` and state from `this.state` to render the
-   * structure of the component.
-   *
-   * No guarantees are made about when or how often this method is invoked, so
-   * it must not have side effects.
-   *
-   *   render: function() {
-   *     var name = this.props.name;
-   *     return <div>Hello, {name}!</div>;
-   *   }
-   *
-   * @return {ReactComponent}
-   * @required
-   */
-  render: 'DEFINE_ONCE',
-
-  // ==== Delegate methods ====
-
-  /**
-   * Invoked when the component is initially created and about to be mounted.
-   * This may have side effects, but any external subscriptions or data created
-   * by this method must be cleaned up in `componentWillUnmount`.
-   *
-   * @optional
-   */
-  componentWillMount: 'DEFINE_MANY',
-
-  /**
-   * Invoked when the component has been mounted and has a DOM representation.
-   * However, there is no guarantee that the DOM node is in the document.
-   *
-   * Use this as an opportunity to operate on the DOM when the component has
-   * been mounted (initialized and rendered) for the first time.
-   *
-   * @param {DOMElement} rootNode DOM element representing the component.
-   * @optional
-   */
-  componentDidMount: 'DEFINE_MANY',
-
-  /**
-   * Invoked before the component receives new props.
-   *
-   * Use this as an opportunity to react to a prop transition by updating the
-   * state using `this.setState`. Current props are accessed via `this.props`.
-   *
-   *   componentWillReceiveProps: function(nextProps, nextContext) {
-   *     this.setState({
-   *       likesIncreasing: nextProps.likeCount > this.props.likeCount
-   *     });
-   *   }
-   *
-   * NOTE: There is no equivalent `componentWillReceiveState`. An incoming prop
-   * transition may cause a state change, but the opposite is not true. If you
-   * need it, you are probably looking for `componentWillUpdate`.
-   *
-   * @param {object} nextProps
-   * @optional
-   */
-  componentWillReceiveProps: 'DEFINE_MANY',
-
-  /**
-   * Invoked while deciding if the component should be updated as a result of
-   * receiving new props, state and/or context.
-   *
-   * Use this as an opportunity to `return false` when you're certain that the
-   * transition to the new props/state/context will not require a component
-   * update.
-   *
-   *   shouldComponentUpdate: function(nextProps, nextState, nextContext) {
-   *     return !equal(nextProps, this.props) ||
-   *       !equal(nextState, this.state) ||
-   *       !equal(nextContext, this.context);
-   *   }
-   *
-   * @param {object} nextProps
-   * @param {?object} nextState
-   * @param {?object} nextContext
-   * @return {boolean} True if the component should update.
-   * @optional
-   */
-  shouldComponentUpdate: 'DEFINE_ONCE',
-
-  /**
-   * Invoked when the component is about to update due to a transition from
-   * `this.props`, `this.state` and `this.context` to `nextProps`, `nextState`
-   * and `nextContext`.
-   *
-   * Use this as an opportunity to perform preparation before an update occurs.
-   *
-   * NOTE: You **cannot** use `this.setState()` in this method.
-   *
-   * @param {object} nextProps
-   * @param {?object} nextState
-   * @param {?object} nextContext
-   * @param {ReactReconcileTransaction} transaction
-   * @optional
-   */
-  componentWillUpdate: 'DEFINE_MANY',
-
-  /**
-   * Invoked when the component's DOM representation has been updated.
-   *
-   * Use this as an opportunity to operate on the DOM when the component has
-   * been updated.
-   *
-   * @param {object} prevProps
-   * @param {?object} prevState
-   * @param {?object} prevContext
-   * @param {DOMElement} rootNode DOM element representing the component.
-   * @optional
-   */
-  componentDidUpdate: 'DEFINE_MANY',
-
-  /**
-   * Invoked when the component is about to be removed from its parent and have
-   * its DOM representation destroyed.
-   *
-   * Use this as an opportunity to deallocate any external resources.
-   *
-   * NOTE: There is no `componentDidUnmount` since your component will have been
-   * destroyed by that point.
-   *
-   * @optional
-   */
-  componentWillUnmount: 'DEFINE_MANY',
-
-  // ==== Advanced methods ====
-
-  /**
-   * Updates the component's currently mounted DOM representation.
-   *
-   * By default, this implements React's rendering and reconciliation algorithm.
-   * Sophisticated clients may wish to override this.
-   *
-   * @param {ReactReconcileTransaction} transaction
-   * @internal
-   * @overridable
-   */
-  updateComponent: 'OVERRIDE_BASE'
-
-};
-
-/**
- * Mapping from class specification keys to special processing functions.
- *
- * Although these are declared like instance properties in the specification
- * when defining classes using `React.createClass`, they are actually static
- * and are accessible on the constructor instead of the prototype. Despite
- * being static, they must be defined outside of the "statics" key under
- * which all other static methods are defined.
- */
-var RESERVED_SPEC_KEYS = {
-  displayName: function (Constructor, displayName) {
-    Constructor.displayName = displayName;
-  },
-  mixins: function (Constructor, mixins) {
-    if (mixins) {
-      for (var i = 0; i < mixins.length; i++) {
-        mixSpecIntoComponent(Constructor, mixins[i]);
-      }
-    }
-  },
-  childContextTypes: function (Constructor, childContextTypes) {
-    if (process.env.NODE_ENV !== 'production') {
-      validateTypeDef(Constructor, childContextTypes, 'childContext');
-    }
-    Constructor.childContextTypes = _assign({}, Constructor.childContextTypes, childContextTypes);
-  },
-  contextTypes: function (Constructor, contextTypes) {
-    if (process.env.NODE_ENV !== 'production') {
-      validateTypeDef(Constructor, contextTypes, 'context');
-    }
-    Constructor.contextTypes = _assign({}, Constructor.contextTypes, contextTypes);
-  },
-  /**
-   * Special case getDefaultProps which should move into statics but requires
-   * automatic merging.
-   */
-  getDefaultProps: function (Constructor, getDefaultProps) {
-    if (Constructor.getDefaultProps) {
-      Constructor.getDefaultProps = createMergedResultFunction(Constructor.getDefaultProps, getDefaultProps);
-    } else {
-      Constructor.getDefaultProps = getDefaultProps;
-    }
-  },
-  propTypes: function (Constructor, propTypes) {
-    if (process.env.NODE_ENV !== 'production') {
-      validateTypeDef(Constructor, propTypes, 'prop');
-    }
-    Constructor.propTypes = _assign({}, Constructor.propTypes, propTypes);
-  },
-  statics: function (Constructor, statics) {
-    mixStaticSpecIntoComponent(Constructor, statics);
-  },
-  autobind: function () {} };
-
-function validateTypeDef(Constructor, typeDef, location) {
-  for (var propName in typeDef) {
-    if (typeDef.hasOwnProperty(propName)) {
-      // use a warning instead of an invariant so components
-      // don't show up in prod but only in __DEV__
-      process.env.NODE_ENV !== 'production' ? warning(typeof typeDef[propName] === 'function', '%s: %s type `%s` is invalid; it must be a function, usually from ' + 'React.PropTypes.', Constructor.displayName || 'ReactClass', ReactPropTypeLocationNames[location], propName) : void 0;
-    }
-  }
-}
-
-function validateMethodOverride(isAlreadyDefined, name) {
-  var specPolicy = ReactClassInterface.hasOwnProperty(name) ? ReactClassInterface[name] : null;
-
-  // Disallow overriding of base class methods unless explicitly allowed.
-  if (ReactClassMixin.hasOwnProperty(name)) {
-    !(specPolicy === 'OVERRIDE_BASE') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactClassInterface: You are attempting to override `%s` from your class specification. Ensure that your method names do not overlap with React methods.', name) : _prodInvariant('73', name) : void 0;
-  }
-
-  // Disallow defining methods more than once unless explicitly allowed.
-  if (isAlreadyDefined) {
-    !(specPolicy === 'DEFINE_MANY' || specPolicy === 'DEFINE_MANY_MERGED') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactClassInterface: You are attempting to define `%s` on your component more than once. This conflict may be due to a mixin.', name) : _prodInvariant('74', name) : void 0;
-  }
-}
-
-/**
- * Mixin helper which handles policy validation and reserved
- * specification keys when building React classes.
- */
-function mixSpecIntoComponent(Constructor, spec) {
-  if (!spec) {
-    if (process.env.NODE_ENV !== 'production') {
-      var typeofSpec = typeof spec;
-      var isMixinValid = typeofSpec === 'object' && spec !== null;
-
-      process.env.NODE_ENV !== 'production' ? warning(isMixinValid, '%s: You\'re attempting to include a mixin that is either null ' + 'or not an object. Check the mixins included by the component, ' + 'as well as any mixins they include themselves. ' + 'Expected object but got %s.', Constructor.displayName || 'ReactClass', spec === null ? null : typeofSpec) : void 0;
-    }
-
-    return;
-  }
-
-  !(typeof spec !== 'function') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactClass: You\'re attempting to use a component class or function as a mixin. Instead, just use a regular object.') : _prodInvariant('75') : void 0;
-  !!ReactElement.isValidElement(spec) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactClass: You\'re attempting to use a component as a mixin. Instead, just use a regular object.') : _prodInvariant('76') : void 0;
-
-  var proto = Constructor.prototype;
-  var autoBindPairs = proto.__reactAutoBindPairs;
-
-  // By handling mixins before any other properties, we ensure the same
-  // chaining order is applied to methods with DEFINE_MANY policy, whether
-  // mixins are listed before or after these methods in the spec.
-  if (spec.hasOwnProperty(MIXINS_KEY)) {
-    RESERVED_SPEC_KEYS.mixins(Constructor, spec.mixins);
-  }
-
-  for (var name in spec) {
-    if (!spec.hasOwnProperty(name)) {
-      continue;
-    }
-
-    if (name === MIXINS_KEY) {
-      // We have already handled mixins in a special case above.
-      continue;
-    }
-
-    var property = spec[name];
-    var isAlreadyDefined = proto.hasOwnProperty(name);
-    validateMethodOverride(isAlreadyDefined, name);
-
-    if (RESERVED_SPEC_KEYS.hasOwnProperty(name)) {
-      RESERVED_SPEC_KEYS[name](Constructor, property);
-    } else {
-      // Setup methods on prototype:
-      // The following member methods should not be automatically bound:
-      // 1. Expected ReactClass methods (in the "interface").
-      // 2. Overridden methods (that were mixed in).
-      var isReactClassMethod = ReactClassInterface.hasOwnProperty(name);
-      var isFunction = typeof property === 'function';
-      var shouldAutoBind = isFunction && !isReactClassMethod && !isAlreadyDefined && spec.autobind !== false;
-
-      if (shouldAutoBind) {
-        autoBindPairs.push(name, property);
-        proto[name] = property;
-      } else {
-        if (isAlreadyDefined) {
-          var specPolicy = ReactClassInterface[name];
-
-          // These cases should already be caught by validateMethodOverride.
-          !(isReactClassMethod && (specPolicy === 'DEFINE_MANY_MERGED' || specPolicy === 'DEFINE_MANY')) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactClass: Unexpected spec policy %s for key %s when mixing in component specs.', specPolicy, name) : _prodInvariant('77', specPolicy, name) : void 0;
-
-          // For methods which are defined more than once, call the existing
-          // methods before calling the new property, merging if appropriate.
-          if (specPolicy === 'DEFINE_MANY_MERGED') {
-            proto[name] = createMergedResultFunction(proto[name], property);
-          } else if (specPolicy === 'DEFINE_MANY') {
-            proto[name] = createChainedFunction(proto[name], property);
-          }
-        } else {
-          proto[name] = property;
-          if (process.env.NODE_ENV !== 'production') {
-            // Add verbose displayName to the function, which helps when looking
-            // at profiling tools.
-            if (typeof property === 'function' && spec.displayName) {
-              proto[name].displayName = spec.displayName + '_' + name;
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-function mixStaticSpecIntoComponent(Constructor, statics) {
-  if (!statics) {
-    return;
-  }
-  for (var name in statics) {
-    var property = statics[name];
-    if (!statics.hasOwnProperty(name)) {
-      continue;
-    }
-
-    var isReserved = name in RESERVED_SPEC_KEYS;
-    !!isReserved ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactClass: You are attempting to define a reserved property, `%s`, that shouldn\'t be on the "statics" key. Define it as an instance property instead; it will still be accessible on the constructor.', name) : _prodInvariant('78', name) : void 0;
-
-    var isInherited = name in Constructor;
-    !!isInherited ? process.env.NODE_ENV !== 'production' ? invariant(false, 'ReactClass: You are attempting to define `%s` on your component more than once. This conflict may be due to a mixin.', name) : _prodInvariant('79', name) : void 0;
-    Constructor[name] = property;
-  }
-}
-
-/**
- * Merge two objects, but throw if both contain the same key.
- *
- * @param {object} one The first object, which is mutated.
- * @param {object} two The second object
- * @return {object} one after it has been mutated to contain everything in two.
- */
-function mergeIntoWithNoDuplicateKeys(one, two) {
-  !(one && two && typeof one === 'object' && typeof two === 'object') ? process.env.NODE_ENV !== 'production' ? invariant(false, 'mergeIntoWithNoDuplicateKeys(): Cannot merge non-objects.') : _prodInvariant('80') : void 0;
-
-  for (var key in two) {
-    if (two.hasOwnProperty(key)) {
-      !(one[key] === undefined) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'mergeIntoWithNoDuplicateKeys(): Tried to merge two objects with the same key: `%s`. This conflict may be due to a mixin; in particular, this may be caused by two getInitialState() or getDefaultProps() methods returning objects with clashing keys.', key) : _prodInvariant('81', key) : void 0;
-      one[key] = two[key];
-    }
-  }
-  return one;
-}
-
-/**
- * Creates a function that invokes two functions and merges their return values.
- *
- * @param {function} one Function to invoke first.
- * @param {function} two Function to invoke second.
- * @return {function} Function that invokes the two argument functions.
- * @private
- */
-function createMergedResultFunction(one, two) {
-  return function mergedResult() {
-    var a = one.apply(this, arguments);
-    var b = two.apply(this, arguments);
-    if (a == null) {
-      return b;
-    } else if (b == null) {
-      return a;
-    }
-    var c = {};
-    mergeIntoWithNoDuplicateKeys(c, a);
-    mergeIntoWithNoDuplicateKeys(c, b);
-    return c;
-  };
-}
-
-/**
- * Creates a function that invokes two functions and ignores their return vales.
- *
- * @param {function} one Function to invoke first.
- * @param {function} two Function to invoke second.
- * @return {function} Function that invokes the two argument functions.
- * @private
- */
-function createChainedFunction(one, two) {
-  return function chainedFunction() {
-    one.apply(this, arguments);
-    two.apply(this, arguments);
-  };
-}
-
-/**
- * Binds a method to the component.
- *
- * @param {object} component Component whose method is going to be bound.
- * @param {function} method Method to be bound.
- * @return {function} The bound method.
- */
-function bindAutoBindMethod(component, method) {
-  var boundMethod = method.bind(component);
-  if (process.env.NODE_ENV !== 'production') {
-    boundMethod.__reactBoundContext = component;
-    boundMethod.__reactBoundMethod = method;
-    boundMethod.__reactBoundArguments = null;
-    var componentName = component.constructor.displayName;
-    var _bind = boundMethod.bind;
-    boundMethod.bind = function (newThis) {
-      for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-        args[_key - 1] = arguments[_key];
-      }
-
-      // User is trying to bind() an autobound method; we effectively will
-      // ignore the value of "this" that the user is trying to use, so
-      // let's warn.
-      if (newThis !== component && newThis !== null) {
-        process.env.NODE_ENV !== 'production' ? warning(false, 'bind(): React component methods may only be bound to the ' + 'component instance. See %s', componentName) : void 0;
-      } else if (!args.length) {
-        process.env.NODE_ENV !== 'production' ? warning(false, 'bind(): You are binding a component method to the component. ' + 'React does this for you automatically in a high-performance ' + 'way, so you can safely remove this call. See %s', componentName) : void 0;
-        return boundMethod;
-      }
-      var reboundMethod = _bind.apply(boundMethod, arguments);
-      reboundMethod.__reactBoundContext = component;
-      reboundMethod.__reactBoundMethod = method;
-      reboundMethod.__reactBoundArguments = args;
-      return reboundMethod;
-    };
-  }
-  return boundMethod;
-}
-
-/**
- * Binds all auto-bound methods in a component.
- *
- * @param {object} component Component whose method is going to be bound.
- */
-function bindAutoBindMethods(component) {
-  var pairs = component.__reactAutoBindPairs;
-  for (var i = 0; i < pairs.length; i += 2) {
-    var autoBindKey = pairs[i];
-    var method = pairs[i + 1];
-    component[autoBindKey] = bindAutoBindMethod(component, method);
-  }
-}
-
-/**
- * Add more to the ReactClass base class. These are all legacy features and
- * therefore not already part of the modern ReactComponent.
- */
-var ReactClassMixin = {
-
-  /**
-   * TODO: This will be deprecated because state should always keep a consistent
-   * type signature and the only use case for this, is to avoid that.
-   */
-  replaceState: function (newState, callback) {
-    this.updater.enqueueReplaceState(this, newState);
-    if (callback) {
-      this.updater.enqueueCallback(this, callback, 'replaceState');
-    }
-  },
-
-  /**
-   * Checks whether or not this composite component is mounted.
-   * @return {boolean} True if mounted, false otherwise.
-   * @protected
-   * @final
-   */
-  isMounted: function () {
-    return this.updater.isMounted(this);
-  }
-};
-
-var ReactClassComponent = function () {};
-_assign(ReactClassComponent.prototype, ReactComponent.prototype, ReactClassMixin);
-
-var didWarnDeprecated = false;
-
-/**
- * Module for creating composite components.
- *
- * @class ReactClass
- */
-var ReactClass = {
-
-  /**
-   * Creates a composite component class given a class specification.
-   * See https://facebook.github.io/react/docs/top-level-api.html#react.createclass
-   *
-   * @param {object} spec Class specification (which must define `render`).
-   * @return {function} Component constructor function.
-   * @public
-   */
-  createClass: function (spec) {
-    if (process.env.NODE_ENV !== 'production') {
-      process.env.NODE_ENV !== 'production' ? warning(didWarnDeprecated, '%s: React.createClass is deprecated and will be removed in version 16. ' + 'Use plain JavaScript classes instead. If you\'re not yet ready to ' + 'migrate, create-react-class is available on npm as a ' + 'drop-in replacement.', spec && spec.displayName || 'A Component') : void 0;
-      didWarnDeprecated = true;
-    }
-
-    // To keep our warnings more understandable, we'll use a little hack here to
-    // ensure that Constructor.name !== 'Constructor'. This makes sure we don't
-    // unnecessarily identify a class without displayName as 'Constructor'.
-    var Constructor = identity(function (props, context, updater) {
-      // This constructor gets overridden by mocks. The argument is used
-      // by mocks to assert on what gets mounted.
-
-      if (process.env.NODE_ENV !== 'production') {
-        process.env.NODE_ENV !== 'production' ? warning(this instanceof Constructor, 'Something is calling a React component directly. Use a factory or ' + 'JSX instead. See: https://fb.me/react-legacyfactory') : void 0;
-      }
-
-      // Wire up auto-binding
-      if (this.__reactAutoBindPairs.length) {
-        bindAutoBindMethods(this);
-      }
-
-      this.props = props;
-      this.context = context;
-      this.refs = emptyObject;
-      this.updater = updater || ReactNoopUpdateQueue;
-
-      this.state = null;
-
-      // ReactClasses doesn't have constructors. Instead, they use the
-      // getInitialState and componentWillMount methods for initialization.
-
-      var initialState = this.getInitialState ? this.getInitialState() : null;
-      if (process.env.NODE_ENV !== 'production') {
-        // We allow auto-mocks to proceed as if they're returning null.
-        if (initialState === undefined && this.getInitialState._isMockFunction) {
-          // This is probably bad practice. Consider warning here and
-          // deprecating this convenience.
-          initialState = null;
-        }
-      }
-      !(typeof initialState === 'object' && !Array.isArray(initialState)) ? process.env.NODE_ENV !== 'production' ? invariant(false, '%s.getInitialState(): must return an object or null', Constructor.displayName || 'ReactCompositeComponent') : _prodInvariant('82', Constructor.displayName || 'ReactCompositeComponent') : void 0;
-
-      this.state = initialState;
-    });
-    Constructor.prototype = new ReactClassComponent();
-    Constructor.prototype.constructor = Constructor;
-    Constructor.prototype.__reactAutoBindPairs = [];
-
-    injectedMixins.forEach(mixSpecIntoComponent.bind(null, Constructor));
-
-    mixSpecIntoComponent(Constructor, spec);
-
-    // Initialize the defaultProps property after all mixins have been merged.
-    if (Constructor.getDefaultProps) {
-      Constructor.defaultProps = Constructor.getDefaultProps();
-    }
-
-    if (process.env.NODE_ENV !== 'production') {
-      // This is a tag to indicate that the use of these method names is ok,
-      // since it's used with createClass. If it's not, then it's likely a
-      // mistake so we'll warn you to use the static property, property
-      // initializer or constructor respectively.
-      if (Constructor.getDefaultProps) {
-        Constructor.getDefaultProps.isReactClassApproved = {};
-      }
-      if (Constructor.prototype.getInitialState) {
-        Constructor.prototype.getInitialState.isReactClassApproved = {};
-      }
-    }
-
-    !Constructor.prototype.render ? process.env.NODE_ENV !== 'production' ? invariant(false, 'createClass(...): Class specification must implement a `render` method.') : _prodInvariant('83') : void 0;
-
-    if (process.env.NODE_ENV !== 'production') {
-      process.env.NODE_ENV !== 'production' ? warning(!Constructor.prototype.componentShouldUpdate, '%s has a method called ' + 'componentShouldUpdate(). Did you mean shouldComponentUpdate()? ' + 'The name is phrased as a question because the function is ' + 'expected to return a value.', spec.displayName || 'A component') : void 0;
-      process.env.NODE_ENV !== 'production' ? warning(!Constructor.prototype.componentWillRecieveProps, '%s has a method called ' + 'componentWillRecieveProps(). Did you mean componentWillReceiveProps()?', spec.displayName || 'A component') : void 0;
-    }
-
-    // Reduce time spent doing lookups by setting these on the prototype.
-    for (var methodName in ReactClassInterface) {
-      if (!Constructor.prototype[methodName]) {
-        Constructor.prototype[methodName] = null;
-      }
-    }
-
-    return Constructor;
-  },
-
-  injection: {
-    injectMixin: function (mixin) {
-      injectedMixins.push(mixin);
-    }
-  }
-
-};
-
-module.exports = ReactClass;
-}).call(this,require('_process'))
-},{"./ReactComponent":165,"./ReactElement":169,"./ReactNoopUpdateQueue":172,"./ReactPropTypeLocationNames":173,"./reactProdInvariant":183,"_process":1,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"fbjs/lib/warning":24,"object-assign":25}],165:[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-var _prodInvariant = require('./reactProdInvariant');
-
-var ReactNoopUpdateQueue = require('./ReactNoopUpdateQueue');
-
-var canDefineProperty = require('./canDefineProperty');
-var emptyObject = require('fbjs/lib/emptyObject');
-var invariant = require('fbjs/lib/invariant');
-var warning = require('fbjs/lib/warning');
-
-/**
- * Base class helpers for the updating state of a component.
- */
-function ReactComponent(props, context, updater) {
-  this.props = props;
-  this.context = context;
-  this.refs = emptyObject;
-  // We initialize the default updater but the real one gets injected by the
-  // renderer.
-  this.updater = updater || ReactNoopUpdateQueue;
-}
-
-ReactComponent.prototype.isReactComponent = {};
-
-/**
- * Sets a subset of the state. Always use this to mutate
- * state. You should treat `this.state` as immutable.
- *
- * There is no guarantee that `this.state` will be immediately updated, so
- * accessing `this.state` after calling this method may return the old value.
- *
- * There is no guarantee that calls to `setState` will run synchronously,
- * as they may eventually be batched together.  You can provide an optional
- * callback that will be executed when the call to setState is actually
- * completed.
- *
- * When a function is provided to setState, it will be called at some point in
- * the future (not synchronously). It will be called with the up to date
- * component arguments (state, props, context). These values can be different
- * from this.* because your function may be called after receiveProps but before
- * shouldComponentUpdate, and this new state, props, and context will not yet be
- * assigned to this.
- *
- * @param {object|function} partialState Next partial state or function to
- *        produce next partial state to be merged with current state.
- * @param {?function} callback Called after state is updated.
- * @final
- * @protected
- */
-ReactComponent.prototype.setState = function (partialState, callback) {
-  !(typeof partialState === 'object' || typeof partialState === 'function' || partialState == null) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'setState(...): takes an object of state variables to update or a function which returns an object of state variables.') : _prodInvariant('85') : void 0;
-  this.updater.enqueueSetState(this, partialState);
-  if (callback) {
-    this.updater.enqueueCallback(this, callback, 'setState');
-  }
-};
-
-/**
- * Forces an update. This should only be invoked when it is known with
- * certainty that we are **not** in a DOM transaction.
- *
- * You may want to call this when you know that some deeper aspect of the
- * component's state has changed but `setState` was not called.
- *
- * This will not invoke `shouldComponentUpdate`, but it will invoke
- * `componentWillUpdate` and `componentDidUpdate`.
- *
- * @param {?function} callback Called after update is complete.
- * @final
- * @protected
- */
-ReactComponent.prototype.forceUpdate = function (callback) {
-  this.updater.enqueueForceUpdate(this);
-  if (callback) {
-    this.updater.enqueueCallback(this, callback, 'forceUpdate');
-  }
-};
-
-/**
- * Deprecated APIs. These APIs used to exist on classic React classes but since
- * we would like to deprecate them, we're not going to move them over to this
- * modern base class. Instead, we define a getter that warns if it's accessed.
- */
-if (process.env.NODE_ENV !== 'production') {
-  var deprecatedAPIs = {
-    isMounted: ['isMounted', 'Instead, make sure to clean up subscriptions and pending requests in ' + 'componentWillUnmount to prevent memory leaks.'],
-    replaceState: ['replaceState', 'Refactor your code to use setState instead (see ' + 'https://github.com/facebook/react/issues/3236).']
-  };
-  var defineDeprecationWarning = function (methodName, info) {
-    if (canDefineProperty) {
-      Object.defineProperty(ReactComponent.prototype, methodName, {
-        get: function () {
-          process.env.NODE_ENV !== 'production' ? warning(false, '%s(...) is deprecated in plain JavaScript React classes. %s', info[0], info[1]) : void 0;
-          return undefined;
-        }
-      });
-    }
-  };
-  for (var fnName in deprecatedAPIs) {
-    if (deprecatedAPIs.hasOwnProperty(fnName)) {
-      defineDeprecationWarning(fnName, deprecatedAPIs[fnName]);
-    }
-  }
-}
-
-module.exports = ReactComponent;
-}).call(this,require('_process'))
-},{"./ReactNoopUpdateQueue":172,"./canDefineProperty":178,"./reactProdInvariant":183,"_process":1,"fbjs/lib/emptyObject":10,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],166:[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2016-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -19305,11 +19252,11 @@ function isNative(fn) {
   var hasOwnProperty = Object.prototype.hasOwnProperty;
   var reIsNative = RegExp('^' + funcToString
   // Take an example native function source for comparison
-  .call(hasOwnProperty)
+  .call(hasOwnProperty
   // Strip regex characters so we can use it for regex
-  .replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')
+  ).replace(/[\\^$.*+?()[\]{}|]/g, '\\$&'
   // Remove hasOwnProperty from the template to make it generic
-  .replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$');
+  ).replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$');
   try {
     var source = funcToString.call(fn);
     return reIsNative.test(source);
@@ -19608,19 +19555,62 @@ var ReactComponentTreeHook = {
 
 
   getRootIDs: getRootIDs,
-  getRegisteredIDs: getItemIDs
+  getRegisteredIDs: getItemIDs,
+
+  pushNonStandardWarningStack: function (isCreatingElement, currentSource) {
+    if (typeof console.reactStack !== 'function') {
+      return;
+    }
+
+    var stack = [];
+    var currentOwner = ReactCurrentOwner.current;
+    var id = currentOwner && currentOwner._debugID;
+
+    try {
+      if (isCreatingElement) {
+        stack.push({
+          name: id ? ReactComponentTreeHook.getDisplayName(id) : null,
+          fileName: currentSource ? currentSource.fileName : null,
+          lineNumber: currentSource ? currentSource.lineNumber : null
+        });
+      }
+
+      while (id) {
+        var element = ReactComponentTreeHook.getElement(id);
+        var parentID = ReactComponentTreeHook.getParentID(id);
+        var ownerID = ReactComponentTreeHook.getOwnerID(id);
+        var ownerName = ownerID ? ReactComponentTreeHook.getDisplayName(ownerID) : null;
+        var source = element && element._source;
+        stack.push({
+          name: ownerName,
+          fileName: source ? source.fileName : null,
+          lineNumber: source ? source.lineNumber : null
+        });
+        id = parentID;
+      }
+    } catch (err) {
+      // Internal state is messed up.
+      // Stop building the stack (it's just a nice to have).
+    }
+
+    console.reactStack(stack);
+  },
+  popNonStandardWarningStack: function () {
+    if (typeof console.reactStackEnd !== 'function') {
+      return;
+    }
+    console.reactStackEnd();
+  }
 };
 
 module.exports = ReactComponentTreeHook;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":167,"./reactProdInvariant":183,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],167:[function(require,module,exports){
+},{"./ReactCurrentOwner":164,"./reactProdInvariant":181,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],164:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -19634,25 +19624,21 @@ module.exports = ReactComponentTreeHook;
  * currently being constructed.
  */
 var ReactCurrentOwner = {
-
   /**
    * @internal
    * @type {ReactComponent}
    */
   current: null
-
 };
 
 module.exports = ReactCurrentOwner;
-},{}],168:[function(require,module,exports){
+},{}],165:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -19673,7 +19659,6 @@ if (process.env.NODE_ENV !== 'production') {
 
 /**
  * Creates a mapping from supported HTML tags to `ReactDOMComponent` classes.
- * This is also accessible via `React.DOM`.
  *
  * @public
  */
@@ -19816,15 +19801,13 @@ var ReactDOMFactories = {
 
 module.exports = ReactDOMFactories;
 }).call(this,require('_process'))
-},{"./ReactElement":169,"./ReactElementValidator":171,"_process":1}],169:[function(require,module,exports){
+},{"./ReactElement":166,"./ReactElementValidator":168,"_process":26}],166:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -20159,17 +20142,15 @@ ReactElement.isValidElement = function (object) {
 
 module.exports = ReactElement;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":167,"./ReactElementSymbol":170,"./canDefineProperty":178,"_process":1,"fbjs/lib/warning":24,"object-assign":25}],170:[function(require,module,exports){
+},{"./ReactCurrentOwner":164,"./ReactElementSymbol":167,"./canDefineProperty":174,"_process":26,"fbjs/lib/warning":24,"object-assign":25}],167:[function(require,module,exports){
 arguments[4][82][0].apply(exports,arguments)
-},{"dup":82}],171:[function(require,module,exports){
+},{"dup":82}],168:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2014-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -20191,6 +20172,7 @@ var checkReactTypeSpec = require('./checkReactTypeSpec');
 var canDefineProperty = require('./canDefineProperty');
 var getIteratorFn = require('./getIteratorFn');
 var warning = require('fbjs/lib/warning');
+var lowPriorityWarning = require('./lowPriorityWarning');
 
 function getDeclarationErrorAddendum() {
   if (ReactCurrentOwner.current) {
@@ -20331,7 +20313,6 @@ function validatePropTypes(element) {
 }
 
 var ReactElementValidator = {
-
   createElement: function (type, props, children) {
     var validType = typeof type === 'string' || typeof type === 'function';
     // We warn in this case but don't throw. We expect the element creation to
@@ -20340,7 +20321,7 @@ var ReactElementValidator = {
       if (typeof type !== 'function' && typeof type !== 'string') {
         var info = '';
         if (type === undefined || typeof type === 'object' && type !== null && Object.keys(type).length === 0) {
-          info += ' You likely forgot to export your component from the file ' + 'it\'s defined in.';
+          info += ' You likely forgot to export your component from the file ' + "it's defined in.";
         }
 
         var sourceInfo = getSourceInfoErrorAddendum(props);
@@ -20352,7 +20333,10 @@ var ReactElementValidator = {
 
         info += ReactComponentTreeHook.getCurrentStackAddendum();
 
+        var currentSource = props !== null && props !== undefined && props.__source !== undefined ? props.__source : null;
+        ReactComponentTreeHook.pushNonStandardWarningStack(true, currentSource);
         process.env.NODE_ENV !== 'production' ? warning(false, 'React.createElement: type is invalid -- expected a string (for ' + 'built-in components) or a class/function (for composite ' + 'components) but got: %s.%s', type == null ? type : typeof type, info) : void 0;
+        ReactComponentTreeHook.popNonStandardWarningStack();
       }
     }
 
@@ -20390,7 +20374,7 @@ var ReactElementValidator = {
         Object.defineProperty(validatedFactory, 'type', {
           enumerable: false,
           get: function () {
-            process.env.NODE_ENV !== 'production' ? warning(false, 'Factory.type is deprecated. Access the class directly ' + 'before passing it to createFactory.') : void 0;
+            lowPriorityWarning(false, 'Factory.type is deprecated. Access the class directly ' + 'before passing it to createFactory.');
             Object.defineProperty(this, 'type', {
               value: type
             });
@@ -20411,20 +20395,17 @@ var ReactElementValidator = {
     validatePropTypes(newElement);
     return newElement;
   }
-
 };
 
 module.exports = ReactElementValidator;
 }).call(this,require('_process'))
-},{"./ReactComponentTreeHook":166,"./ReactCurrentOwner":167,"./ReactElement":169,"./canDefineProperty":178,"./checkReactTypeSpec":179,"./getIteratorFn":180,"_process":1,"fbjs/lib/warning":24}],172:[function(require,module,exports){
+},{"./ReactComponentTreeHook":163,"./ReactCurrentOwner":164,"./ReactElement":166,"./canDefineProperty":174,"./checkReactTypeSpec":175,"./getIteratorFn":177,"./lowPriorityWarning":179,"_process":26,"fbjs/lib/warning":24}],169:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -20443,7 +20424,6 @@ function warnNoop(publicInstance, callerName) {
  * This is the abstract API for an update queue.
  */
 var ReactNoopUpdateQueue = {
-
   /**
    * Checks whether or not this composite component is mounted.
    * @param {ReactClass} publicInstance The instance we want to test.
@@ -20514,16 +20494,14 @@ var ReactNoopUpdateQueue = {
 
 module.exports = ReactNoopUpdateQueue;
 }).call(this,require('_process'))
-},{"_process":1,"fbjs/lib/warning":24}],173:[function(require,module,exports){
+},{"_process":26,"fbjs/lib/warning":24}],170:[function(require,module,exports){
 arguments[4][100][0].apply(exports,arguments)
-},{"_process":1,"dup":100}],174:[function(require,module,exports){
+},{"_process":26,"dup":100}],171:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -20535,61 +20513,17 @@ var _require = require('./ReactElement'),
 var factory = require('prop-types/factory');
 
 module.exports = factory(isValidElement);
-},{"./ReactElement":169,"prop-types/factory":27}],175:[function(require,module,exports){
+},{"./ReactElement":166,"prop-types/factory":28}],172:[function(require,module,exports){
 arguments[4][101][0].apply(exports,arguments)
-},{"dup":101}],176:[function(require,module,exports){
-/**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
-'use strict';
-
-var _assign = require('object-assign');
-
-var ReactComponent = require('./ReactComponent');
-var ReactNoopUpdateQueue = require('./ReactNoopUpdateQueue');
-
-var emptyObject = require('fbjs/lib/emptyObject');
-
-/**
- * Base class helpers for the updating state of a component.
- */
-function ReactPureComponent(props, context, updater) {
-  // Duplicated from ReactComponent.
-  this.props = props;
-  this.context = context;
-  this.refs = emptyObject;
-  // We initialize the default updater but the real one gets injected by the
-  // renderer.
-  this.updater = updater || ReactNoopUpdateQueue;
-}
-
-function ComponentDummy() {}
-ComponentDummy.prototype = ReactComponent.prototype;
-ReactPureComponent.prototype = new ComponentDummy();
-ReactPureComponent.prototype.constructor = ReactPureComponent;
-// Avoid an extra prototype jump for these methods.
-_assign(ReactPureComponent.prototype, ReactComponent.prototype);
-ReactPureComponent.prototype.isPureReactComponent = true;
-
-module.exports = ReactPureComponent;
-},{"./ReactComponent":165,"./ReactNoopUpdateQueue":172,"fbjs/lib/emptyObject":10,"object-assign":25}],177:[function(require,module,exports){
-arguments[4][111][0].apply(exports,arguments)
-},{"dup":111}],178:[function(require,module,exports){
+},{"dup":101}],173:[function(require,module,exports){
+arguments[4][109][0].apply(exports,arguments)
+},{"dup":109}],174:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -20609,15 +20543,13 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = canDefineProperty;
 }).call(this,require('_process'))
-},{"_process":1}],179:[function(require,module,exports){
+},{"_process":26}],175:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -20698,16 +20630,35 @@ function checkReactTypeSpec(typeSpecs, values, location, componentName, element,
 
 module.exports = checkReactTypeSpec;
 }).call(this,require('_process'))
-},{"./ReactComponentTreeHook":166,"./ReactPropTypeLocationNames":173,"./ReactPropTypesSecret":175,"./reactProdInvariant":183,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],180:[function(require,module,exports){
-arguments[4][144][0].apply(exports,arguments)
-},{"dup":144}],181:[function(require,module,exports){
+},{"./ReactComponentTreeHook":163,"./ReactPropTypeLocationNames":170,"./ReactPropTypesSecret":172,"./reactProdInvariant":181,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],176:[function(require,module,exports){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+var _require = require('./ReactBaseClasses'),
+    Component = _require.Component;
+
+var _require2 = require('./ReactElement'),
+    isValidElement = _require2.isValidElement;
+
+var ReactNoopUpdateQueue = require('./ReactNoopUpdateQueue');
+var factory = require('create-react-class/factory');
+
+module.exports = factory(Component, isValidElement, ReactNoopUpdateQueue);
+},{"./ReactBaseClasses":161,"./ReactElement":166,"./ReactNoopUpdateQueue":169,"create-react-class/factory":1}],177:[function(require,module,exports){
+arguments[4][142][0].apply(exports,arguments)
+},{"dup":142}],178:[function(require,module,exports){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  * 
  */
@@ -20721,15 +20672,78 @@ function getNextDebugID() {
 }
 
 module.exports = getNextDebugID;
-},{}],182:[function(require,module,exports){
+},{}],179:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2014-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+'use strict';
+
+/**
+ * Forked from fbjs/warning:
+ * https://github.com/facebook/fbjs/blob/e66ba20ad5be433eb54423f2b097d829324d9de6/packages/fbjs/src/__forks__/warning.js
+ *
+ * Only change is we use console.warn instead of console.error,
+ * and do nothing when 'console' is not supported.
+ * This really simplifies the code.
+ * ---
+ * Similar to invariant but only logs a warning if the condition is not met.
+ * This can be used to log issues in development environments in critical
+ * paths. Removing the logging code for production environments will keep the
+ * same logic and follow the same code paths.
+ */
+
+var lowPriorityWarning = function () {};
+
+if (process.env.NODE_ENV !== 'production') {
+  var printWarning = function (format) {
+    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+      args[_key - 1] = arguments[_key];
+    }
+
+    var argIndex = 0;
+    var message = 'Warning: ' + format.replace(/%s/g, function () {
+      return args[argIndex++];
+    });
+    if (typeof console !== 'undefined') {
+      console.warn(message);
+    }
+    try {
+      // --- Welcome to debugging React ---
+      // This error was thrown as a convenience so that you can use this stack
+      // to find the callsite that caused this warning to fire.
+      throw new Error(message);
+    } catch (x) {}
+  };
+
+  lowPriorityWarning = function (condition, format) {
+    if (format === undefined) {
+      throw new Error('`warning(condition, format, ...args)` requires a warning ' + 'message argument');
+    }
+    if (!condition) {
+      for (var _len2 = arguments.length, args = Array(_len2 > 2 ? _len2 - 2 : 0), _key2 = 2; _key2 < _len2; _key2++) {
+        args[_key2 - 2] = arguments[_key2];
+      }
+
+      printWarning.apply(undefined, [format].concat(args));
+    }
+  };
+}
+
+module.exports = lowPriorityWarning;
+}).call(this,require('_process'))
+},{"_process":26}],180:[function(require,module,exports){
+(function (process){
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 'use strict';
@@ -20761,17 +20775,15 @@ function onlyChild(children) {
 
 module.exports = onlyChild;
 }).call(this,require('_process'))
-},{"./ReactElement":169,"./reactProdInvariant":183,"_process":1,"fbjs/lib/invariant":17}],183:[function(require,module,exports){
-arguments[4][152][0].apply(exports,arguments)
-},{"dup":152}],184:[function(require,module,exports){
+},{"./ReactElement":166,"./reactProdInvariant":181,"_process":26,"fbjs/lib/invariant":17}],181:[function(require,module,exports){
+arguments[4][151][0].apply(exports,arguments)
+},{"dup":151}],182:[function(require,module,exports){
 (function (process){
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -20898,7 +20910,7 @@ function traverseAllChildrenImpl(children, nameSoFar, callback, traverseContext)
       if (process.env.NODE_ENV !== 'production') {
         addendum = ' If you meant to render a collection of children, use an array ' + 'instead or wrap the object using createFragment(object) from the ' + 'React add-ons.';
         if (children._isReactElement) {
-          addendum = ' It looks like you\'re using an element created by a different ' + 'version of React. Make sure to use only one copy of React.';
+          addendum = " It looks like you're using an element created by a different " + 'version of React. Make sure to use only one copy of React.';
         }
         if (ReactCurrentOwner.current) {
           var name = ReactCurrentOwner.current.getName();
@@ -20941,111 +20953,14 @@ function traverseAllChildren(children, callback, traverseContext) {
 
 module.exports = traverseAllChildren;
 }).call(this,require('_process'))
-},{"./KeyEscapeUtils":160,"./ReactCurrentOwner":167,"./ReactElementSymbol":170,"./getIteratorFn":180,"./reactProdInvariant":183,"_process":1,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],185:[function(require,module,exports){
+},{"./KeyEscapeUtils":158,"./ReactCurrentOwner":164,"./ReactElementSymbol":167,"./getIteratorFn":177,"./reactProdInvariant":181,"_process":26,"fbjs/lib/invariant":17,"fbjs/lib/warning":24}],183:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib/React');
 
-},{"./lib/React":162}],186:[function(require,module,exports){
-// Generated by psc-bundle 0.11.4
+},{"./lib/React":160}],184:[function(require,module,exports){
+// Generated by purs bundle 0.12.0
 var PS = {};
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Semigroupoid = function (compose) {
-      this.compose = compose;
-  };
-  var semigroupoidFn = new Semigroupoid(function (f) {
-      return function (g) {
-          return function (x) {
-              return f(g(x));
-          };
-      };
-  });
-  var compose = function (dict) {
-      return dict.compose;
-  };
-  exports["Semigroupoid"] = Semigroupoid;
-  exports["compose"] = compose;
-  exports["semigroupoidFn"] = semigroupoidFn;
-})(PS["Control.Semigroupoid"] = PS["Control.Semigroupoid"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.toForeign = function (value) {
-    return value;
-  };
-
-  exports.unsafeFromForeign = function (value) {
-    return value;
-  };
-
-  exports.typeOf = function (value) {
-    return typeof value;
-  };
-
-  exports.tagOf = function (value) {
-    return Object.prototype.toString.call(value).slice(8, -1);
-  };
-})(PS["Data.Foreign"] = PS["Data.Foreign"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];        
-  var Category = function (Semigroupoid0, id) {
-      this.Semigroupoid0 = Semigroupoid0;
-      this.id = id;
-  };
-  var id = function (dict) {
-      return dict.id;
-  };
-  var categoryFn = new Category(function () {
-      return Control_Semigroupoid.semigroupoidFn;
-  }, function (x) {
-      return x;
-  });
-  exports["Category"] = Category;
-  exports["id"] = id;
-  exports["categoryFn"] = categoryFn;
-})(PS["Control.Category"] = PS["Control.Category"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Category = PS["Control.Category"];
-  var flip = function (f) {
-      return function (b) {
-          return function (a) {
-              return f(a)(b);
-          };
-      };
-  };
-  var $$const = function (a) {
-      return function (v) {
-          return a;
-      };
-  };
-  exports["const"] = $$const;
-  exports["flip"] = flip;
-})(PS["Data.Function"] = PS["Data.Function"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.arrayMap = function (f) {
-    return function (arr) {
-      var l = arr.length;
-      var result = new Array(l);
-      for (var i = 0; i < l; i++) {
-        result[i] = f(arr[i]);
-      }
-      return result;
-    };
-  };
-})(PS["Data.Functor"] = PS["Data.Functor"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.unit = {};
-})(PS["Data.Unit"] = PS["Data.Unit"] || {});
 (function(exports) {
     "use strict";
 
@@ -21095,9 +21010,77 @@ var PS = {};
   };
 })(PS["Data.Show"] = PS["Data.Show"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var $foreign = PS["Data.Show"];     
+  var $foreign = PS["Data.Symbol"];      
+  var SProxy = (function () {
+      function SProxy() {
+
+      };
+      SProxy.value = new SProxy();
+      return SProxy;
+  })();
+  var IsSymbol = function (reflectSymbol) {
+      this.reflectSymbol = reflectSymbol;
+  };
+  var reflectSymbol = function (dict) {
+      return dict.reflectSymbol;
+  };
+  exports["IsSymbol"] = IsSymbol;
+  exports["reflectSymbol"] = reflectSymbol;
+  exports["SProxy"] = SProxy;
+})(PS["Data.Symbol"] = PS["Data.Symbol"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.unsafeGet = function (label) {
+    return function (rec) {
+      return rec[label];
+    };
+  };
+
+  exports.unsafeSet = function (label) {
+    return function (value) {
+      return function (rec) {
+        var copy = {};
+        for (var key in rec) {
+          if ({}.hasOwnProperty.call(rec, key)) {
+            copy[key] = rec[key];
+          }
+        }
+        copy[label] = value;
+        return copy;
+      };
+    };
+  };
+
+  exports.unsafeDelete = function (label) {
+    return function (rec) {
+      var copy = {};
+      for (var key in rec) {
+        if (key !== label && {}.hasOwnProperty.call(rec, key)) {
+          copy[key] = rec[key];
+        }
+      }
+      return copy;
+    };
+  };
+})(PS["Record.Unsafe"] = PS["Record.Unsafe"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Record.Unsafe"];
+  exports["unsafeGet"] = $foreign.unsafeGet;
+  exports["unsafeSet"] = $foreign.unsafeSet;
+  exports["unsafeDelete"] = $foreign.unsafeDelete;
+})(PS["Record.Unsafe"] = PS["Record.Unsafe"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Show"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Type_Data_RowList = PS["Type.Data.RowList"];                 
   var Show = function (show) {
       this.show = show;
   };
@@ -21114,145 +21097,141 @@ var PS = {};
   exports["showString"] = showString;
 })(PS["Data.Show"] = PS["Data.Show"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+    "use strict";
+
+  exports.arrayApply = function (fs) {
+    return function (xs) {
+      var l = fs.length;
+      var k = xs.length;
+      var result = new Array(l*k);
+      var n = 0;
+      for (var i = 0; i < l; i++) {
+        var f = fs[i];
+        for (var j = 0; j < k; j++) {
+          result[n++] = f(xs[j]);
+        }
+      }
+      return result;
+    };
+  };
+})(PS["Control.Apply"] = PS["Control.Apply"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Semigroupoid = function (compose) {
+      this.compose = compose;
+  };
+  var semigroupoidFn = new Semigroupoid(function (f) {
+      return function (g) {
+          return function (x) {
+              return f(g(x));
+          };
+      };
+  });
+  var compose = function (dict) {
+      return dict.compose;
+  };
+  exports["compose"] = compose;
+  exports["Semigroupoid"] = Semigroupoid;
+  exports["semigroupoidFn"] = semigroupoidFn;
+})(PS["Control.Semigroupoid"] = PS["Control.Semigroupoid"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];                 
+  var Category = function (Semigroupoid0, identity) {
+      this.Semigroupoid0 = Semigroupoid0;
+      this.identity = identity;
+  };
+  var identity = function (dict) {
+      return dict.identity;
+  };
+  var categoryFn = new Category(function () {
+      return Control_Semigroupoid.semigroupoidFn;
+  }, function (x) {
+      return x;
+  });
+  exports["Category"] = Category;
+  exports["identity"] = identity;
+  exports["categoryFn"] = categoryFn;
+})(PS["Control.Category"] = PS["Control.Category"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var otherwise = true;
+  exports["otherwise"] = otherwise;
+})(PS["Data.Boolean"] = PS["Data.Boolean"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.refEq = function (r1) {
+    return function (r2) {
+      return r1 === r2;
+    };
+  };
+})(PS["Data.Eq"] = PS["Data.Eq"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.unit = {};
+})(PS["Data.Unit"] = PS["Data.Unit"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var $foreign = PS["Data.Unit"];
   var Data_Show = PS["Data.Show"];
   exports["unit"] = $foreign.unit;
 })(PS["Data.Unit"] = PS["Data.Unit"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var $foreign = PS["Data.Functor"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Unit = PS["Data.Unit"];        
-  var Functor = function (map) {
-      this.map = map;
+  var $foreign = PS["Data.Eq"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Data_Unit = PS["Data.Unit"];
+  var Data_Void = PS["Data.Void"];
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Type_Data_RowList = PS["Type.Data.RowList"];                 
+  var Eq = function (eq) {
+      this.eq = eq;
+  }; 
+  var eqString = new Eq($foreign.refEq);
+  var eqInt = new Eq($foreign.refEq);
+  var eqChar = new Eq($foreign.refEq);
+  var eqBoolean = new Eq($foreign.refEq);
+  var eq = function (dict) {
+      return dict.eq;
   };
-  var map = function (dict) {
-      return dict.map;
-  };
-  var $$void = function (dictFunctor) {
-      return map(dictFunctor)(Data_Function["const"](Data_Unit.unit));
-  };
-  var voidRight = function (dictFunctor) {
+  var notEq = function (dictEq) {
       return function (x) {
-          return map(dictFunctor)(Data_Function["const"](x));
+          return function (y) {
+              return eq(eqBoolean)(eq(dictEq)(x)(y))(false);
+          };
       };
   };
-  var functorFn = new Functor(Control_Semigroupoid.compose(Control_Semigroupoid.semigroupoidFn));
-  var functorArray = new Functor($foreign.arrayMap);
-  exports["Functor"] = Functor;
-  exports["map"] = map;
-  exports["void"] = $$void;
-  exports["voidRight"] = voidRight;
-  exports["functorFn"] = functorFn;
-  exports["functorArray"] = functorArray;
-})(PS["Data.Functor"] = PS["Data.Functor"] || {});
+  exports["Eq"] = Eq;
+  exports["eq"] = eq;
+  exports["notEq"] = notEq;
+  exports["eqBoolean"] = eqBoolean;
+  exports["eqInt"] = eqInt;
+  exports["eqChar"] = eqChar;
+  exports["eqString"] = eqString;
+})(PS["Data.Eq"] = PS["Data.Eq"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Control.Apply"];
-  var Control_Category = PS["Control.Category"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];        
-  var Apply = function (Functor0, apply) {
-      this.Functor0 = Functor0;
-      this.apply = apply;
-  };                      
-  var apply = function (dict) {
-      return dict.apply;
-  };
-  var applyFirst = function (dictApply) {
-      return function (a) {
-          return function (b) {
-              return apply(dictApply)(Data_Functor.map(dictApply.Functor0())(Data_Function["const"])(a))(b);
+    "use strict";
+
+  exports.unsafeCompareImpl = function (lt) {
+    return function (eq) {
+      return function (gt) {
+        return function (x) {
+          return function (y) {
+            return x < y ? lt : x === y ? eq : gt;
           };
+        };
       };
+    };
   };
-  var applySecond = function (dictApply) {
-      return function (a) {
-          return function (b) {
-              return apply(dictApply)(Data_Functor.map(dictApply.Functor0())(Data_Function["const"](Control_Category.id(Control_Category.categoryFn)))(a))(b);
-          };
-      };
-  };
-  exports["Apply"] = Apply;
-  exports["apply"] = apply;
-  exports["applyFirst"] = applyFirst;
-  exports["applySecond"] = applySecond;
-})(PS["Control.Apply"] = PS["Control.Apply"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Apply = PS["Control.Apply"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Unit = PS["Data.Unit"];        
-  var Applicative = function (Apply0, pure) {
-      this.Apply0 = Apply0;
-      this.pure = pure;
-  };
-  var pure = function (dict) {
-      return dict.pure;
-  };
-  var unless = function (dictApplicative) {
-      return function (v) {
-          return function (v1) {
-              if (!v) {
-                  return v1;
-              };
-              if (v) {
-                  return pure(dictApplicative)(Data_Unit.unit);
-              };
-              throw new Error("Failed pattern match at Control.Applicative line 63, column 1 - line 63, column 19: " + [ v.constructor.name, v1.constructor.name ]);
-          };
-      };
-  };
-  var liftA1 = function (dictApplicative) {
-      return function (f) {
-          return function (a) {
-              return Control_Apply.apply(dictApplicative.Apply0())(pure(dictApplicative)(f))(a);
-          };
-      };
-  };
-  exports["Applicative"] = Applicative;
-  exports["liftA1"] = liftA1;
-  exports["pure"] = pure;
-  exports["unless"] = unless;
-})(PS["Control.Applicative"] = PS["Control.Applicative"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Control.Bind"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Category = PS["Control.Category"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Unit = PS["Data.Unit"];        
-  var Bind = function (Apply0, bind) {
-      this.Apply0 = Apply0;
-      this.bind = bind;
-  };
-  var Discard = function (discard) {
-      this.discard = discard;
-  };
-  var discard = function (dict) {
-      return dict.discard;
-  };                     
-  var bind = function (dict) {
-      return dict.bind;
-  };
-  var discardUnit = new Discard(function (dictBind) {
-      return bind(dictBind);
-  });
-  exports["Bind"] = Bind;
-  exports["Discard"] = Discard;
-  exports["bind"] = bind;
-  exports["discard"] = discard;
-  exports["discardUnit"] = discardUnit;
-})(PS["Control.Bind"] = PS["Control.Bind"] || {});
+})(PS["Data.Ord.Unsafe"] = PS["Data.Ord.Unsafe"] || {});
 (function(exports) {
     "use strict";
 
@@ -21271,11 +21250,14 @@ var PS = {};
   };
 })(PS["Data.Semigroup"] = PS["Data.Semigroup"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var $foreign = PS["Data.Semigroup"];
+  var Data_Symbol = PS["Data.Symbol"];
   var Data_Unit = PS["Data.Unit"];
-  var Data_Void = PS["Data.Void"];        
+  var Data_Void = PS["Data.Void"];
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Type_Data_RowList = PS["Type.Data.RowList"];                 
   var Semigroup = function (append) {
       this.append = append;
   }; 
@@ -21284,44 +21266,376 @@ var PS = {};
   var append = function (dict) {
       return dict.append;
   };
-  var semigroupFn = function (dictSemigroup) {
-      return new Semigroup(function (f) {
-          return function (g) {
-              return function (x) {
-                  return append(dictSemigroup)(f(x))(g(x));
-              };
-          };
-      });
-  };
   exports["Semigroup"] = Semigroup;
   exports["append"] = append;
   exports["semigroupString"] = semigroupString;
-  exports["semigroupFn"] = semigroupFn;
   exports["semigroupArray"] = semigroupArray;
 })(PS["Data.Semigroup"] = PS["Data.Semigroup"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Semigroup = PS["Data.Semigroup"];        
-  var Alt = function (Functor0, alt) {
-      this.Functor0 = Functor0;
-      this.alt = alt;
-  };                                                       
-  var alt = function (dict) {
-      return dict.alt;
-  };
-  exports["Alt"] = Alt;
-  exports["alt"] = alt;
-})(PS["Control.Alt"] = PS["Control.Alt"] || {});
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];                 
+  var LT = (function () {
+      function LT() {
+
+      };
+      LT.value = new LT();
+      return LT;
+  })();
+  var GT = (function () {
+      function GT() {
+
+      };
+      GT.value = new GT();
+      return GT;
+  })();
+  var EQ = (function () {
+      function EQ() {
+
+      };
+      EQ.value = new EQ();
+      return EQ;
+  })();
+  exports["LT"] = LT;
+  exports["GT"] = GT;
+  exports["EQ"] = EQ;
+})(PS["Data.Ordering"] = PS["Data.Ordering"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Ord.Unsafe"];
+  var Data_Ordering = PS["Data.Ordering"];                 
+  var unsafeCompare = $foreign.unsafeCompareImpl(Data_Ordering.LT.value)(Data_Ordering.EQ.value)(Data_Ordering.GT.value);
+  exports["unsafeCompare"] = unsafeCompare;
+})(PS["Data.Ord.Unsafe"] = PS["Data.Ord.Unsafe"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.intSub = function (x) {
+    return function (y) {
+      /* jshint bitwise: false */
+      return x - y | 0;
+    };
+  };
+})(PS["Data.Ring"] = PS["Data.Ring"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.intAdd = function (x) {
+    return function (y) {
+      /* jshint bitwise: false */
+      return x + y | 0;
+    };
+  };
+
+  exports.intMul = function (x) {
+    return function (y) {
+      /* jshint bitwise: false */
+      return x * y | 0;
+    };
+  };
+})(PS["Data.Semiring"] = PS["Data.Semiring"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Semiring"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Data_Unit = PS["Data.Unit"];
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Type_Data_Row = PS["Type.Data.Row"];
+  var Type_Data_RowList = PS["Type.Data.RowList"];                 
+  var Semiring = function (add, mul, one, zero) {
+      this.add = add;
+      this.mul = mul;
+      this.one = one;
+      this.zero = zero;
+  };
+  var zero = function (dict) {
+      return dict.zero;
+  };                                                                            
+  var semiringInt = new Semiring($foreign.intAdd, $foreign.intMul, 1, 0);
+  var one = function (dict) {
+      return dict.one;
+  };
+  var mul = function (dict) {
+      return dict.mul;
+  };
+  var add = function (dict) {
+      return dict.add;
+  };
+  exports["Semiring"] = Semiring;
+  exports["add"] = add;
+  exports["zero"] = zero;
+  exports["mul"] = mul;
+  exports["one"] = one;
+  exports["semiringInt"] = semiringInt;
+})(PS["Data.Semiring"] = PS["Data.Semiring"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Ring"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Data_Unit = PS["Data.Unit"];
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Type_Data_RowList = PS["Type.Data.RowList"];                 
+  var Ring = function (Semiring0, sub) {
+      this.Semiring0 = Semiring0;
+      this.sub = sub;
+  };
+  var sub = function (dict) {
+      return dict.sub;
+  };                  
+  var ringInt = new Ring(function () {
+      return Data_Semiring.semiringInt;
+  }, $foreign.intSub);
+  exports["Ring"] = Ring;
+  exports["sub"] = sub;
+  exports["ringInt"] = ringInt;
+})(PS["Data.Ring"] = PS["Data.Ring"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Ord"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Ord_Unsafe = PS["Data.Ord.Unsafe"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Data_Unit = PS["Data.Unit"];
+  var Data_Void = PS["Data.Void"];
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Type_Data_RowList = PS["Type.Data.RowList"];                 
+  var Ord = function (Eq0, compare) {
+      this.Eq0 = Eq0;
+      this.compare = compare;
+  }; 
+  var ordString = new Ord(function () {
+      return Data_Eq.eqString;
+  }, Data_Ord_Unsafe.unsafeCompare);
+  var ordInt = new Ord(function () {
+      return Data_Eq.eqInt;
+  }, Data_Ord_Unsafe.unsafeCompare);
+  var ordChar = new Ord(function () {
+      return Data_Eq.eqChar;
+  }, Data_Ord_Unsafe.unsafeCompare);
+  var compare = function (dict) {
+      return dict.compare;
+  };
+  exports["Ord"] = Ord;
+  exports["compare"] = compare;
+  exports["ordInt"] = ordInt;
+  exports["ordString"] = ordString;
+  exports["ordChar"] = ordChar;
+})(PS["Data.Ord"] = PS["Data.Ord"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Category = PS["Control.Category"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ring = PS["Data.Ring"];
+  var flip = function (f) {
+      return function (b) {
+          return function (a) {
+              return f(a)(b);
+          };
+      };
+  };
+  var $$const = function (a) {
+      return function (v) {
+          return a;
+      };
+  };
+  exports["flip"] = flip;
+  exports["const"] = $$const;
+})(PS["Data.Function"] = PS["Data.Function"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.arrayMap = function (f) {
+    return function (arr) {
+      var l = arr.length;
+      var result = new Array(l);
+      for (var i = 0; i < l; i++) {
+        result[i] = f(arr[i]);
+      }
+      return result;
+    };
+  };
+})(PS["Data.Functor"] = PS["Data.Functor"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Functor"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Unit = PS["Data.Unit"];                 
+  var Functor = function (map) {
+      this.map = map;
+  };
+  var map = function (dict) {
+      return dict.map;
+  };
+  var $$void = function (dictFunctor) {
+      return map(dictFunctor)(Data_Function["const"](Data_Unit.unit));
+  };                                                                                             
+  var functorArray = new Functor($foreign.arrayMap);
+  exports["Functor"] = Functor;
+  exports["map"] = map;
+  exports["void"] = $$void;
+  exports["functorArray"] = functorArray;
+})(PS["Data.Functor"] = PS["Data.Functor"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Control.Apply"];
+  var Control_Category = PS["Control.Category"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];                 
+  var Apply = function (Functor0, apply) {
+      this.Functor0 = Functor0;
+      this.apply = apply;
+  }; 
+  var applyArray = new Apply(function () {
+      return Data_Functor.functorArray;
+  }, $foreign.arrayApply);
+  var apply = function (dict) {
+      return dict.apply;
+  };
+  var applyFirst = function (dictApply) {
+      return function (a) {
+          return function (b) {
+              return apply(dictApply)(Data_Functor.map(dictApply.Functor0())(Data_Function["const"])(a))(b);
+          };
+      };
+  };
+  var applySecond = function (dictApply) {
+      return function (a) {
+          return function (b) {
+              return apply(dictApply)(Data_Functor.map(dictApply.Functor0())(Data_Function["const"](Control_Category.identity(Control_Category.categoryFn)))(a))(b);
+          };
+      };
+  };
+  exports["Apply"] = Apply;
+  exports["apply"] = apply;
+  exports["applyFirst"] = applyFirst;
+  exports["applySecond"] = applySecond;
+  exports["applyArray"] = applyArray;
+})(PS["Control.Apply"] = PS["Control.Apply"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Apply = PS["Control.Apply"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Unit = PS["Data.Unit"];                 
+  var Applicative = function (Apply0, pure) {
+      this.Apply0 = Apply0;
+      this.pure = pure;
+  };
+  var pure = function (dict) {
+      return dict.pure;
+  };
+  var unless = function (dictApplicative) {
+      return function (v) {
+          return function (v1) {
+              if (!v) {
+                  return v1;
+              };
+              if (v) {
+                  return pure(dictApplicative)(Data_Unit.unit);
+              };
+              throw new Error("Failed pattern match at Control.Applicative line 62, column 1 - line 62, column 65: " + [ v.constructor.name, v1.constructor.name ]);
+          };
+      };
+  };
+  var liftA1 = function (dictApplicative) {
+      return function (f) {
+          return function (a) {
+              return Control_Apply.apply(dictApplicative.Apply0())(pure(dictApplicative)(f))(a);
+          };
+      };
+  }; 
+  var applicativeArray = new Applicative(function () {
+      return Control_Apply.applyArray;
+  }, function (x) {
+      return [ x ];
+  });
+  exports["Applicative"] = Applicative;
+  exports["pure"] = pure;
+  exports["liftA1"] = liftA1;
+  exports["unless"] = unless;
+  exports["applicativeArray"] = applicativeArray;
+})(PS["Control.Applicative"] = PS["Control.Applicative"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Control.Bind"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Apply = PS["Control.Apply"];
+  var Control_Category = PS["Control.Category"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Unit = PS["Data.Unit"];                 
+  var Bind = function (Apply0, bind) {
+      this.Apply0 = Apply0;
+      this.bind = bind;
+  };
+  var Discard = function (discard) {
+      this.discard = discard;
+  };
+  var discard = function (dict) {
+      return dict.discard;
+  };                     
+  var bind = function (dict) {
+      return dict.bind;
+  };
+  var bindFlipped = function (dictBind) {
+      return Data_Function.flip(bind(dictBind));
+  };
+  var discardUnit = new Discard(function (dictBind) {
+      return bind(dictBind);
+  });
+  exports["Bind"] = Bind;
+  exports["bind"] = bind;
+  exports["bindFlipped"] = bindFlipped;
+  exports["Discard"] = Discard;
+  exports["discard"] = discard;
+  exports["discardUnit"] = discardUnit;
+})(PS["Control.Bind"] = PS["Control.Bind"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Unit = PS["Data.Unit"];                 
+  var Lazy = function (defer) {
+      this.defer = defer;
+  }; 
+  var defer = function (dict) {
+      return dict.defer;
+  };
+  var fix = function (dictLazy) {
+      return function (f) {
+          var go = defer(dictLazy)(function (v) {
+              return f(go);
+          });
+          return go;
+      };
+  };
+  exports["defer"] = defer;
+  exports["Lazy"] = Lazy;
+  exports["fix"] = fix;
+})(PS["Control.Lazy"] = PS["Control.Lazy"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
   var Control_Bind = PS["Control.Bind"];
   var Data_Functor = PS["Data.Functor"];
-  var Data_Unit = PS["Data.Unit"];        
+  var Data_Unit = PS["Data.Unit"];                 
   var Monad = function (Applicative0, Bind1) {
       this.Applicative0 = Applicative0;
       this.Bind1 = Bind1;
@@ -21341,64 +21655,60 @@ var PS = {};
   exports["ap"] = ap;
 })(PS["Control.Monad"] = PS["Control.Monad"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Category = PS["Control.Category"];        
-  var Bifunctor = function (bimap) {
-      this.bimap = bimap;
-  };
-  var bimap = function (dict) {
-      return dict.bimap;
-  };
-  var rmap = function (dictBifunctor) {
-      return bimap(dictBifunctor)(Control_Category.id(Control_Category.categoryFn));
-  };
-  exports["Bifunctor"] = Bifunctor;
-  exports["bimap"] = bimap;
-  exports["rmap"] = rmap;
-})(PS["Data.Bifunctor"] = PS["Data.Bifunctor"] || {});
-(function(exports) {
     "use strict";
 
-  exports.refEq = function (r1) {
-    return function (r2) {
-      return r1 === r2;
-    };
-  };
-})(PS["Data.Eq"] = PS["Data.Eq"] || {});
+  exports.topInt = 2147483647;
+  exports.bottomInt = -2147483648;
+
+  exports.topChar = String.fromCharCode(65535);
+  exports.bottomChar = String.fromCharCode(0);
+})(PS["Data.Bounded"] = PS["Data.Bounded"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var $foreign = PS["Data.Eq"];
-  var Data_Unit = PS["Data.Unit"];
-  var Data_Void = PS["Data.Void"];        
-  var Eq = function (eq) {
-      this.eq = eq;
-  }; 
-  var eqString = new Eq($foreign.refEq);
-  var eqNumber = new Eq($foreign.refEq);
-  var eqInt = new Eq($foreign.refEq);
-  var eqChar = new Eq($foreign.refEq);
-  var eqBoolean = new Eq($foreign.refEq);
-  var eq = function (dict) {
-      return dict.eq;
-  }; 
-  var notEq = function (dictEq) {
-      return function (x) {
-          return function (y) {
-              return eq(eqBoolean)(eq(dictEq)(x)(y))(false);
-          };
-      };
+  var $foreign = PS["Data.Bounded"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Unit = PS["Data.Unit"];                 
+  var Bounded = function (Ord0, bottom, top) {
+      this.Ord0 = Ord0;
+      this.bottom = bottom;
+      this.top = top;
   };
-  exports["Eq"] = Eq;
-  exports["eq"] = eq;
-  exports["notEq"] = notEq;
-  exports["eqBoolean"] = eqBoolean;
-  exports["eqInt"] = eqInt;
-  exports["eqNumber"] = eqNumber;
-  exports["eqChar"] = eqChar;
-  exports["eqString"] = eqString;
-})(PS["Data.Eq"] = PS["Data.Eq"] || {});
+  var top = function (dict) {
+      return dict.top;
+  };                                            
+  var boundedInt = new Bounded(function () {
+      return Data_Ord.ordInt;
+  }, $foreign.bottomInt, $foreign.topInt);
+  var boundedChar = new Bounded(function () {
+      return Data_Ord.ordChar;
+  }, $foreign.bottomChar, $foreign.topChar);
+  var bottom = function (dict) {
+      return dict.bottom;
+  };
+  exports["Bounded"] = Bounded;
+  exports["bottom"] = bottom;
+  exports["top"] = top;
+  exports["boundedInt"] = boundedInt;
+  exports["boundedChar"] = boundedChar;
+})(PS["Data.Bounded"] = PS["Data.Bounded"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Data_Unit = PS["Data.Unit"];                 
+  var CommutativeRing = function (Ring0) {
+      this.Ring0 = Ring0;
+  }; 
+  var commutativeRingInt = new CommutativeRing(function () {
+      return Data_Ring.ringInt;
+  });
+  exports["CommutativeRing"] = CommutativeRing;
+  exports["commutativeRingInt"] = commutativeRingInt;
+})(PS["Data.CommutativeRing"] = PS["Data.CommutativeRing"] || {});
 (function(exports) {
     "use strict";
 
@@ -21429,10 +21739,25 @@ var PS = {};
   };
 })(PS["Data.Foldable"] = PS["Data.Foldable"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Semigroup = PS["Data.Semigroup"];                 
+  var Alt = function (Functor0, alt) {
+      this.Functor0 = Functor0;
+      this.alt = alt;
+  };                                                       
+  var alt = function (dict) {
+      return dict.alt;
+  };
+  exports["Alt"] = Alt;
+  exports["alt"] = alt;
+})(PS["Control.Alt"] = PS["Control.Alt"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
-  var Data_Functor = PS["Data.Functor"];        
+  var Data_Functor = PS["Data.Functor"];                 
   var Plus = function (Alt0, empty) {
       this.Alt0 = Alt0;
       this.empty = empty;
@@ -21444,13 +21769,13 @@ var PS = {};
   exports["empty"] = empty;
 })(PS["Control.Plus"] = PS["Control.Plus"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
   var Control_Plus = PS["Control.Plus"];
-  var Data_Functor = PS["Data.Functor"];        
+  var Data_Functor = PS["Data.Functor"];                 
   var Alternative = function (Applicative0, Plus1) {
       this.Applicative0 = Applicative0;
       this.Plus1 = Plus1;
@@ -21458,140 +21783,122 @@ var PS = {};
   exports["Alternative"] = Alternative;
 })(PS["Control.Alternative"] = PS["Control.Alternative"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var otherwise = true;
-  exports["otherwise"] = otherwise;
-})(PS["Data.Boolean"] = PS["Data.Boolean"] || {});
+  var Control_Alt = PS["Control.Alt"];
+  var Control_Alternative = PS["Control.Alternative"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Apply = PS["Control.Apply"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Monad = PS["Control.Monad"];
+  var Control_Plus = PS["Control.Plus"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Unit = PS["Data.Unit"];                 
+  var MonadZero = function (Alternative1, Monad0) {
+      this.Alternative1 = Alternative1;
+      this.Monad0 = Monad0;
+  }; 
+  var guard = function (dictMonadZero) {
+      return function (v) {
+          if (v) {
+              return Control_Applicative.pure((dictMonadZero.Alternative1()).Applicative0())(Data_Unit.unit);
+          };
+          if (!v) {
+              return Control_Plus.empty((dictMonadZero.Alternative1()).Plus1());
+          };
+          throw new Error("Failed pattern match at Control.MonadZero line 54, column 1 - line 54, column 52: " + [ v.constructor.name ]);
+      };
+  };
+  exports["MonadZero"] = MonadZero;
+  exports["guard"] = guard;
+})(PS["Control.MonadZero"] = PS["Control.MonadZero"] || {});
 (function(exports) {
     "use strict";
 
-  exports.unsafeCompareImpl = function (lt) {
-    return function (eq) {
-      return function (gt) {
-        return function (x) {
-          return function (y) {
-            return x < y ? lt : x === y ? eq : gt;
-          };
-        };
-      };
+  exports.intDegree = function (x) {
+    return Math.min(Math.abs(x), 2147483647);
+  };
+
+  // See the Euclidean definition in
+  // https://en.m.wikipedia.org/wiki/Modulo_operation.
+  exports.intDiv = function (x) {
+    return function (y) {
+      if (y === 0) return 0;
+      return y > 0 ? Math.floor(x / y) : -Math.floor(x / -y);
     };
   };
-})(PS["Data.Ord.Unsafe"] = PS["Data.Ord.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Show = PS["Data.Show"];        
-  var LT = (function () {
-      function LT() {
 
-      };
-      LT.value = new LT();
-      return LT;
-  })();
-  var GT = (function () {
-      function GT() {
-
-      };
-      GT.value = new GT();
-      return GT;
-  })();
-  var EQ = (function () {
-      function EQ() {
-
-      };
-      EQ.value = new EQ();
-      return EQ;
-  })();
-  exports["LT"] = LT;
-  exports["GT"] = GT;
-  exports["EQ"] = EQ;
-})(PS["Data.Ordering"] = PS["Data.Ordering"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Ord.Unsafe"];
-  var Data_Ordering = PS["Data.Ordering"];        
-  var unsafeCompare = $foreign.unsafeCompareImpl(Data_Ordering.LT.value)(Data_Ordering.EQ.value)(Data_Ordering.GT.value);
-  exports["unsafeCompare"] = unsafeCompare;
-})(PS["Data.Ord.Unsafe"] = PS["Data.Ord.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Ord"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Ord_Unsafe = PS["Data.Ord.Unsafe"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Unit = PS["Data.Unit"];
-  var Data_Void = PS["Data.Void"];        
-  var Ord = function (Eq0, compare) {
-      this.Eq0 = Eq0;
-      this.compare = compare;
-  }; 
-  var ordString = new Ord(function () {
-      return Data_Eq.eqString;
-  }, Data_Ord_Unsafe.unsafeCompare);
-  var ordNumber = new Ord(function () {
-      return Data_Eq.eqNumber;
-  }, Data_Ord_Unsafe.unsafeCompare);
-  var ordInt = new Ord(function () {
-      return Data_Eq.eqInt;
-  }, Data_Ord_Unsafe.unsafeCompare);
-  var ordChar = new Ord(function () {
-      return Data_Eq.eqChar;
-  }, Data_Ord_Unsafe.unsafeCompare);
-  var ordBoolean = new Ord(function () {
-      return Data_Eq.eqBoolean;
-  }, Data_Ord_Unsafe.unsafeCompare);
-  var compare = function (dict) {
-      return dict.compare;
+  exports.intMod = function (x) {
+    return function (y) {
+      if (y === 0) return 0;
+      var yy = Math.abs(y);
+      return ((x % yy) + yy) % yy;
+    };
   };
-  exports["Ord"] = Ord;
-  exports["compare"] = compare;
-  exports["ordBoolean"] = ordBoolean;
-  exports["ordInt"] = ordInt;
-  exports["ordNumber"] = ordNumber;
-  exports["ordString"] = ordString;
-  exports["ordChar"] = ordChar;
-})(PS["Data.Ord"] = PS["Data.Ord"] || {});
+})(PS["Data.EuclideanRing"] = PS["Data.EuclideanRing"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.EuclideanRing"];
+  var Data_BooleanAlgebra = PS["Data.BooleanAlgebra"];
+  var Data_CommutativeRing = PS["Data.CommutativeRing"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semiring = PS["Data.Semiring"];                 
+  var EuclideanRing = function (CommutativeRing0, degree, div, mod) {
+      this.CommutativeRing0 = CommutativeRing0;
+      this.degree = degree;
+      this.div = div;
+      this.mod = mod;
+  };
+  var mod = function (dict) {
+      return dict.mod;
+  }; 
+  var euclideanRingInt = new EuclideanRing(function () {
+      return Data_CommutativeRing.commutativeRingInt;
+  }, $foreign.intDegree, $foreign.intDiv, $foreign.intMod);
+  var div = function (dict) {
+      return dict.div;
+  };
+  var degree = function (dict) {
+      return dict.degree;
+  };
+  exports["EuclideanRing"] = EuclideanRing;
+  exports["degree"] = degree;
+  exports["div"] = div;
+  exports["mod"] = mod;
+  exports["euclideanRingInt"] = euclideanRingInt;
+})(PS["Data.EuclideanRing"] = PS["Data.EuclideanRing"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var Data_Boolean = PS["Data.Boolean"];
   var Data_Eq = PS["Data.Eq"];
   var Data_EuclideanRing = PS["Data.EuclideanRing"];
-  var Data_Function = PS["Data.Function"];
   var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
   var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Symbol = PS["Data.Symbol"];
   var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Type_Data_RowList = PS["Type.Data.RowList"];                 
   var Monoid = function (Semigroup0, mempty) {
       this.Semigroup0 = Semigroup0;
       this.mempty = mempty;
   };                 
   var monoidString = new Monoid(function () {
       return Data_Semigroup.semigroupString;
-  }, "");  
+  }, "");
   var mempty = function (dict) {
       return dict.mempty;
   };
-  var monoidFn = function (dictMonoid) {
-      return new Monoid(function () {
-          return Data_Semigroup.semigroupFn(dictMonoid.Semigroup0());
-      }, Data_Function["const"](mempty(dictMonoid)));
-  };
   exports["Monoid"] = Monoid;
   exports["mempty"] = mempty;
-  exports["monoidFn"] = monoidFn;
   exports["monoidString"] = monoidString;
 })(PS["Data.Monoid"] = PS["Data.Monoid"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Alternative = PS["Control.Alternative"];
@@ -21614,7 +21921,7 @@ var PS = {};
   var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Show = PS["Data.Show"];
   var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
+  var Prelude = PS["Prelude"];                 
   var Nothing = (function () {
       function Nothing() {
 
@@ -21640,10 +21947,11 @@ var PS = {};
               if (v2 instanceof Just) {
                   return v1(v2.value0);
               };
-              throw new Error("Failed pattern match at Data.Maybe line 220, column 1 - line 220, column 22: " + [ v.constructor.name, v1.constructor.name, v2.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Maybe line 218, column 1 - line 218, column 51: " + [ v.constructor.name, v1.constructor.name, v2.constructor.name ]);
           };
       };
-  };                                                         
+  };
+  var isNothing = maybe(true)(Data_Function["const"](false));
   var isJust = maybe(false)(Data_Function["const"](true));
   var functorMaybe = new Data_Functor.Functor(function (v) {
       return function (v1) {
@@ -21654,20 +21962,20 @@ var PS = {};
       };
   });
   var fromMaybe = function (a) {
-      return maybe(a)(Control_Category.id(Control_Category.categoryFn));
+      return maybe(a)(Control_Category.identity(Control_Category.categoryFn));
   };
   var fromJust = function (dictPartial) {
       return function (v) {
-          var __unused = function (dictPartial1) {
-              return function ($dollar34) {
-                  return $dollar34;
+          var $__unused = function (dictPartial1) {
+              return function ($dollar35) {
+                  return $dollar35;
               };
           };
-          return __unused(dictPartial)((function () {
+          return $__unused(dictPartial)((function () {
               if (v instanceof Just) {
                   return v.value0;
               };
-              throw new Error("Failed pattern match at Data.Maybe line 271, column 1 - line 271, column 21: " + [ v.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Maybe line 269, column 1 - line 269, column 46: " + [ v.constructor.name ]);
           })());
       };
   };
@@ -21681,12 +21989,30 @@ var PS = {};
           if (v instanceof Nothing) {
               return Nothing.value;
           };
-          throw new Error("Failed pattern match at Data.Maybe line 69, column 3 - line 69, column 31: " + [ v.constructor.name, v1.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Maybe line 67, column 1 - line 67, column 35: " + [ v.constructor.name, v1.constructor.name ]);
+      };
+  });
+  var bindMaybe = new Control_Bind.Bind(function () {
+      return applyMaybe;
+  }, function (v) {
+      return function (v1) {
+          if (v instanceof Just) {
+              return v1(v.value0);
+          };
+          if (v instanceof Nothing) {
+              return Nothing.value;
+          };
+          throw new Error("Failed pattern match at Data.Maybe line 126, column 1 - line 126, column 33: " + [ v.constructor.name, v1.constructor.name ]);
       };
   });
   var applicativeMaybe = new Control_Applicative.Applicative(function () {
       return applyMaybe;
   }, Just.create);
+  var monadMaybe = new Control_Monad.Monad(function () {
+      return applicativeMaybe;
+  }, function () {
+      return bindMaybe;
+  });
   var altMaybe = new Control_Alt.Alt(function () {
       return functorMaybe;
   }, function (v) {
@@ -21697,24 +22023,51 @@ var PS = {};
           return v;
       };
   });
+  var plusMaybe = new Control_Plus.Plus(function () {
+      return altMaybe;
+  }, Nothing.value);
+  var alternativeMaybe = new Control_Alternative.Alternative(function () {
+      return applicativeMaybe;
+  }, function () {
+      return plusMaybe;
+  });
+  var monadZeroMaybe = new Control_MonadZero.MonadZero(function () {
+      return alternativeMaybe;
+  }, function () {
+      return monadMaybe;
+  });
   exports["Nothing"] = Nothing;
   exports["Just"] = Just;
-  exports["fromJust"] = fromJust;
+  exports["maybe"] = maybe;
   exports["fromMaybe"] = fromMaybe;
   exports["isJust"] = isJust;
-  exports["maybe"] = maybe;
+  exports["isNothing"] = isNothing;
+  exports["fromJust"] = fromJust;
   exports["functorMaybe"] = functorMaybe;
   exports["applyMaybe"] = applyMaybe;
   exports["applicativeMaybe"] = applicativeMaybe;
   exports["altMaybe"] = altMaybe;
+  exports["plusMaybe"] = plusMaybe;
+  exports["alternativeMaybe"] = alternativeMaybe;
+  exports["bindMaybe"] = bindMaybe;
+  exports["monadMaybe"] = monadMaybe;
+  exports["monadZeroMaybe"] = monadZeroMaybe;
 })(PS["Data.Maybe"] = PS["Data.Maybe"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
   var Data_Function = PS["Data.Function"];
   var Data_Functor = PS["Data.Functor"];
-  var Prelude = PS["Prelude"];        
+  var Data_Monoid_Additive = PS["Data.Monoid.Additive"];
+  var Data_Monoid_Conj = PS["Data.Monoid.Conj"];
+  var Data_Monoid_Disj = PS["Data.Monoid.Disj"];
+  var Data_Monoid_Dual = PS["Data.Monoid.Dual"];
+  var Data_Monoid_Endo = PS["Data.Monoid.Endo"];
+  var Data_Monoid_Multiplicative = PS["Data.Monoid.Multiplicative"];
+  var Data_Semigroup_First = PS["Data.Semigroup.First"];
+  var Data_Semigroup_Last = PS["Data.Semigroup.Last"];
+  var Prelude = PS["Prelude"];                 
   var Newtype = function (unwrap, wrap) {
       this.unwrap = unwrap;
       this.wrap = wrap;
@@ -21725,81 +22078,12 @@ var PS = {};
   var unwrap = function (dict) {
       return dict.unwrap;
   };
-  var under = function (dictNewtype) {
-      return function (dictNewtype1) {
-          return function (v) {
-              return function (f) {
-                  return function ($55) {
-                      return unwrap(dictNewtype1)(f(wrap(dictNewtype)($55)));
-                  };
-              };
-          };
-      };
-  };
-  var alaF = function (dictFunctor) {
-      return function (dictFunctor1) {
-          return function (dictNewtype) {
-              return function (dictNewtype1) {
-                  return function (v) {
-                      return function (f) {
-                          return function ($64) {
-                              return Data_Functor.map(dictFunctor1)(unwrap(dictNewtype1))(f(Data_Functor.map(dictFunctor)(wrap(dictNewtype))($64)));
-                          };
-                      };
-                  };
-              };
-          };
-      };
-  };
-  exports["Newtype"] = Newtype;
-  exports["alaF"] = alaF;
-  exports["under"] = under;
   exports["unwrap"] = unwrap;
   exports["wrap"] = wrap;
+  exports["Newtype"] = Newtype;
 })(PS["Data.Newtype"] = PS["Data.Newtype"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Extend = PS["Control.Extend"];
-  var Control_Monad = PS["Control.Monad"];
-  var Data_Bounded = PS["Data.Bounded"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Functor_Invariant = PS["Data.Functor.Invariant"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Show = PS["Data.Show"];
-  var Prelude = PS["Prelude"];        
-  var First = function (x) {
-      return x;
-  };
-  var semigroupFirst = new Data_Semigroup.Semigroup(function (v) {
-      return function (v1) {
-          if (v instanceof Data_Maybe.Just) {
-              return v;
-          };
-          return v1;
-      };
-  });                                  
-  var newtypeFirst = new Data_Newtype.Newtype(function (n) {
-      return n;
-  }, First);
-  var monoidFirst = new Data_Monoid.Monoid(function () {
-      return semigroupFirst;
-  }, Data_Maybe.Nothing.value);
-  exports["First"] = First;
-  exports["newtypeFirst"] = newtypeFirst;
-  exports["semigroupFirst"] = semigroupFirst;
-  exports["monoidFirst"] = monoidFirst;
-})(PS["Data.Maybe.First"] = PS["Data.Maybe.First"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var $foreign = PS["Data.Foldable"];
   var Control_Alt = PS["Control.Alt"];
@@ -21829,7 +22113,7 @@ var PS = {};
   var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Semiring = PS["Data.Semiring"];
   var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
+  var Prelude = PS["Prelude"];                 
   var Foldable = function (foldMap, foldl, foldr) {
       this.foldMap = foldMap;
       this.foldl = foldl;
@@ -21837,15 +22121,6 @@ var PS = {};
   };
   var foldr = function (dict) {
       return dict.foldr;
-  };
-  var traverse_ = function (dictApplicative) {
-      return function (dictFoldable) {
-          return function (f) {
-              return foldr(dictFoldable)(function ($181) {
-                  return Control_Apply.applySecond(dictApplicative.Apply0())(f($181));
-              })(Control_Applicative.pure(dictApplicative)(Data_Unit.unit));
-          };
-      };
   };
   var foldl = function (dict) {
       return dict.foldl;
@@ -21858,61 +22133,24 @@ var PS = {};
                       return function (x) {
                           if (v.init) {
                               return {
-                                  init: false, 
+                                  init: false,
                                   acc: x
                               };
                           };
                           return {
-                              init: false, 
+                              init: false,
                               acc: Data_Semigroup.append(dictMonoid.Semigroup0())(v.acc)(Data_Semigroup.append(dictMonoid.Semigroup0())(sep)(x))
                           };
                       };
                   };
                   return (foldl(dictFoldable)(go)({
-                      init: true, 
+                      init: true,
                       acc: Data_Monoid.mempty(dictMonoid)
                   })(xs)).acc;
               };
           };
       };
   }; 
-  var foldableMaybe = new Foldable(function (dictMonoid) {
-      return function (f) {
-          return function (v) {
-              if (v instanceof Data_Maybe.Nothing) {
-                  return Data_Monoid.mempty(dictMonoid);
-              };
-              if (v instanceof Data_Maybe.Just) {
-                  return f(v.value0);
-              };
-              throw new Error("Failed pattern match at Data.Foldable line 133, column 3 - line 133, column 30: " + [ f.constructor.name, v.constructor.name ]);
-          };
-      };
-  }, function (v) {
-      return function (z) {
-          return function (v1) {
-              if (v1 instanceof Data_Maybe.Nothing) {
-                  return z;
-              };
-              if (v1 instanceof Data_Maybe.Just) {
-                  return v(z)(v1.value0);
-              };
-              throw new Error("Failed pattern match at Data.Foldable line 131, column 3 - line 131, column 25: " + [ v.constructor.name, z.constructor.name, v1.constructor.name ]);
-          };
-      };
-  }, function (v) {
-      return function (z) {
-          return function (v1) {
-              if (v1 instanceof Data_Maybe.Nothing) {
-                  return z;
-              };
-              if (v1 instanceof Data_Maybe.Just) {
-                  return v(v1.value0)(z);
-              };
-              throw new Error("Failed pattern match at Data.Foldable line 129, column 3 - line 129, column 25: " + [ v.constructor.name, z.constructor.name, v1.constructor.name ]);
-          };
-      };
-  });
   var foldMapDefaultR = function (dictFoldable) {
       return function (dictMonoid) {
           return function (f) {
@@ -21931,517 +22169,15 @@ var PS = {};
       return dict.foldMap;
   };
   exports["Foldable"] = Foldable;
+  exports["foldr"] = foldr;
+  exports["foldl"] = foldl;
   exports["foldMap"] = foldMap;
   exports["foldMapDefaultR"] = foldMapDefaultR;
-  exports["foldl"] = foldl;
-  exports["foldr"] = foldr;
   exports["intercalate"] = intercalate;
-  exports["traverse_"] = traverse_;
   exports["foldableArray"] = foldableArray;
-  exports["foldableMaybe"] = foldableMaybe;
 })(PS["Data.Foldable"] = PS["Data.Foldable"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Traversable"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Category = PS["Control.Category"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Maybe_First = PS["Data.Maybe.First"];
-  var Data_Maybe_Last = PS["Data.Maybe.Last"];
-  var Data_Monoid_Additive = PS["Data.Monoid.Additive"];
-  var Data_Monoid_Conj = PS["Data.Monoid.Conj"];
-  var Data_Monoid_Disj = PS["Data.Monoid.Disj"];
-  var Data_Monoid_Dual = PS["Data.Monoid.Dual"];
-  var Data_Monoid_Multiplicative = PS["Data.Monoid.Multiplicative"];
-  var Prelude = PS["Prelude"];
-  var Traversable = function (Foldable1, Functor0, sequence, traverse) {
-      this.Foldable1 = Foldable1;
-      this.Functor0 = Functor0;
-      this.sequence = sequence;
-      this.traverse = traverse;
-  };
-  var traverse = function (dict) {
-      return dict.traverse;
-  }; 
-  var traversableMaybe = new Traversable(function () {
-      return Data_Foldable.foldableMaybe;
-  }, function () {
-      return Data_Maybe.functorMaybe;
-  }, function (dictApplicative) {
-      return function (v) {
-          if (v instanceof Data_Maybe.Nothing) {
-              return Control_Applicative.pure(dictApplicative)(Data_Maybe.Nothing.value);
-          };
-          if (v instanceof Data_Maybe.Just) {
-              return Data_Functor.map((dictApplicative.Apply0()).Functor0())(Data_Maybe.Just.create)(v.value0);
-          };
-          throw new Error("Failed pattern match at Data.Traversable line 87, column 3 - line 87, column 35: " + [ v.constructor.name ]);
-      };
-  }, function (dictApplicative) {
-      return function (v) {
-          return function (v1) {
-              if (v1 instanceof Data_Maybe.Nothing) {
-                  return Control_Applicative.pure(dictApplicative)(Data_Maybe.Nothing.value);
-              };
-              if (v1 instanceof Data_Maybe.Just) {
-                  return Data_Functor.map((dictApplicative.Apply0()).Functor0())(Data_Maybe.Just.create)(v(v1.value0));
-              };
-              throw new Error("Failed pattern match at Data.Traversable line 85, column 3 - line 85, column 37: " + [ v.constructor.name, v1.constructor.name ]);
-          };
-      };
-  });
-  var sequence = function (dict) {
-      return dict.sequence;
-  }; 
-  var $$for = function (dictApplicative) {
-      return function (dictTraversable) {
-          return function (x) {
-              return function (f) {
-                  return traverse(dictTraversable)(dictApplicative)(f)(x);
-              };
-          };
-      };
-  };
-  exports["Traversable"] = Traversable;
-  exports["for"] = $$for;
-  exports["sequence"] = sequence;
-  exports["traverse"] = traverse;
-  exports["traversableMaybe"] = traversableMaybe;
-})(PS["Data.Traversable"] = PS["Data.Traversable"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Alt = PS["Control.Alt"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Extend = PS["Control.Extend"];
-  var Control_Monad = PS["Control.Monad"];
-  var Data_Bifoldable = PS["Data.Bifoldable"];
-  var Data_Bifunctor = PS["Data.Bifunctor"];
-  var Data_Bitraversable = PS["Data.Bitraversable"];
-  var Data_Bounded = PS["Data.Bounded"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Functor_Invariant = PS["Data.Functor.Invariant"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Show = PS["Data.Show"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Prelude = PS["Prelude"];        
-  var Left = (function () {
-      function Left(value0) {
-          this.value0 = value0;
-      };
-      Left.create = function (value0) {
-          return new Left(value0);
-      };
-      return Left;
-  })();
-  var Right = (function () {
-      function Right(value0) {
-          this.value0 = value0;
-      };
-      Right.create = function (value0) {
-          return new Right(value0);
-      };
-      return Right;
-  })();
-  var functorEither = new Data_Functor.Functor(function (v) {
-      return function (v1) {
-          if (v1 instanceof Left) {
-              return new Left(v1.value0);
-          };
-          if (v1 instanceof Right) {
-              return new Right(v(v1.value0));
-          };
-          throw new Error("Failed pattern match at Data.Either line 37, column 3 - line 37, column 26: " + [ v.constructor.name, v1.constructor.name ]);
-      };
-  });                                                                                                     
-  var fromRight = function (dictPartial) {
-      return function (v) {
-          var __unused = function (dictPartial1) {
-              return function ($dollar62) {
-                  return $dollar62;
-              };
-          };
-          return __unused(dictPartial)((function () {
-              if (v instanceof Right) {
-                  return v.value0;
-              };
-              throw new Error("Failed pattern match at Data.Either line 253, column 1 - line 253, column 23: " + [ v.constructor.name ]);
-          })());
-      };
-  };
-  var foldableEither = new Data_Foldable.Foldable(function (dictMonoid) {
-      return function (f) {
-          return function (v) {
-              if (v instanceof Left) {
-                  return Data_Monoid.mempty(dictMonoid);
-              };
-              if (v instanceof Right) {
-                  return f(v.value0);
-              };
-              throw new Error("Failed pattern match at Data.Either line 189, column 3 - line 189, column 31: " + [ f.constructor.name, v.constructor.name ]);
-          };
-      };
-  }, function (v) {
-      return function (z) {
-          return function (v1) {
-              if (v1 instanceof Left) {
-                  return z;
-              };
-              if (v1 instanceof Right) {
-                  return v(z)(v1.value0);
-              };
-              throw new Error("Failed pattern match at Data.Either line 187, column 3 - line 187, column 26: " + [ v.constructor.name, z.constructor.name, v1.constructor.name ]);
-          };
-      };
-  }, function (v) {
-      return function (z) {
-          return function (v1) {
-              if (v1 instanceof Left) {
-                  return z;
-              };
-              if (v1 instanceof Right) {
-                  return v(v1.value0)(z);
-              };
-              throw new Error("Failed pattern match at Data.Either line 185, column 3 - line 185, column 26: " + [ v.constructor.name, z.constructor.name, v1.constructor.name ]);
-          };
-      };
-  });
-  var traversableEither = new Data_Traversable.Traversable(function () {
-      return foldableEither;
-  }, function () {
-      return functorEither;
-  }, function (dictApplicative) {
-      return function (v) {
-          if (v instanceof Left) {
-              return Control_Applicative.pure(dictApplicative)(new Left(v.value0));
-          };
-          if (v instanceof Right) {
-              return Data_Functor.map((dictApplicative.Apply0()).Functor0())(Right.create)(v.value0);
-          };
-          throw new Error("Failed pattern match at Data.Either line 203, column 3 - line 203, column 36: " + [ v.constructor.name ]);
-      };
-  }, function (dictApplicative) {
-      return function (v) {
-          return function (v1) {
-              if (v1 instanceof Left) {
-                  return Control_Applicative.pure(dictApplicative)(new Left(v1.value0));
-              };
-              if (v1 instanceof Right) {
-                  return Data_Functor.map((dictApplicative.Apply0()).Functor0())(Right.create)(v(v1.value0));
-              };
-              throw new Error("Failed pattern match at Data.Either line 201, column 3 - line 201, column 39: " + [ v.constructor.name, v1.constructor.name ]);
-          };
-      };
-  });
-  var either = function (v) {
-      return function (v1) {
-          return function (v2) {
-              if (v2 instanceof Left) {
-                  return v(v2.value0);
-              };
-              if (v2 instanceof Right) {
-                  return v1(v2.value0);
-              };
-              throw new Error("Failed pattern match at Data.Either line 230, column 1 - line 230, column 26: " + [ v.constructor.name, v1.constructor.name, v2.constructor.name ]);
-          };
-      };
-  };
-  var bifunctorEither = new Data_Bifunctor.Bifunctor(function (v) {
-      return function (v1) {
-          return function (v2) {
-              if (v2 instanceof Left) {
-                  return new Left(v(v2.value0));
-              };
-              if (v2 instanceof Right) {
-                  return new Right(v1(v2.value0));
-              };
-              throw new Error("Failed pattern match at Data.Either line 44, column 3 - line 44, column 34: " + [ v.constructor.name, v1.constructor.name, v2.constructor.name ]);
-          };
-      };
-  });
-  var applyEither = new Control_Apply.Apply(function () {
-      return functorEither;
-  }, function (v) {
-      return function (v1) {
-          if (v instanceof Left) {
-              return new Left(v.value0);
-          };
-          if (v instanceof Right) {
-              return Data_Functor.map(functorEither)(v.value0)(v1);
-          };
-          throw new Error("Failed pattern match at Data.Either line 80, column 3 - line 80, column 28: " + [ v.constructor.name, v1.constructor.name ]);
-      };
-  });
-  var applicativeEither = new Control_Applicative.Applicative(function () {
-      return applyEither;
-  }, Right.create);
-  exports["Left"] = Left;
-  exports["Right"] = Right;
-  exports["either"] = either;
-  exports["fromRight"] = fromRight;
-  exports["functorEither"] = functorEither;
-  exports["bifunctorEither"] = bifunctorEither;
-  exports["applyEither"] = applyEither;
-  exports["applicativeEither"] = applicativeEither;
-  exports["foldableEither"] = foldableEither;
-  exports["traversableEither"] = traversableEither;
-})(PS["Data.Either"] = PS["Data.Either"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
-  var MonadThrow = function (Monad0, throwError) {
-      this.Monad0 = Monad0;
-      this.throwError = throwError;
-  };
-  var throwError = function (dict) {
-      return dict.throwError;
-  };
-  exports["MonadThrow"] = MonadThrow;
-  exports["throwError"] = throwError;
-})(PS["Control.Monad.Error.Class"] = PS["Control.Monad.Error.Class"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.pureE = function (a) {
-    return function () {
-      return a;
-    };
-  };
-
-  exports.bindE = function (a) {
-    return function (f) {
-      return function () {
-        return f(a())();
-      };
-    };
-  };
-})(PS["Control.Monad.Eff"] = PS["Control.Monad.Eff"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Control.Monad.Eff"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Monad = PS["Control.Monad"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Unit = PS["Data.Unit"];        
-  var monadEff = new Control_Monad.Monad(function () {
-      return applicativeEff;
-  }, function () {
-      return bindEff;
-  });
-  var bindEff = new Control_Bind.Bind(function () {
-      return applyEff;
-  }, $foreign.bindE);
-  var applyEff = new Control_Apply.Apply(function () {
-      return functorEff;
-  }, Control_Monad.ap(monadEff));
-  var applicativeEff = new Control_Applicative.Applicative(function () {
-      return applyEff;
-  }, $foreign.pureE);
-  var functorEff = new Data_Functor.Functor(Control_Applicative.liftA1(applicativeEff));
-  exports["functorEff"] = functorEff;
-  exports["applyEff"] = applyEff;
-  exports["applicativeEff"] = applicativeEff;
-  exports["bindEff"] = bindEff;
-  exports["monadEff"] = monadEff;
-})(PS["Control.Monad.Eff"] = PS["Control.Monad.Eff"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Category = PS["Control.Category"];
-  var Control_Monad = PS["Control.Monad"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];        
-  var MonadEff = function (Monad0, liftEff) {
-      this.Monad0 = Monad0;
-      this.liftEff = liftEff;
-  };                                                   
-  var liftEff = function (dict) {
-      return dict.liftEff;
-  };
-  exports["MonadEff"] = MonadEff;
-  exports["liftEff"] = liftEff;
-})(PS["Control.Monad.Eff.Class"] = PS["Control.Monad.Eff.Class"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.unsafeCoerceEff = function (f) {
-    return f;
-  };
-})(PS["Control.Monad.Eff.Unsafe"] = PS["Control.Monad.Eff.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Control.Monad.Eff.Unsafe"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  exports["unsafeCoerceEff"] = $foreign.unsafeCoerceEff;
-})(PS["Control.Monad.Eff.Unsafe"] = PS["Control.Monad.Eff.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Data_Unit = PS["Data.Unit"];        
-  var Lazy = function (defer) {
-      this.defer = defer;
-  }; 
-  var defer = function (dict) {
-      return dict.defer;
-  };
-  var fix = function (dictLazy) {
-      return function (f) {
-          return defer(dictLazy)(function (v) {
-              return f(fix(dictLazy)(f));
-          });
-      };
-  };
-  exports["Lazy"] = Lazy;
-  exports["defer"] = defer;
-  exports["fix"] = fix;
-})(PS["Control.Lazy"] = PS["Control.Lazy"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Alt = PS["Control.Alt"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Comonad = PS["Control.Comonad"];
-  var Control_Extend = PS["Control.Extend"];
-  var Control_Lazy = PS["Control.Lazy"];
-  var Control_Monad = PS["Control.Monad"];
-  var Data_BooleanAlgebra = PS["Data.BooleanAlgebra"];
-  var Data_Bounded = PS["Data.Bounded"];
-  var Data_CommutativeRing = PS["Data.CommutativeRing"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_EuclideanRing = PS["Data.EuclideanRing"];
-  var Data_Field = PS["Data.Field"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Functor_Invariant = PS["Data.Functor.Invariant"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Show = PS["Data.Show"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Prelude = PS["Prelude"];        
-  var Identity = function (x) {
-      return x;
-  };
-  var newtypeIdentity = new Data_Newtype.Newtype(function (n) {
-      return n;
-  }, Identity);
-  var functorIdentity = new Data_Functor.Functor(function (f) {
-      return function (v) {
-          return f(v);
-      };
-  });
-  var applyIdentity = new Control_Apply.Apply(function () {
-      return functorIdentity;
-  }, function (v) {
-      return function (v1) {
-          return v(v1);
-      };
-  });
-  var bindIdentity = new Control_Bind.Bind(function () {
-      return applyIdentity;
-  }, function (v) {
-      return function (f) {
-          return f(v);
-      };
-  });
-  var applicativeIdentity = new Control_Applicative.Applicative(function () {
-      return applyIdentity;
-  }, Identity);
-  var monadIdentity = new Control_Monad.Monad(function () {
-      return applicativeIdentity;
-  }, function () {
-      return bindIdentity;
-  });
-  exports["Identity"] = Identity;
-  exports["newtypeIdentity"] = newtypeIdentity;
-  exports["functorIdentity"] = functorIdentity;
-  exports["applyIdentity"] = applyIdentity;
-  exports["applicativeIdentity"] = applicativeIdentity;
-  exports["bindIdentity"] = bindIdentity;
-  exports["monadIdentity"] = monadIdentity;
-})(PS["Data.Identity"] = PS["Data.Identity"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Monad = PS["Control.Monad"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Monad_Eff_Unsafe = PS["Control.Monad.Eff.Unsafe"];
-  var Control_Monad_ST = PS["Control.Monad.ST"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Bifunctor = PS["Data.Bifunctor"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Unit = PS["Data.Unit"];
-  var Partial_Unsafe = PS["Partial.Unsafe"];
-  var Prelude = PS["Prelude"];        
-  var Loop = (function () {
-      function Loop(value0) {
-          this.value0 = value0;
-      };
-      Loop.create = function (value0) {
-          return new Loop(value0);
-      };
-      return Loop;
-  })();
-  var Done = (function () {
-      function Done(value0) {
-          this.value0 = value0;
-      };
-      Done.create = function (value0) {
-          return new Done(value0);
-      };
-      return Done;
-  })();
-  var MonadRec = function (Monad0, tailRecM) {
-      this.Monad0 = Monad0;
-      this.tailRecM = tailRecM;
-  };
-  var tailRecM = function (dict) {
-      return dict.tailRecM;
-  };
-  exports["Loop"] = Loop;
-  exports["Done"] = Done;
-  exports["MonadRec"] = MonadRec;
-  exports["tailRecM"] = tailRecM;
-})(PS["Control.Monad.Rec.Class"] = PS["Control.Monad.Rec.Class"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
@@ -22479,7 +22215,7 @@ var PS = {};
   var Data_Traversable = PS["Data.Traversable"];
   var Data_Unit = PS["Data.Unit"];
   var Prelude = PS["Prelude"];
-  var Type_Equality = PS["Type.Equality"];        
+  var Type_Equality = PS["Type.Equality"];                 
   var Tuple = (function () {
       function Tuple(value0, value1) {
           this.value0 = value0;
@@ -22503,1216 +22239,197 @@ var PS = {};
   exports["snd"] = snd;
 })(PS["Data.Tuple"] = PS["Data.Tuple"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
+  var Data_Show = PS["Data.Show"];
   var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
-  var MonadState = function (Monad0, state) {
-      this.Monad0 = Monad0;
-      this.state = state;
-  };
-  var state = function (dict) {
-      return dict.state;
-  };
-  var modify = function (dictMonadState) {
-      return function (f) {
-          return state(dictMonadState)(function (s) {
-              return new Data_Tuple.Tuple(Data_Unit.unit, f(s));
-          });
+  var Prelude = PS["Prelude"];                 
+  var Warning = (function () {
+      function Warning() {
+
       };
-  };
-  var gets = function (dictMonadState) {
-      return function (f) {
-          return state(dictMonadState)(function (s) {
-              return new Data_Tuple.Tuple(f(s), s);
-          });
+      Warning.value = new Warning();
+      return Warning;
+  })();
+  var Danger = (function () {
+      function Danger() {
+
       };
-  };
-  exports["MonadState"] = MonadState;
-  exports["gets"] = gets;
-  exports["modify"] = modify;
-  exports["state"] = state;
-})(PS["Control.Monad.State.Class"] = PS["Control.Monad.State.Class"] || {});
+      Danger.value = new Danger();
+      return Danger;
+  })();
+  var warn = Data_Tuple.Tuple.create(Warning.value);
+  var showLevel = new Data_Show.Show(function (v) {
+      if (v instanceof Warning) {
+          return "warning";
+      };
+      if (v instanceof Danger) {
+          return "danger";
+      };
+      throw new Error("Failed pattern match at Data.Level line 13, column 1 - line 13, column 33: " + [ v.constructor.name ]);
+  });
+  var danger = Data_Tuple.Tuple.create(Danger.value);
+  exports["Warning"] = Warning;
+  exports["Danger"] = Danger;
+  exports["warn"] = warn;
+  exports["danger"] = danger;
+  exports["showLevel"] = showLevel;
+})(PS["Data.Level"] = PS["Data.Level"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Prelude = PS["Prelude"];        
-  var MonadTrans = function (lift) {
-      this.lift = lift;
+    "use strict";
+
+  exports.pureE = function (a) {
+    return function () {
+      return a;
+    };
   };
-  var lift = function (dict) {
-      return dict.lift;
+
+  exports.bindE = function (a) {
+    return function (f) {
+      return function () {
+        return f(a())();
+      };
+    };
   };
-  exports["MonadTrans"] = MonadTrans;
-  exports["lift"] = lift;
-})(PS["Control.Monad.Trans.Class"] = PS["Control.Monad.Trans.Class"] || {});
+})(PS["Effect"] = PS["Effect"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var Control_Alt = PS["Control.Alt"];
-  var Control_Alternative = PS["Control.Alternative"];
+  var $foreign = PS["Effect"];
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
   var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
   var Control_Monad = PS["Control.Monad"];
-  var Control_Monad_Cont_Class = PS["Control.Monad.Cont.Class"];
-  var Control_Monad_Eff_Class = PS["Control.Monad.Eff.Class"];
-  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
-  var Control_Monad_Reader_Class = PS["Control.Monad.Reader.Class"];
-  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
-  var Control_Monad_State_Class = PS["Control.Monad.State.Class"];
-  var Control_Monad_Trans_Class = PS["Control.Monad.Trans.Class"];
-  var Control_Monad_Writer_Class = PS["Control.Monad.Writer.Class"];
-  var Control_MonadPlus = PS["Control.MonadPlus"];
-  var Control_MonadZero = PS["Control.MonadZero"];
-  var Control_Plus = PS["Control.Plus"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Function = PS["Data.Function"];
   var Data_Functor = PS["Data.Functor"];
   var Data_Monoid = PS["Data.Monoid"];
-  var Data_Newtype = PS["Data.Newtype"];
   var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Prelude = PS["Prelude"];        
-  var ExceptT = function (x) {
-      return x;
-  };
-  var runExceptT = function (v) {
-      return v;
-  };          
-  var monadTransExceptT = new Control_Monad_Trans_Class.MonadTrans(function (dictMonad) {
-      return function (m) {
-          return Control_Bind.bind(dictMonad.Bind1())(m)(function (v) {
-              return Control_Applicative.pure(dictMonad.Applicative0())(new Data_Either.Right(v));
-          });
-      };
+  var Prelude = PS["Prelude"];                 
+  var monadEffect = new Control_Monad.Monad(function () {
+      return applicativeEffect;
+  }, function () {
+      return bindEffect;
   });
-  var mapExceptT = function (f) {
-      return function (v) {
-          return f(v);
-      };
-  };
-  var functorExceptT = function (dictFunctor) {
-      return new Data_Functor.Functor(function (f) {
-          return mapExceptT(Data_Functor.map(dictFunctor)(Data_Functor.map(Data_Either.functorEither)(f)));
-      });
-  };
-  var monadExceptT = function (dictMonad) {
-      return new Control_Monad.Monad(function () {
-          return applicativeExceptT(dictMonad);
-      }, function () {
-          return bindExceptT(dictMonad);
-      });
-  };
-  var bindExceptT = function (dictMonad) {
-      return new Control_Bind.Bind(function () {
-          return applyExceptT(dictMonad);
-      }, function (v) {
-          return function (k) {
-              return Control_Bind.bind(dictMonad.Bind1())(v)(Data_Either.either(function ($97) {
-                  return Control_Applicative.pure(dictMonad.Applicative0())(Data_Either.Left.create($97));
-              })(function (a) {
-                  var v1 = k(a);
-                  return v1;
-              }));
-          };
-      });
-  };
-  var applyExceptT = function (dictMonad) {
-      return new Control_Apply.Apply(function () {
-          return functorExceptT(((dictMonad.Bind1()).Apply0()).Functor0());
-      }, Control_Monad.ap(monadExceptT(dictMonad)));
-  };
-  var applicativeExceptT = function (dictMonad) {
-      return new Control_Applicative.Applicative(function () {
-          return applyExceptT(dictMonad);
-      }, function ($98) {
-          return ExceptT(Control_Applicative.pure(dictMonad.Applicative0())(Data_Either.Right.create($98)));
-      });
-  };
-  var monadStateExceptT = function (dictMonadState) {
-      return new Control_Monad_State_Class.MonadState(function () {
-          return monadExceptT(dictMonadState.Monad0());
-      }, function (f) {
-          return Control_Monad_Trans_Class.lift(monadTransExceptT)(dictMonadState.Monad0())(Control_Monad_State_Class.state(dictMonadState)(f));
-      });
-  };
-  var monadThrowExceptT = function (dictMonad) {
-      return new Control_Monad_Error_Class.MonadThrow(function () {
-          return monadExceptT(dictMonad);
-      }, function ($102) {
-          return ExceptT(Control_Applicative.pure(dictMonad.Applicative0())(Data_Either.Left.create($102)));
-      });
-  };
-  exports["ExceptT"] = ExceptT;
-  exports["mapExceptT"] = mapExceptT;
-  exports["runExceptT"] = runExceptT;
-  exports["functorExceptT"] = functorExceptT;
-  exports["applyExceptT"] = applyExceptT;
-  exports["applicativeExceptT"] = applicativeExceptT;
-  exports["bindExceptT"] = bindExceptT;
-  exports["monadExceptT"] = monadExceptT;
-  exports["monadTransExceptT"] = monadTransExceptT;
-  exports["monadThrowExceptT"] = monadThrowExceptT;
-  exports["monadStateExceptT"] = monadStateExceptT;
-})(PS["Control.Monad.Except.Trans"] = PS["Control.Monad.Except.Trans"] || {});
+  var bindEffect = new Control_Bind.Bind(function () {
+      return applyEffect;
+  }, $foreign.bindE);
+  var applyEffect = new Control_Apply.Apply(function () {
+      return functorEffect;
+  }, Control_Monad.ap(monadEffect));
+  var applicativeEffect = new Control_Applicative.Applicative(function () {
+      return applyEffect;
+  }, $foreign.pureE);
+  var functorEffect = new Data_Functor.Functor(Control_Applicative.liftA1(applicativeEffect));
+  exports["functorEffect"] = functorEffect;
+  exports["applyEffect"] = applyEffect;
+  exports["applicativeEffect"] = applicativeEffect;
+  exports["bindEffect"] = bindEffect;
+  exports["monadEffect"] = monadEffect;
+})(PS["Effect"] = PS["Effect"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
-  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Prelude = PS["Prelude"];                                                           
-  var runExcept = function ($0) {
-      return Data_Newtype.unwrap(Data_Identity.newtypeIdentity)(Control_Monad_Except_Trans.runExceptT($0));
-  };
-  var mapExcept = function (f) {
-      return Control_Monad_Except_Trans.mapExceptT(function ($1) {
-          return Data_Identity.Identity(f(Data_Newtype.unwrap(Data_Identity.newtypeIdentity)($1)));
+    "use strict";
+  var React =require("react"); 
+  var Fragment = React.Fragment || "div";
+
+  exports.component_ = function(spec) {
+    var Component = function constructor() {
+      this.state = spec.initialState;
+      this._setState = this.setState.bind(this);
+      return this;
+    };
+
+    Component.prototype = Object.create(React.PureComponent.prototype);
+
+    Component.displayName = spec.displayName;
+
+    Component.prototype.componentDidMount = function componentDidMount() {
+      spec.receiveProps({
+        isFirstMount: true,
+        props: this.props,
+        state: this.state,
+        setState: this._setState,
+        setStateThen: this._setState,
+        instance_: this
       });
+    };
+
+    Component.prototype.componentDidUpdate = function componentDidUpdate() {
+      spec.receiveProps({
+        isFirstMount: false,
+        props: this.props,
+        state: this.state,
+        setState: this._setState,
+        setStateThen: this._setState,
+        instance_: this
+      });
+    };
+
+    Component.prototype.render = function render() {
+      return spec.render({
+        props: this.props,
+        state: this.state,
+        setState: this._setState,
+        setStateThen: this._setState,
+        instance_: this
+      });
+    };
+
+    return Component;
   };
-  exports["mapExcept"] = mapExcept;
-  exports["runExcept"] = runExcept;
-})(PS["Control.Monad.Except"] = PS["Control.Monad.Except"] || {});
+
+  exports.element_ = function(el, attrs) {
+    return React.createElement.apply(
+      null,
+      [el, attrs].concat((attrs && attrs.children) || [])
+    );
+  };                                       
+
+  exports.fragment = function(children) {
+    return React.createElement.apply(null, [Fragment, {}].concat(children));
+  };
+})(PS["React.Basic"] = PS["React.Basic"] || {});
 (function(exports) {
     "use strict";
 
-  // module Data.Int
-
-  exports.fromNumberImpl = function (just) {
-    return function (nothing) {
-      return function (n) {
-        /* jshint bitwise: false */
-        return (n | 0) === n ? just(n) : nothing;
-      };
-    };
-  };
-
-  exports.fromStringAsImpl = function (just) {
-    return function (nothing) {
-      return function (radix) {
-        var digits;
-        if (radix < 11) {
-          digits = "[0-" + (radix - 1).toString() + "]";
-        } else if (radix === 11) {
-          digits = "[0-9a]";
-        } else {
-          digits = "[0-9a-" + String.fromCharCode(86 + radix) + "]";
-        }
-        var pattern = new RegExp("^[\\+\\-]?" + digits + "+$", "i");
-
-        return function (s) {
-          /* jshint bitwise: false */
-          if (pattern.test(s)) {
-            var i = parseInt(s, radix);
-            return (i | 0) === i ? just(i) : nothing;
-          } else {
-            return nothing;
-          }
-        };
-      };
-    };
-  };
-})(PS["Data.Int"] = PS["Data.Int"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Int"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Boolean = PS["Data.Boolean"];
-  var Data_Bounded = PS["Data.Bounded"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Int_Bits = PS["Data.Int.Bits"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ring = PS["Data.Ring"];
-  var Global = PS["Global"];
-  var $$Math = PS["Math"];
-  var Prelude = PS["Prelude"];
-  var fromStringAs = $foreign.fromStringAsImpl(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
-  var fromString = fromStringAs(10);
-  var fromNumber = $foreign.fromNumberImpl(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
-  exports["fromNumber"] = fromNumber;
-  exports["fromString"] = fromString;
-  exports["fromStringAs"] = fromStringAs;
-})(PS["Data.Int"] = PS["Data.Int"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Alt = PS["Control.Alt"];
-  var Control_Alternative = PS["Control.Alternative"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Plus = PS["Control.Plus"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Show = PS["Data.Show"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Prelude = PS["Prelude"];        
-  var NonEmpty = (function () {
-      function NonEmpty(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
-      };
-      NonEmpty.create = function (value0) {
-          return function (value1) {
-              return new NonEmpty(value0, value1);
-          };
-      };
-      return NonEmpty;
-  })();
-  var singleton = function (dictPlus) {
-      return function (a) {
-          return new NonEmpty(a, Control_Plus.empty(dictPlus));
-      };
-  };
-  exports["NonEmpty"] = NonEmpty;
-  exports["singleton"] = singleton;
-})(PS["Data.NonEmpty"] = PS["Data.NonEmpty"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Unfoldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unit = PS["Data.Unit"];
-  var Partial_Unsafe = PS["Partial.Unsafe"];
-  var Prelude = PS["Prelude"];        
-  var Unfoldable = function (unfoldr) {
-      this.unfoldr = unfoldr;
-  };
-  var unfoldr = function (dict) {
-      return dict.unfoldr;
-  };
-  exports["Unfoldable"] = Unfoldable;
-  exports["unfoldr"] = unfoldr;
-})(PS["Data.Unfoldable"] = PS["Data.Unfoldable"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Alt = PS["Control.Alt"];
-  var Control_Alternative = PS["Control.Alternative"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Comonad = PS["Control.Comonad"];
-  var Control_Extend = PS["Control.Extend"];
-  var Control_Monad = PS["Control.Monad"];
-  var Control_MonadPlus = PS["Control.MonadPlus"];
-  var Control_MonadZero = PS["Control.MonadZero"];
-  var Control_Plus = PS["Control.Plus"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_NonEmpty = PS["Data.NonEmpty"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Show = PS["Data.Show"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unfoldable = PS["Data.Unfoldable"];
-  var Prelude = PS["Prelude"];        
-  var Nil = (function () {
-      function Nil() {
-
-      };
-      Nil.value = new Nil();
-      return Nil;
-  })();
-  var Cons = (function () {
-      function Cons(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
-      };
-      Cons.create = function (value0) {
-          return function (value1) {
-              return new Cons(value0, value1);
-          };
-      };
-      return Cons;
-  })();
-  var NonEmptyList = function (x) {
-      return x;
-  };               
-  var foldableList = new Data_Foldable.Foldable(function (dictMonoid) {
-      return function (f) {
-          return Data_Foldable.foldl(foldableList)(function (acc) {
-              return function ($116) {
-                  return Data_Semigroup.append(dictMonoid.Semigroup0())(acc)(f($116));
-              };
-          })(Data_Monoid.mempty(dictMonoid));
-      };
-  }, function (f) {
-      var go = function (__copy_b) {
-          return function (__copy_v) {
-              var __tco_b = __copy_b;
-              var __tco_done = false;
-              var __tco_result;
-              function __tco_loop(b, v) {
-                  if (v instanceof Nil) {
-                      __tco_done = true;
-                      return b;
-                  };
-                  if (v instanceof Cons) {
-                      __tco_b = f(b)(v.value0);
-                      __copy_v = v.value1;
-                      return;
-                  };
-                  throw new Error("Failed pattern match at Data.List.Types line 76, column 12 - line 78, column 30: " + [ v.constructor.name ]);
-              };
-              while (!__tco_done) {
-                  __tco_result = __tco_loop(__tco_b, __copy_v);
-              };
-              return __tco_result;
-          };
-      };
-      return go;
-  }, function (f) {
+  exports.runFn2 = function (fn) {
+    return function (a) {
       return function (b) {
-          var rev = function (__copy_acc) {
-              return function (__copy_v) {
-                  var __tco_acc = __copy_acc;
-                  var __tco_done = false;
-                  var __tco_result;
-                  function __tco_loop(acc, v) {
-                      if (v instanceof Nil) {
-                          __tco_done = true;
-                          return acc;
-                      };
-                      if (v instanceof Cons) {
-                          __tco_acc = new Cons(v.value0, acc);
-                          __copy_v = v.value1;
-                          return;
-                      };
-                      throw new Error("Failed pattern match at Data.List.Types line 71, column 15 - line 73, column 33: " + [ v.constructor.name ]);
-                  };
-                  while (!__tco_done) {
-                      __tco_result = __tco_loop(__tco_acc, __copy_v);
-                  };
-                  return __tco_result;
-              };
-          };
-          return function ($117) {
-              return Data_Foldable.foldl(foldableList)(Data_Function.flip(f))(b)(rev(Nil.value)($117));
-          };
+        return fn(a, b);
       };
-  });                                                                     
-  var functorList = new Data_Functor.Functor(function (f) {
-      return Data_Foldable.foldr(foldableList)(function (x) {
-          return function (acc) {
-              return new Cons(f(x), acc);
-          };
-      })(Nil.value);
-  });                                                                  
-  var semigroupList = new Data_Semigroup.Semigroup(function (xs) {
-      return function (ys) {
-          return Data_Foldable.foldr(foldableList)(Cons.create)(ys)(xs);
-      };
-  });                                                                              
-  var unfoldableList = new Data_Unfoldable.Unfoldable(function (f) {
-      return function (b) {
-          var go = function (__copy_source) {
-              return function (__copy_memo) {
-                  var __tco_source = __copy_source;
-                  var __tco_done = false;
-                  var __tco_result;
-                  function __tco_loop(source, memo) {
-                      var v = f(source);
-                      if (v instanceof Data_Maybe.Nothing) {
-                          __tco_done = true;
-                          return Data_Foldable.foldl(foldableList)(Data_Function.flip(Cons.create))(Nil.value)(memo);
-                      };
-                      if (v instanceof Data_Maybe.Just) {
-                          __tco_source = v.value0.value1;
-                          __copy_memo = new Cons(v.value0.value0, memo);
-                          return;
-                      };
-                      throw new Error("Failed pattern match at Data.List.Types line 84, column 22 - line 86, column 52: " + [ v.constructor.name ]);
-                  };
-                  while (!__tco_done) {
-                      __tco_result = __tco_loop(__tco_source, __copy_memo);
-                  };
-                  return __tco_result;
-              };
-          };
-          return go(b)(Nil.value);
-      };
-  });
-  var applyList = new Control_Apply.Apply(function () {
-      return functorList;
-  }, function (v) {
-      return function (v1) {
-          if (v instanceof Nil) {
-              return Nil.value;
-          };
-          if (v instanceof Cons) {
-              return Data_Semigroup.append(semigroupList)(Data_Functor.map(functorList)(v.value0)(v1))(Control_Apply.apply(applyList)(v.value1)(v1));
-          };
-          throw new Error("Failed pattern match at Data.List.Types line 93, column 3 - line 93, column 20: " + [ v.constructor.name, v1.constructor.name ]);
-      };
-  });
-  var applicativeList = new Control_Applicative.Applicative(function () {
-      return applyList;
-  }, function (a) {
-      return new Cons(a, Nil.value);
-  });                                              
-  var altList = new Control_Alt.Alt(function () {
-      return functorList;
-  }, Data_Semigroup.append(semigroupList));
-  var plusList = new Control_Plus.Plus(function () {
-      return altList;
-  }, Nil.value);
-  exports["Nil"] = Nil;
-  exports["Cons"] = Cons;
-  exports["NonEmptyList"] = NonEmptyList;
-  exports["semigroupList"] = semigroupList;
-  exports["functorList"] = functorList;
-  exports["foldableList"] = foldableList;
-  exports["unfoldableList"] = unfoldableList;
-  exports["applyList"] = applyList;
-  exports["applicativeList"] = applicativeList;
-  exports["altList"] = altList;
-  exports["plusList"] = plusList;
-})(PS["Data.List.Types"] = PS["Data.List.Types"] || {});
+    };
+  };
+})(PS["Data.Function.Uncurried"] = PS["Data.Function.Uncurried"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var Control_Alt = PS["Control.Alt"];
-  var Control_Alternative = PS["Control.Alternative"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Lazy = PS["Control.Lazy"];
-  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Bifunctor = PS["Data.Bifunctor"];
-  var Data_Boolean = PS["Data.Boolean"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_List_Types = PS["Data.List.Types"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_NonEmpty = PS["Data.NonEmpty"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Show = PS["Data.Show"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unfoldable = PS["Data.Unfoldable"];
+  var $foreign = PS["Data.Function.Uncurried"];
   var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];                                                   
-  var uncons = function (v) {
-      if (v instanceof Data_List_Types.Nil) {
-          return Data_Maybe.Nothing.value;
-      };
-      if (v instanceof Data_List_Types.Cons) {
-          return new Data_Maybe.Just({
-              head: v.value0, 
-              tail: v.value1
-          });
-      };
-      throw new Error("Failed pattern match at Data.List line 257, column 1 - line 257, column 21: " + [ v.constructor.name ]);
-  };
-  var toUnfoldable = function (dictUnfoldable) {
-      return Data_Unfoldable.unfoldr(dictUnfoldable)(function (xs) {
-          return Data_Functor.map(Data_Maybe.functorMaybe)(function (rec) {
-              return new Data_Tuple.Tuple(rec.head, rec.tail);
-          })(uncons(xs));
-      });
-  };
-  var tail = function (v) {
-      if (v instanceof Data_List_Types.Nil) {
-          return Data_Maybe.Nothing.value;
-      };
-      if (v instanceof Data_List_Types.Cons) {
-          return new Data_Maybe.Just(v.value1);
-      };
-      throw new Error("Failed pattern match at Data.List line 243, column 1 - line 243, column 19: " + [ v.constructor.name ]);
-  };
-  var some = function (dictAlternative) {
-      return function (dictLazy) {
-          return function (v) {
-              return Control_Apply.apply((dictAlternative.Applicative0()).Apply0())(Data_Functor.map(((dictAlternative.Plus1()).Alt0()).Functor0())(Data_List_Types.Cons.create)(v))(Control_Lazy.defer(dictLazy)(function (v1) {
-                  return many(dictAlternative)(dictLazy)(v);
-              }));
-          };
-      };
-  };
-  var many = function (dictAlternative) {
-      return function (dictLazy) {
-          return function (v) {
-              return Control_Alt.alt((dictAlternative.Plus1()).Alt0())(some(dictAlternative)(dictLazy)(v))(Control_Applicative.pure(dictAlternative.Applicative0())(Data_List_Types.Nil.value));
-          };
-      };
-  };
-  var head = function (v) {
-      if (v instanceof Data_List_Types.Nil) {
-          return Data_Maybe.Nothing.value;
-      };
-      if (v instanceof Data_List_Types.Cons) {
-          return new Data_Maybe.Just(v.value0);
-      };
-      throw new Error("Failed pattern match at Data.List line 228, column 1 - line 228, column 19: " + [ v.constructor.name ]);
-  };
-  exports["head"] = head;
-  exports["many"] = many;
-  exports["some"] = some;
-  exports["tail"] = tail;
-  exports["toUnfoldable"] = toUnfoldable;
-  exports["uncons"] = uncons;
-})(PS["Data.List"] = PS["Data.List"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_List = PS["Data.List"];
-  var Data_List_Types = PS["Data.List.Types"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_NonEmpty = PS["Data.NonEmpty"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unfoldable = PS["Data.Unfoldable"];
-  var Partial_Unsafe = PS["Partial.Unsafe"];
-  var Prelude = PS["Prelude"];
-  var singleton = function ($44) {
-      return Data_List_Types.NonEmptyList(Data_NonEmpty.singleton(Data_List_Types.plusList)($44));
-  };
-  exports["singleton"] = singleton;
-})(PS["Data.List.NonEmpty"] = PS["Data.List.NonEmpty"] || {});
+  exports["runFn2"] = $foreign.runFn2;
+})(PS["Data.Function.Uncurried"] = PS["Data.Function.Uncurried"] || {});
 (function(exports) {
     "use strict";
 
-  exports._charAt = function (just) {
-    return function (nothing) {
-      return function (i) {
-        return function (s) {
-          return i >= 0 && i < s.length ? just(s.charAt(i)) : nothing;
-        };
-      };
+  exports.mkEffectFn1 = function mkEffectFn1(fn) {
+    return function(x) {
+      return fn(x)();
     };
   };
 
-  exports.singleton = function (c) {
-    return c;
-  };
-
-  exports.fromCharArray = function (a) {
-    return a.join("");
-  };
-
-  exports._indexOf = function (just) {
-    return function (nothing) {
-      return function (x) {
-        return function (s) {
-          var i = s.indexOf(x);
-          return i === -1 ? nothing : just(i);
-        };
+  exports.runEffectFn1 = function runEffectFn1(fn) {
+    return function(a) {
+      return function() {
+        return fn(a);
       };
     };
   };
-
-  exports.length = function (s) {
-    return s.length;
-  };
-
-  exports.drop = function (n) {
-    return function (s) {
-      return s.substring(n);
-    };
-  };
-
-  exports.split = function (sep) {
-    return function (s) {
-      return s.split(sep);
-    };
-  };
-
-  exports.toCharArray = function (s) {
-    return s.split("");
-  };
-})(PS["Data.String"] = PS["Data.String"] || {});
+})(PS["Effect.Uncurried"] = PS["Effect.Uncurried"] || {});
 (function(exports) {
-    "use strict";
-
-  exports.charAt = function (i) {
-    return function (s) {
-      if (i >= 0 && i < s.length) return s.charAt(i);
-      throw new Error("Data.String.Unsafe.charAt: Invalid index.");
-    };
-  };
-})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var $foreign = PS["Data.String.Unsafe"];
-  exports["charAt"] = $foreign.charAt;
-})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.String"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Show = PS["Data.Show"];
-  var Data_String_Unsafe = PS["Data.String.Unsafe"];
-  var Prelude = PS["Prelude"];
-  var Pattern = function (x) {
-      return x;
-  };
-  var uncons = function (v) {
-      if (v === "") {
-          return Data_Maybe.Nothing.value;
-      };
-      return new Data_Maybe.Just({
-          head: Data_String_Unsafe.charAt(0)(v), 
-          tail: $foreign.drop(1)(v)
-      });
-  }; 
-  var $$null = function (s) {
-      return s === "";
-  };              
-  var newtypePattern = new Data_Newtype.Newtype(function (n) {
-      return n;
-  }, Pattern);                                                                                
-  var indexOf = $foreign._indexOf(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);      
-  var charAt = $foreign._charAt(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
-  exports["Pattern"] = Pattern;
-  exports["charAt"] = charAt;
-  exports["indexOf"] = indexOf;
-  exports["null"] = $$null;
-  exports["uncons"] = uncons;
-  exports["newtypePattern"] = newtypePattern;
-  exports["drop"] = $foreign.drop;
-  exports["fromCharArray"] = $foreign.fromCharArray;
-  exports["length"] = $foreign.length;
-  exports["singleton"] = $foreign.singleton;
-  exports["split"] = $foreign.split;
-  exports["toCharArray"] = $foreign.toCharArray;
-})(PS["Data.String"] = PS["Data.String"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Foreign"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
-  var Control_Monad_Except = PS["Control.Monad.Except"];
-  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Boolean = PS["Data.Boolean"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Function = PS["Data.Function"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_Int = PS["Data.Int"];
-  var Data_List_NonEmpty = PS["Data.List.NonEmpty"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Show = PS["Data.Show"];
-  var Data_String = PS["Data.String"];
-  var Prelude = PS["Prelude"];
-  var TypeMismatch = (function () {
-      function TypeMismatch(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
-      };
-      TypeMismatch.create = function (value0) {
-          return function (value1) {
-              return new TypeMismatch(value0, value1);
-          };
-      };
-      return TypeMismatch;
-  })();
-  var fail = function ($121) {
-      return Control_Monad_Error_Class.throwError(Control_Monad_Except_Trans.monadThrowExceptT(Data_Identity.monadIdentity))(Data_List_NonEmpty.singleton($121));
-  };
-  var unsafeReadTagged = function (tag) {
-      return function (value) {
-          if ($foreign.tagOf(value) === tag) {
-              return Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Data_Identity.monadIdentity))($foreign.unsafeFromForeign(value));
-          };
-          if (Data_Boolean.otherwise) {
-              return fail(new TypeMismatch(tag, $foreign.tagOf(value)));
-          };
-          throw new Error("Failed pattern match at Data.Foreign line 105, column 1 - line 107, column 54: " + [ tag.constructor.name, value.constructor.name ]);
-      };
-  };                                            
-  var readNumber = unsafeReadTagged("Number");
-  var readInt = function (value) {
-      var error = Data_Either.Left.create(Data_List_NonEmpty.singleton(new TypeMismatch("Int", $foreign.tagOf(value))));
-      var fromNumber = function ($122) {
-          return Data_Maybe.maybe(error)(Control_Applicative.pure(Data_Either.applicativeEither))(Data_Int.fromNumber($122));
-      };
-      return Control_Monad_Except.mapExcept(Data_Either.either(Data_Function["const"](error))(fromNumber))(readNumber(value));
-  };
-  var readString = unsafeReadTagged("String");
-  exports["TypeMismatch"] = TypeMismatch;
-  exports["fail"] = fail;
-  exports["readInt"] = readInt;
-  exports["readNumber"] = readNumber;
-  exports["readString"] = readString;
-  exports["unsafeReadTagged"] = unsafeReadTagged;
-  exports["toForeign"] = $foreign.toForeign;
-  exports["typeOf"] = $foreign.typeOf;
-})(PS["Data.Foreign"] = PS["Data.Foreign"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.unsafeReadPropImpl = function (f, s, key, value) {
-    return value == null ? f : s(value[key]);
-  };
-})(PS["Data.Foreign.Index"] = PS["Data.Foreign.Index"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Foreign.Index"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foreign = PS["Data.Foreign"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_List_NonEmpty = PS["Data.List.NonEmpty"];
-  var Prelude = PS["Prelude"];
-  var unsafeReadProp = function (k) {
-      return function (value) {
-          return $foreign.unsafeReadPropImpl(Data_Foreign.fail(new Data_Foreign.TypeMismatch("object", Data_Foreign.typeOf(value))), Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Data_Identity.monadIdentity)), k, value);
-      };
-  };
-  var readProp = unsafeReadProp;
-  exports["readProp"] = readProp;
-})(PS["Data.Foreign.Index"] = PS["Data.Foreign.Index"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_BooleanAlgebra = PS["Data.BooleanAlgebra"];
-  var Data_Bounded = PS["Data.Bounded"];
-  var Data_CommutativeRing = PS["Data.CommutativeRing"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_EuclideanRing = PS["Data.EuclideanRing"];
-  var Data_Field = PS["Data.Field"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Functor_Contravariant = PS["Data.Functor.Contravariant"];
-  var Data_Functor_Invariant = PS["Data.Functor.Invariant"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Show = PS["Data.Show"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Prelude = PS["Prelude"];        
-  var Const = function (x) {
-      return x;
-  };
-  var newtypeConst = new Data_Newtype.Newtype(function (n) {
-      return n;
-  }, Const);
-  var functorConst = new Data_Functor.Functor(function (v) {
-      return function (v1) {
-          return v1;
-      };
-  });
-  var applyConst = function (dictSemigroup) {
-      return new Control_Apply.Apply(function () {
-          return functorConst;
-      }, function (v) {
-          return function (v1) {
-              return Data_Semigroup.append(dictSemigroup)(v)(v1);
-          };
-      });
-  };
-  var applicativeConst = function (dictMonoid) {
-      return new Control_Applicative.Applicative(function () {
-          return applyConst(dictMonoid.Semigroup0());
-      }, function (v) {
-          return Data_Monoid.mempty(dictMonoid);
-      });
-  };
-  exports["Const"] = Const;
-  exports["newtypeConst"] = newtypeConst;
-  exports["functorConst"] = functorConst;
-  exports["applyConst"] = applyConst;
-  exports["applicativeConst"] = applicativeConst;
-})(PS["Data.Const"] = PS["Data.Const"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Category = PS["Control.Category"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Prelude = PS["Prelude"];        
-  var Profunctor = function (dimap) {
-      this.dimap = dimap;
-  }; 
-  var dimap = function (dict) {
-      return dict.dimap;
-  };
-  exports["Profunctor"] = Profunctor;
-  exports["dimap"] = dimap;
-})(PS["Data.Profunctor"] = PS["Data.Profunctor"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Category = PS["Control.Category"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Profunctor = PS["Data.Profunctor"];
-  var Prelude = PS["Prelude"];        
-  var Choice = function (Profunctor0, left, right) {
-      this.Profunctor0 = Profunctor0;
-      this.left = left;
-      this.right = right;
-  };
-  var right = function (dict) {
-      return dict.right;
-  };
-  var left = function (dict) {
-      return dict.left;
-  };
-  exports["Choice"] = Choice;
-  exports["left"] = left;
-  exports["right"] = right;
-})(PS["Data.Profunctor.Choice"] = PS["Data.Profunctor.Choice"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Category = PS["Control.Category"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Profunctor = PS["Data.Profunctor"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Prelude = PS["Prelude"];        
-  var Strong = function (Profunctor0, first, second) {
-      this.Profunctor0 = Profunctor0;
-      this.first = first;
-      this.second = second;
-  };                                            
-  var second = function (dict) {
-      return dict.second;
-  };
-  var first = function (dict) {
-      return dict.first;
-  };
-  exports["Strong"] = Strong;
-  exports["first"] = first;
-  exports["second"] = second;
-})(PS["Data.Profunctor.Strong"] = PS["Data.Profunctor.Strong"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Profunctor_Choice = PS["Data.Profunctor.Choice"];
-  var Data_Profunctor_Star = PS["Data.Profunctor.Star"];
-  var Data_Profunctor_Strong = PS["Data.Profunctor.Strong"];
-  var Prelude = PS["Prelude"];        
-  var Wander = function (Choice1, Strong0, wander) {
-      this.Choice1 = Choice1;
-      this.Strong0 = Strong0;
-      this.wander = wander;
-  }; 
-  var wander = function (dict) {
-      return dict.wander;
-  };
-  exports["Wander"] = Wander;
-  exports["wander"] = wander;
-})(PS["Data.Lens.Internal.Wander"] = PS["Data.Lens.Internal.Wander"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Const = PS["Data.Const"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Lens_Internal_Wander = PS["Data.Lens.Internal.Wander"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Profunctor = PS["Data.Profunctor"];
-  var Data_Profunctor_Choice = PS["Data.Profunctor.Choice"];
-  var Data_Profunctor_Cochoice = PS["Data.Profunctor.Cochoice"];
-  var Data_Profunctor_Strong = PS["Data.Profunctor.Strong"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Prelude = PS["Prelude"];        
-  var Forget = function (x) {
-      return x;
-  };
-  var profunctorForget = new Data_Profunctor.Profunctor(function (f) {
-      return function (v) {
-          return function (v1) {
-              return function ($25) {
-                  return v1(f($25));
-              };
-          };
-      };
-  });
-  var strongForget = new Data_Profunctor_Strong.Strong(function () {
-      return profunctorForget;
-  }, function (v) {
-      return function ($26) {
-          return v(Data_Tuple.fst($26));
-      };
-  }, function (v) {
-      return function ($27) {
-          return v(Data_Tuple.snd($27));
-      };
-  });
-  var newtypeForget = new Data_Newtype.Newtype(function (n) {
-      return n;
-  }, Forget);
-  var choiceForget = function (dictMonoid) {
-      return new Data_Profunctor_Choice.Choice(function () {
-          return profunctorForget;
-      }, function (v) {
-          return Data_Either.either(v)(Data_Monoid.mempty(Data_Monoid.monoidFn(dictMonoid)));
-      }, function (v) {
-          return Data_Either.either(Data_Monoid.mempty(Data_Monoid.monoidFn(dictMonoid)))(v);
-      });
-  };
-  var wanderForget = function (dictMonoid) {
-      return new Data_Lens_Internal_Wander.Wander(function () {
-          return choiceForget(dictMonoid);
-      }, function () {
-          return strongForget;
-      }, function (f) {
-          return function (v) {
-              return Data_Newtype.alaF(Data_Functor.functorFn)(Data_Functor.functorFn)(Data_Const.newtypeConst)(Data_Const.newtypeConst)(Data_Const.Const)(f(Data_Const.applicativeConst(dictMonoid)))(v);
-          };
-      });
-  };
-  exports["Forget"] = Forget;
-  exports["newtypeForget"] = newtypeForget;
-  exports["profunctorForget"] = profunctorForget;
-  exports["choiceForget"] = choiceForget;
-  exports["strongForget"] = strongForget;
-  exports["wanderForget"] = wanderForget;
-})(PS["Data.Lens.Internal.Forget"] = PS["Data.Lens.Internal.Forget"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Category = PS["Control.Category"];
-  var Control_Monad_State_Class = PS["Control.Monad.State.Class"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Lens_Internal_Forget = PS["Data.Lens.Internal.Forget"];
-  var Data_Lens_Internal_Indexed = PS["Data.Lens.Internal.Indexed"];
-  var Data_Lens_Types = PS["Data.Lens.Types"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Prelude = PS["Prelude"];
-  var to = function (f) {
-      return function (p) {
-          return function ($3) {
-              return Data_Newtype.unwrap(Data_Lens_Internal_Forget.newtypeForget)(p)(f($3));
-          };
-      };
-  };
-  exports["to"] = to;
-})(PS["Data.Lens.Getter"] = PS["Data.Lens.Getter"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Alternative = PS["Control.Alternative"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Plus = PS["Control.Plus"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Lens_Indexed = PS["Data.Lens.Indexed"];
-  var Data_Lens_Internal_Indexed = PS["Data.Lens.Internal.Indexed"];
-  var Data_Lens_Internal_Wander = PS["Data.Lens.Internal.Wander"];
-  var Data_Lens_Types = PS["Data.Lens.Types"];
-  var Data_Monoid_Disj = PS["Data.Monoid.Disj"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Profunctor_Star = PS["Data.Profunctor.Star"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Prelude = PS["Prelude"];        
-  var traversed = function (dictTraversable) {
-      return function (dictWander) {
-          return Data_Lens_Internal_Wander.wander(dictWander)(function (dictApplicative) {
-              return Data_Traversable.traverse(dictTraversable)(dictApplicative);
-          });
-      };
-  };
-  exports["traversed"] = traversed;
-})(PS["Data.Lens.Traversal"] = PS["Data.Lens.Traversal"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Monad_Except = PS["Control.Monad.Except"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Foreign = PS["Data.Foreign"];
-  var Data_Foreign_Index = PS["Data.Foreign.Index"];
-  var Data_Foreign_Keys = PS["Data.Foreign.Keys"];
-  var Data_Lens = PS["Data.Lens"];
-  var Data_Lens_Getter = PS["Data.Lens.Getter"];
-  var Data_Lens_Internal_Forget = PS["Data.Lens.Internal.Forget"];
-  var Data_Lens_Traversal = PS["Data.Lens.Traversal"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Prelude = PS["Prelude"];        
-  var string = function (dictMonoid) {
-      return function ($10) {
-          return Data_Lens_Getter.to(function ($11) {
-              return Control_Monad_Except.runExcept(Data_Foreign.readString($11));
-          })(Data_Lens_Traversal.traversed(Data_Either.traversableEither)(Data_Lens_Internal_Forget.wanderForget(dictMonoid))($10));
-      };
-  };
-  var prop = function (dictMonoid) {
-      return function (p) {
-          return function ($12) {
-              return Data_Lens_Getter.to(function ($13) {
-                  return Control_Monad_Except.runExcept(Data_Foreign_Index.readProp(p)($13));
-              })(Data_Lens_Traversal.traversed(Data_Either.traversableEither)(Data_Lens_Internal_Forget.wanderForget(dictMonoid))($12));
-          };
-      };
-  };
-  var $$int = function (dictMonoid) {
-      return function ($18) {
-          return Data_Lens_Getter.to(function ($19) {
-              return Control_Monad_Except.runExcept(Data_Foreign.readInt($19));
-          })(Data_Lens_Traversal.traversed(Data_Either.traversableEither)(Data_Lens_Internal_Forget.wanderForget(dictMonoid))($18));
-      };
-  };
-  exports["int"] = $$int;
-  exports["prop"] = prop;
-  exports["string"] = string;
-})(PS["Data.Foreign.Lens"] = PS["Data.Foreign.Lens"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Lens_Internal_Forget = PS["Data.Lens.Internal.Forget"];
-  var Data_Lens_Internal_Indexed = PS["Data.Lens.Internal.Indexed"];
-  var Data_Lens_Types = PS["Data.Lens.Types"];
-  var Data_List = PS["Data.List"];
-  var Data_List_Types = PS["Data.List.Types"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Maybe_First = PS["Data.Maybe.First"];
-  var Data_Maybe_Last = PS["Data.Maybe.Last"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Monoid_Additive = PS["Data.Monoid.Additive"];
-  var Data_Monoid_Conj = PS["Data.Monoid.Conj"];
-  var Data_Monoid_Disj = PS["Data.Monoid.Disj"];
-  var Data_Monoid_Dual = PS["Data.Monoid.Dual"];
-  var Data_Monoid_Endo = PS["Data.Monoid.Endo"];
-  var Data_Monoid_Multiplicative = PS["Data.Monoid.Multiplicative"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Profunctor = PS["Data.Profunctor"];
-  var Data_Profunctor_Choice = PS["Data.Profunctor.Choice"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];
-  var foldMapOf = Data_Newtype.under(Data_Lens_Internal_Forget.newtypeForget)(Data_Lens_Internal_Forget.newtypeForget)(Data_Lens_Internal_Forget.Forget);
-  var preview = function (p) {
-      return function ($62) {
-          return Data_Newtype.unwrap(Data_Maybe_First.newtypeFirst)(foldMapOf(p)(function ($63) {
-              return Data_Maybe_First.First(Data_Maybe.Just.create($63));
-          })($62));
-      };
-  };
-  exports["foldMapOf"] = foldMapOf;
-  exports["preview"] = preview;
-})(PS["Data.Lens.Fold"] = PS["Data.Lens.Fold"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Foreign = PS["Data.Foreign"];
-  var Data_Foreign_Lens = PS["Data.Foreign.Lens"];
-  var Data_Lens_Fold = PS["Data.Lens.Fold"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Maybe_First = PS["Data.Maybe.First"];
-  var Prelude = PS["Prelude"];        
-  var getValue = function ($0) {
-      return Data_Maybe.fromMaybe("")(Data_Lens_Fold.preview(function ($1) {
-          return Data_Foreign_Lens.prop(Data_Maybe_First.monoidFirst)("target")(Data_Foreign_Lens.prop(Data_Maybe_First.monoidFirst)("value")(Data_Foreign_Lens.string(Data_Maybe_First.monoidFirst)($1)));
-      })(Data_Foreign.toForeign($0)));
-  };
-  var getKeyCode = function ($2) {
-      return Data_Maybe.fromMaybe(0)(Data_Lens_Fold.preview(function ($3) {
-          return Data_Foreign_Lens.prop(Data_Maybe_First.monoidFirst)("keyCode")(Data_Foreign_Lens["int"](Data_Maybe_First.monoidFirst)($3));
-      })(Data_Foreign.toForeign($2)));
-  };
-  exports["getKeyCode"] = getKeyCode;
-  exports["getValue"] = getValue;
-})(PS["Component.Event"] = PS["Component.Event"] || {});
+  var $foreign = PS["Effect.Uncurried"];
+  var Effect = PS["Effect"];
+  exports["mkEffectFn1"] = $foreign.mkEffectFn1;
+  exports["runEffectFn1"] = $foreign.runEffectFn1;
+})(PS["Effect.Uncurried"] = PS["Effect.Uncurried"] || {});
 (function(exports) {
     "use strict";
 
@@ -23723,656 +22440,458 @@ var PS = {};
   };
 })(PS["Unsafe.Coerce"] = PS["Unsafe.Coerce"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var $foreign = PS["Unsafe.Coerce"];
   exports["unsafeCoerce"] = $foreign.unsafeCoerce;
 })(PS["Unsafe.Coerce"] = PS["Unsafe.Coerce"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var Unsafe_Coerce = PS["Unsafe.Coerce"];        
-  var runExists = Unsafe_Coerce.unsafeCoerce;
-  var mkExists = Unsafe_Coerce.unsafeCoerce;
-  exports["mkExists"] = mkExists;
-  exports["runExists"] = runExists;
-})(PS["Data.Exists"] = PS["Data.Exists"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
+  var $foreign = PS["React.Basic"];
   var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Monad = PS["Control.Monad"];
-  var Control_Monad_Eff_Class = PS["Control.Monad.Eff.Class"];
-  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
-  var Control_Monad_Reader_Class = PS["Control.Monad.Reader.Class"];
-  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
-  var Control_Monad_State_Class = PS["Control.Monad.State.Class"];
-  var Control_Monad_Trans_Class = PS["Control.Monad.Trans.Class"];
-  var Control_Monad_Writer_Class = PS["Control.Monad.Writer.Class"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Bifunctor = PS["Data.Bifunctor"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Exists = PS["Data.Exists"];
-  var Data_Functor = PS["Data.Functor"];
+  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
   var Data_Monoid = PS["Data.Monoid"];
   var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
-  var Bound = (function () {
-      function Bound(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
-      };
-      Bound.create = function (value0) {
-          return function (value1) {
-              return new Bound(value0, value1);
-          };
-      };
-      return Bound;
-  })();
-  var FreeT = (function () {
-      function FreeT(value0) {
-          this.value0 = value0;
-      };
-      FreeT.create = function (value0) {
-          return new FreeT(value0);
-      };
-      return FreeT;
-  })();
-  var Bind = (function () {
-      function Bind(value0) {
-          this.value0 = value0;
-      };
-      Bind.create = function (value0) {
-          return new Bind(value0);
-      };
-      return Bind;
-  })();
-  var monadTransFreeT = function (dictFunctor) {
-      return new Control_Monad_Trans_Class.MonadTrans(function (dictMonad) {
-          return function (ma) {
-              return new FreeT(function (v) {
-                  return Data_Functor.map(((dictMonad.Bind1()).Apply0()).Functor0())(Data_Either.Left.create)(ma);
+  var Effect = PS["Effect"];
+  var Effect_Uncurried = PS["Effect.Uncurried"];
+  var Prelude = PS["Prelude"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];                                    
+  var empty = false;                                                        
+  var element = Data_Function_Uncurried.runFn2($foreign.element_);
+  var component = function (v) {
+      return $foreign.component_({
+          displayName: v.displayName,
+          initialState: v.initialState,
+          receiveProps: function ($$this) {
+              return v.receiveProps({
+                  isFirstMount: $$this.isFirstMount,
+                  props: $$this.props,
+                  state: $$this.state,
+                  setState: Effect_Uncurried.runEffectFn1($$this.setState),
+                  setStateThen: function (update) {
+                      return function (cb) {
+                          return function () {
+                              return $$this.setStateThen(update, Effect_Uncurried.mkEffectFn1(cb));
+                          };
+                      };
+                  },
+                  instance_: $$this.instance_
+              })();
+          },
+          render: function ($$this) {
+              return v.render({
+                  props: $$this.props,
+                  state: $$this.state,
+                  setState: Effect_Uncurried.runEffectFn1($$this.setState),
+                  setStateThen: function (update) {
+                      return function (cb) {
+                          return function () {
+                              return $$this.setStateThen(update, Effect_Uncurried.mkEffectFn1(cb));
+                          };
+                      };
+                  },
+                  instance_: $$this.instance_
               });
-          };
+          }
       });
   };
-  var freeT = FreeT.create;
-  var bound = function (m) {
-      return function (f) {
-          return new Bind(Data_Exists.mkExists(new Bound(m, f)));
-      };
-  };
-  var functorFreeT = function (dictFunctor) {
-      return function (dictFunctor1) {
-          return new Data_Functor.Functor(function (f) {
-              return function (v) {
-                  if (v instanceof FreeT) {
-                      return new FreeT(function (v1) {
-                          return Data_Functor.map(dictFunctor1)(Data_Bifunctor.bimap(Data_Either.bifunctorEither)(f)(Data_Functor.map(dictFunctor)(Data_Functor.map(functorFreeT(dictFunctor)(dictFunctor1))(f))))(v.value0(Data_Unit.unit));
-                      });
-                  };
-                  if (v instanceof Bind) {
-                      return Data_Exists.runExists(function (v1) {
-                          return bound(v1.value0)(function ($104) {
-                              return Data_Functor.map(functorFreeT(dictFunctor)(dictFunctor1))(f)(v1.value1($104));
-                          });
-                      })(v.value0);
-                  };
-                  throw new Error("Failed pattern match at Control.Monad.Free.Trans line 59, column 3 - line 59, column 69: " + [ f.constructor.name, v.constructor.name ]);
-              };
-          });
-      };
-  };
-  var monadFreeT = function (dictFunctor) {
-      return function (dictMonad) {
-          return new Control_Monad.Monad(function () {
-              return applicativeFreeT(dictFunctor)(dictMonad);
-          }, function () {
-              return bindFreeT(dictFunctor)(dictMonad);
-          });
-      };
-  };
-  var bindFreeT = function (dictFunctor) {
-      return function (dictMonad) {
-          return new Control_Bind.Bind(function () {
-              return applyFreeT(dictFunctor)(dictMonad);
-          }, function (v) {
-              return function (f) {
-                  if (v instanceof Bind) {
-                      return Data_Exists.runExists(function (v1) {
-                          return bound(v1.value0)(function (x) {
-                              return bound(function (v2) {
-                                  return v1.value1(x);
-                              })(f);
-                          });
-                      })(v.value0);
-                  };
-                  return bound(function (v1) {
-                      return v;
-                  })(f);
-              };
-          });
-      };
-  };
-  var applyFreeT = function (dictFunctor) {
-      return function (dictMonad) {
-          return new Control_Apply.Apply(function () {
-              return functorFreeT(dictFunctor)(((dictMonad.Bind1()).Apply0()).Functor0());
-          }, Control_Monad.ap(monadFreeT(dictFunctor)(dictMonad)));
-      };
-  };
-  var applicativeFreeT = function (dictFunctor) {
-      return function (dictMonad) {
-          return new Control_Applicative.Applicative(function () {
-              return applyFreeT(dictFunctor)(dictMonad);
-          }, function (a) {
-              return new FreeT(function (v) {
-                  return Control_Applicative.pure(dictMonad.Applicative0())(new Data_Either.Left(a));
-              });
-          });
-      };
-  };
-  var resume = function (dictFunctor) {
-      return function (dictMonadRec) {
-          var go = function (v) {
-              if (v instanceof FreeT) {
-                  return Data_Functor.map((((dictMonadRec.Monad0()).Bind1()).Apply0()).Functor0())(Control_Monad_Rec_Class.Done.create)(v.value0(Data_Unit.unit));
-              };
-              if (v instanceof Bind) {
-                  return Data_Exists.runExists(function (v1) {
-                      var v2 = v1.value0(Data_Unit.unit);
-                      if (v2 instanceof FreeT) {
-                          return Control_Bind.bind((dictMonadRec.Monad0()).Bind1())(v2.value0(Data_Unit.unit))(function (v3) {
-                              if (v3 instanceof Data_Either.Left) {
-                                  return Control_Applicative.pure((dictMonadRec.Monad0()).Applicative0())(new Control_Monad_Rec_Class.Loop(v1.value1(v3.value0)));
-                              };
-                              if (v3 instanceof Data_Either.Right) {
-                                  return Control_Applicative.pure((dictMonadRec.Monad0()).Applicative0())(new Control_Monad_Rec_Class.Done(new Data_Either.Right(Data_Functor.map(dictFunctor)(function (h) {
-                                      return Control_Bind.bind(bindFreeT(dictFunctor)(dictMonadRec.Monad0()))(h)(v1.value1);
-                                  })(v3.value0))));
-                              };
-                              throw new Error("Failed pattern match at Control.Monad.Free.Trans line 53, column 20 - line 55, column 67: " + [ v3.constructor.name ]);
-                          });
-                      };
-                      if (v2 instanceof Bind) {
-                          return Data_Exists.runExists(function (v3) {
-                              return Control_Applicative.pure((dictMonadRec.Monad0()).Applicative0())(new Control_Monad_Rec_Class.Loop(Control_Bind.bind(bindFreeT(dictFunctor)(dictMonadRec.Monad0()))(v3.value0(Data_Unit.unit))(function (z) {
-                                  return Control_Bind.bind(bindFreeT(dictFunctor)(dictMonadRec.Monad0()))(v3.value1(z))(v1.value1);
-                              })));
-                          })(v2.value0);
-                      };
-                      throw new Error("Failed pattern match at Control.Monad.Free.Trans line 51, column 5 - line 56, column 98: " + [ v2.constructor.name ]);
-                  })(v.value0);
-              };
-              throw new Error("Failed pattern match at Control.Monad.Free.Trans line 49, column 3 - line 49, column 35: " + [ v.constructor.name ]);
-          };
-          return Control_Monad_Rec_Class.tailRecM(dictMonadRec)(go);
-      };
-  };
-  exports["freeT"] = freeT;
-  exports["resume"] = resume;
-  exports["functorFreeT"] = functorFreeT;
-  exports["applyFreeT"] = applyFreeT;
-  exports["applicativeFreeT"] = applicativeFreeT;
-  exports["bindFreeT"] = bindFreeT;
-  exports["monadFreeT"] = monadFreeT;
-  exports["monadTransFreeT"] = monadTransFreeT;
-})(PS["Control.Monad.Free.Trans"] = PS["Control.Monad.Free.Trans"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Monad_Except = PS["Control.Monad.Except"];
-  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
-  var Control_Monad_Free_Trans = PS["Control.Monad.Free.Trans"];
-  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
-  var Control_Monad_Trans_Class = PS["Control.Monad.Trans.Class"];
-  var Control_Parallel = PS["Control.Parallel"];
-  var Control_Parallel_Class = PS["Control.Parallel.Class"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Bifunctor = PS["Data.Bifunctor"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Profunctor = PS["Data.Profunctor"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];
-  var CoTransform = (function () {
-      function CoTransform(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
-      };
-      CoTransform.create = function (value0) {
-          return function (value1) {
-              return new CoTransform(value0, value1);
-          };
-      };
-      return CoTransform;
-  })();
-  var bifunctorCoTransform = new Data_Bifunctor.Bifunctor(function (f) {
-      return function (g) {
-          return function (v) {
-              return new CoTransform(f(v.value0), function ($188) {
-                  return g(v.value1($188));
-              });
-          };
-      };
-  });
-  var functorCoTransform = new Data_Functor.Functor(Data_Bifunctor.rmap(bifunctorCoTransform));
-  var cotransform = function (dictMonad) {
-      return function (o) {
-          return Control_Monad_Free_Trans.freeT(function (v) {
-              return Control_Applicative.pure(dictMonad.Applicative0())(new Data_Either.Right(new CoTransform(o, Control_Applicative.pure(Control_Monad_Free_Trans.applicativeFreeT(functorCoTransform)(dictMonad)))));
-          });
-      };
-  };
-  exports["CoTransform"] = CoTransform;
-  exports["cotransform"] = cotransform;
-  exports["bifunctorCoTransform"] = bifunctorCoTransform;
-  exports["functorCoTransform"] = functorCoTransform;
-})(PS["Control.Coroutine"] = PS["Control.Coroutine"] || {});
-(function(exports) {
-  /* globals setTimeout, clearTimeout, setImmediate, clearImmediate */
-  "use strict";
-
-  exports._unsafeInterleaveAff = function (aff) {
-    return aff;
-  };
-
-  exports._forkAff = function (nonCanceler, aff) {
-    var voidF = function () {};
-
-    return function (success) {
-      var canceler = aff(voidF, voidF);
-      success(canceler);
-      return nonCanceler;
-    };
-  };
-
-  exports._makeAff = function (cb) {
-    return function (success, error) {
-      try {
-        return cb(function (e) {
-          return function () {
-            error(e);
-          };
-        })(function (v) {
-          return function () {
-            success(v);
-          };
-        })();
-      } catch (err) {
-        error(err);
-      }
-    };
-  };
-
-  exports._pure = function (nonCanceler, v) {
-    return function (success) {
-      success(v);
-      return nonCanceler;
-    };
-  };
-
-  exports._fmap = function (f, aff) {
-    return function (success, error) {
-      return aff(function (v) {
-        success(f(v));
-      }, error);
-    };
-  };
-
-  exports._bind = function (alwaysCanceler, aff, f) {
-    return function (success, error) {
-      var canceler1, canceler2;
-
-      var isCanceled    = false;
-      var requestCancel = false;
-
-      var onCanceler = function () {};
-
-      canceler1 = aff(function (v) {
-        if (requestCancel) {
-          isCanceled = true;
-
-          return alwaysCanceler;
-        } else {
-          canceler2 = f(v)(success, error);
-
-          onCanceler(canceler2);
-
-          return canceler2;
-        }
-      }, error);
-
-      return function (e) {
-        return function (s, f) {
-          requestCancel = true;
-
-          if (canceler2 !== undefined) {
-            return canceler2(e)(s, f);
-          } else {
-            return canceler1(e)(function (bool) {
-              if (bool || isCanceled) {
-                s(true);
-              } else {
-                onCanceler = function (canceler) {
-                  canceler(e)(s, f);
-                };
-              }
-            }, f);
+  var stateless = function (v) {
+      return component({
+          displayName: v.displayName,
+          initialState: {},
+          receiveProps: function (v1) {
+              return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
+          },
+          render: function ($$this) {
+              return v.render($$this.props);
           }
-        };
-      };
-    };
-  };
-
-  exports._runAff = function (errorT, successT, aff) {
-    // If errorT or successT throw, and an Aff is comprised only of synchronous
-    // effects, then it's possible for makeAff/liftEff to accidentally catch
-    // it, which may end up rerunning the Aff depending on error recovery
-    // behavior. To mitigate this, we observe synchronicity using mutation. If
-    // an Aff is observed to be synchronous, we let the stack reset and run the
-    // handlers outside of the normal callback flow.
-    return function () {
-      var status = 0;
-      var result, success;
-
-      var canceler = aff(function (v) {
-        if (status === 2) {
-          successT(v)();
-        } else {
-          status = 1;
-          result = v;
-          success = true;
-        }
-      }, function (e) {
-        if (status === 2) {
-          errorT(e)();
-        } else {
-          status = 1;
-          result = e;
-          success = false;
-        }
       });
-
-      if (status === 1) {
-        if (success) {
-          successT(result)();
-        } else {
-          errorT(result)();
-        }
-      } else {
-        status = 2;
-      }
-
-      return canceler;
-    };
   };
-
-  exports._liftEff = function (nonCanceler, e) {
-    return function (success, error) {
-      var result;
-      try {
-        result = e();
-      } catch (err) {
-        error(err);
-        return nonCanceler;
-      }
-
-      success(result);
-      return nonCanceler;
-    };
-  };
-
-  exports._tailRecM = function (isLeft, f, a) {
-    return function (success, error) {
-      return function go (acc) {
-        var result, status, canceler;
-
-        // Observes synchronous effects using a flag.
-        //   status = 0 (unresolved status)
-        //   status = 1 (synchronous effect)
-        //   status = 2 (asynchronous effect)
-
-        var csuccess = function (v) {
-          // If the status is still unresolved, we have observed a
-          // synchronous effect. Otherwise, the status will be `2`.
-          if (status === 0) {
-            // Store the result for further synchronous processing.
-            result = v;
-            status = 1;
-          } else {
-            // When we have observed an asynchronous effect, we use normal
-            // recursion. This is safe because we will be on a new stack.
-            if (isLeft(v)) {
-              go(v.value0);
-            } else {
-              success(v.value0);
-            }
-          }
-        };
-
-        while (true) {
-          status = 0;
-          canceler = f(acc)(csuccess, error);
-
-          // If the status has already resolved to `1` by our Aff handler, then
-          // we have observed a synchronous effect. Otherwise it will still be
-          // `0`.
-          if (status === 1) {
-            // When we have observed a synchronous effect, we merely swap out the
-            // accumulator and continue the loop, preserving stack.
-            if (isLeft(result)) {
-              acc = result.value0;
-              continue;
-            } else {
-              success(result.value0);
-            }
-          } else {
-            // If the status has not resolved yet, then we have observed an
-            // asynchronous effect.
-            status = 2;
-          }
-          return canceler;
-        }
-
-      }(a);
-    };
-  };
-})(PS["Control.Monad.Aff"] = PS["Control.Monad.Aff"] || {});
+  exports["component"] = component;
+  exports["stateless"] = stateless;
+  exports["element"] = element;
+  exports["empty"] = empty;
+  exports["fragment"] = $foreign.fragment;
+})(PS["React.Basic"] = PS["React.Basic"] || {});
 (function(exports) {
-    "use strict";
-
-  exports.throwException = function (e) {
-    return function () {
-      throw e;
-    };
-  };
-})(PS["Control.Monad.Eff.Exception"] = PS["Control.Monad.Eff.Exception"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var $foreign = PS["Control.Monad.Eff.Exception"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Show = PS["Data.Show"];
-  var Prelude = PS["Prelude"];
-  exports["throwException"] = $foreign.throwException;
-})(PS["Control.Monad.Eff.Exception"] = PS["Control.Monad.Eff.Exception"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Control.Monad.Aff"];
   var Control_Alt = PS["Control.Alt"];
-  var Control_Alternative = PS["Control.Alternative"];
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
   var Control_Bind = PS["Control.Bind"];
+  var Control_Extend = PS["Control.Extend"];
   var Control_Monad = PS["Control.Monad"];
-  var Control_Monad_Aff_Internal = PS["Control.Monad.Aff.Internal"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Monad_Eff_Class = PS["Control.Monad.Eff.Class"];
-  var Control_Monad_Eff_Exception = PS["Control.Monad.Eff.Exception"];
-  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
-  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
-  var Control_MonadPlus = PS["Control.MonadPlus"];
-  var Control_MonadZero = PS["Control.MonadZero"];
-  var Control_Parallel = PS["Control.Parallel"];
-  var Control_Parallel_Class = PS["Control.Parallel.Class"];
-  var Control_Plus = PS["Control.Plus"];
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Either = PS["Data.Either"];
+  var Data_Bifoldable = PS["Data.Bifoldable"];
+  var Data_Bifunctor = PS["Data.Bifunctor"];
+  var Data_Bitraversable = PS["Data.Bitraversable"];
+  var Data_Bounded = PS["Data.Bounded"];
   var Data_Eq = PS["Data.Eq"];
   var Data_Foldable = PS["Data.Foldable"];
   var Data_Function = PS["Data.Function"];
-  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
   var Data_Functor = PS["Data.Functor"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Functor_Invariant = PS["Data.Functor.Invariant"];
+  var Data_Maybe = PS["Data.Maybe"];
   var Data_Monoid = PS["Data.Monoid"];
-  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
   var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Time_Duration = PS["Data.Time.Duration"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unit = PS["Data.Unit"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Traversable = PS["Data.Traversable"];
+  var Prelude = PS["Prelude"];                 
+  var Left = (function () {
+      function Left(value0) {
+          this.value0 = value0;
+      };
+      Left.create = function (value0) {
+          return new Left(value0);
+      };
+      return Left;
+  })();
+  var Right = (function () {
+      function Right(value0) {
+          this.value0 = value0;
+      };
+      Right.create = function (value0) {
+          return new Right(value0);
+      };
+      return Right;
+  })();
+  var functorEither = new Data_Functor.Functor(function (f) {
+      return function (m) {
+          if (m instanceof Left) {
+              return new Left(m.value0);
+          };
+          if (m instanceof Right) {
+              return new Right(f(m.value0));
+          };
+          throw new Error("Failed pattern match at Data.Either line 35, column 8 - line 35, column 52: " + [ m.constructor.name ]);
+      };
+  });                                                                                                     
+  var fromRight = function (dictPartial) {
+      return function (v) {
+          var $__unused = function (dictPartial1) {
+              return function ($dollar63) {
+                  return $dollar63;
+              };
+          };
+          return $__unused(dictPartial)((function () {
+              if (v instanceof Right) {
+                  return v.value0;
+              };
+              throw new Error("Failed pattern match at Data.Either line 243, column 1 - line 243, column 52: " + [ v.constructor.name ]);
+          })());
+      };
+  };
+  var either = function (v) {
+      return function (v1) {
+          return function (v2) {
+              if (v2 instanceof Left) {
+                  return v(v2.value0);
+              };
+              if (v2 instanceof Right) {
+                  return v1(v2.value0);
+              };
+              throw new Error("Failed pattern match at Data.Either line 220, column 1 - line 220, column 64: " + [ v.constructor.name, v1.constructor.name, v2.constructor.name ]);
+          };
+      };
+  };
+  exports["Left"] = Left;
+  exports["Right"] = Right;
+  exports["either"] = either;
+  exports["fromRight"] = fromRight;
+  exports["functorEither"] = functorEither;
+})(PS["Data.Either"] = PS["Data.Either"] || {});
+(function(exports) {
+    "use strict";        
+
+  exports.nullable = function (a, r, f) {
+    return a == null ? r : f(a);
+  };
+})(PS["Data.Nullable"] = PS["Data.Nullable"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Nullable"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Show = PS["Data.Show"];
+  var Prelude = PS["Prelude"];                                          
+  var toMaybe = function (n) {
+      return $foreign.nullable(n, Data_Maybe.Nothing.value, Data_Maybe.Just.create);
+  };
+  exports["toMaybe"] = toMaybe;
+})(PS["Data.Nullable"] = PS["Data.Nullable"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Type_Data_Boolean = PS["Type.Data.Boolean"];
+  var Type_Data_Symbol = PS["Type.Data.Symbol"];
+  var Type_Equality = PS["Type.Equality"];
+  var RLProxy = (function () {
+      function RLProxy() {
+
+      };
+      RLProxy.value = new RLProxy();
+      return RLProxy;
+  })();
+  exports["RLProxy"] = RLProxy;
+})(PS["Type.Row"] = PS["Type.Row"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Symbol = PS["Data.Symbol"];
   var Prelude = PS["Prelude"];
+  var Record_Unsafe = PS["Record.Unsafe"];
+  var Record_Unsafe_Union = PS["Record.Unsafe.Union"];
+  var Type_Row = PS["Type.Row"];
   var Unsafe_Coerce = PS["Unsafe.Coerce"];
-  var Canceler = function (x) {
+  var insert = function (dictIsSymbol) {
+      return function (dictLacks) {
+          return function (dictCons) {
+              return function (l) {
+                  return function (a) {
+                      return function (r) {
+                          return Record_Unsafe.unsafeSet(Data_Symbol.reflectSymbol(dictIsSymbol)(l))(a)(r);
+                      };
+                  };
+              };
+          };
+      };
+  };
+  var get = function (dictIsSymbol) {
+      return function (dictCons) {
+          return function (l) {
+              return function (r) {
+                  return Record_Unsafe.unsafeGet(Data_Symbol.reflectSymbol(dictIsSymbol)(l))(r);
+              };
+          };
+      };
+  };
+  var $$delete = function (dictIsSymbol) {
+      return function (dictLacks) {
+          return function (dictCons) {
+              return function (l) {
+                  return function (r) {
+                      return Record_Unsafe.unsafeDelete(Data_Symbol.reflectSymbol(dictIsSymbol)(l))(r);
+                  };
+              };
+          };
+      };
+  };
+  exports["get"] = get;
+  exports["insert"] = insert;
+  exports["delete"] = $$delete;
+})(PS["Record"] = PS["Record"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Category = PS["Control.Category"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Effect = PS["Effect"];
+  var Effect_Uncurried = PS["Effect.Uncurried"];
+  var Prelude = PS["Prelude"];
+  var Record = PS["Record"];
+  var Type_Row = PS["Type.Row"];                 
+  var EventFn = function (x) {
       return x;
   };
-  var runAff = function (ex) {
-      return function (f) {
-          return function (aff) {
-              return $foreign._runAff(ex, f, aff);
+  var Merge = function (mergeImpl) {
+      this.mergeImpl = mergeImpl;
+  };
+  var unsafeEventFn = EventFn;                                  
+  var mergeNil = new Merge(function (v) {
+      return function (v1) {
+          return function (v2) {
+              return {};
           };
       };
-  };         
-  var makeAff$prime = function (h) {
-      return $foreign._makeAff(h);
+  });
+  var mergeImpl = function (dict) {
+      return dict.mergeImpl;
   };
-  var functorAff = new Data_Functor.Functor(function (f) {
-      return function (fa) {
-          return $foreign._fmap(f, fa);
-      };
-  });                                        
-  var cancel = function (v) {
-      return v;
-  };
-  var launchAff = (function () {
-      var lowerEx = Data_Functor.map(Control_Monad_Eff.functorEff)(function ($54) {
-          return Canceler(Data_Functor.map(Data_Functor.functorFn)($foreign._unsafeInterleaveAff)(cancel($54)));
-      });
-      return function ($55) {
-          return lowerEx(runAff(Control_Monad_Eff_Exception.throwException)(Data_Function["const"](Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit)))($foreign._unsafeInterleaveAff($55)));
-      };
-  })();
-  var applyAff = new Control_Apply.Apply(function () {
-      return functorAff;
-  }, function (ff) {
-      return function (fa) {
-          return $foreign._bind(alwaysCanceler, ff, function (f) {
-              return Data_Functor.map(functorAff)(f)(fa);
-          });
-      };
-  });
-  var applicativeAff = new Control_Applicative.Applicative(function () {
-      return applyAff;
-  }, function (v) {
-      return $foreign._pure(nonCanceler, v);
-  });
-  var nonCanceler = Data_Function["const"](Control_Applicative.pure(applicativeAff)(false));
-  var alwaysCanceler = Data_Function["const"](Control_Applicative.pure(applicativeAff)(true));
-  var forkAff = function (aff) {
-      return $foreign._forkAff(nonCanceler, aff);
-  };
-  var makeAff = function (h) {
-      return makeAff$prime(function (e) {
-          return function (a) {
-              return Data_Functor.map(Control_Monad_Eff.functorEff)(Data_Function["const"](nonCanceler))(h(e)(a));
-          };
-      });
-  };                                                                         
-  var bindAff = new Control_Bind.Bind(function () {
-      return applyAff;
-  }, function (fa) {
-      return function (f) {
-          return $foreign._bind(alwaysCanceler, fa, f);
-      };
-  });
-  var monadAff = new Control_Monad.Monad(function () {
-      return applicativeAff;
-  }, function () {
-      return bindAff;
-  });
-  var monadEffAff = new Control_Monad_Eff_Class.MonadEff(function () {
-      return monadAff;
-  }, function (eff) {
-      return $foreign._liftEff(nonCanceler, eff);
-  });
-  var monadRecAff = new Control_Monad_Rec_Class.MonadRec(function () {
-      return monadAff;
-  }, function (f) {
-      return function (a) {
-          var isLoop = function (v) {
-              if (v instanceof Control_Monad_Rec_Class.Loop) {
-                  return true;
+  var mergeCons = function (dictIsSymbol) {
+      return function (dictCons) {
+          return function (dictCons1) {
+              return function (dictLacks) {
+                  return function (dictLacks1) {
+                      return function (dictMerge) {
+                          return new Merge(function (v) {
+                              return function (fns) {
+                                  return function (a) {
+                                      var v1 = mergeImpl(dictMerge)(Type_Row.RLProxy.value)(Record["delete"](dictIsSymbol)(dictLacks)(dictCons)(Data_Symbol.SProxy.value)(fns));
+                                      var v2 = Record.get(dictIsSymbol)(dictCons)(Data_Symbol.SProxy.value)(fns);
+                                      return Record.insert(dictIsSymbol)(dictLacks1)(dictCons1)(Data_Symbol.SProxy.value)(v2(a))(v1(a));
+                                  };
+                              };
+                          });
+                      };
+                  };
               };
-              return false;
           };
-          return $foreign._tailRecM(isLoop, f, a);
       };
-  });
-  exports["Canceler"] = Canceler;
-  exports["cancel"] = cancel;
-  exports["forkAff"] = forkAff;
-  exports["launchAff"] = launchAff;
-  exports["makeAff"] = makeAff;
-  exports["nonCanceler"] = nonCanceler;
-  exports["runAff"] = runAff;
-  exports["functorAff"] = functorAff;
-  exports["applyAff"] = applyAff;
-  exports["applicativeAff"] = applicativeAff;
-  exports["bindAff"] = bindAff;
-  exports["monadAff"] = monadAff;
-  exports["monadEffAff"] = monadEffAff;
-  exports["monadRecAff"] = monadRecAff;
-})(PS["Control.Monad.Aff"] = PS["Control.Monad.Aff"] || {});
-(function(exports) {// module Control.Monad.Eff.Save
-
-  exports.saveTextAs = function(text) {
-    return function(filename) {
-      return function() {
-        var blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
-        saveAs(blob, filename);
-        return {};
-      }
-    }
-  }
-})(PS["Control.Monad.Eff.Save"] = PS["Control.Monad.Eff.Save"] || {});
+  };
+  var merge = function (dictRowToList) {
+      return function (dictMerge) {
+          return mergeImpl(dictMerge)(Type_Row.RLProxy.value);
+      };
+  };
+  var handler_ = function ($21) {
+      return Effect_Uncurried.mkEffectFn1(Data_Function["const"]($21));
+  };
+  var handler = function (v) {
+      return function (cb) {
+          return function ($22) {
+              return cb(v($22))();
+          };
+      };
+  };
+  exports["unsafeEventFn"] = unsafeEventFn;
+  exports["handler"] = handler;
+  exports["handler_"] = handler_;
+  exports["merge"] = merge;
+  exports["Merge"] = Merge;
+  exports["mergeImpl"] = mergeImpl;
+  exports["mergeNil"] = mergeNil;
+  exports["mergeCons"] = mergeCons;
+})(PS["React.Basic.Events"] = PS["React.Basic.Events"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var $foreign = PS["Control.Monad.Eff.Save"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_Events = PS["React.Basic.Events"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];                 
+  var unsafeCreateDOMComponent = Unsafe_Coerce.unsafeCoerce;
+  exports["unsafeCreateDOMComponent"] = unsafeCreateDOMComponent;
+})(PS["React.Basic.DOM.Internal"] = PS["React.Basic.DOM.Internal"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM_Internal = PS["React.Basic.DOM.Internal"];
+  var React_Basic_Events = PS["React.Basic.Events"];
+  var ul = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("ul"));
+  };
+  var span = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("span"));
+  };
+  var pre = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("pre"));
+  };
+  var li = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("li"));
+  };
+  var input = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("input"));
+  };
+  var hr = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("hr"));
+  };
+  var h3 = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("h3"));
+  };
+  var h3_ = function (children) {
+      return h3()({
+          children: children
+      });
+  };
+  var h2 = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("h2"));
+  };
+  var div = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("div"));
+  };
+  var button = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("button"));
+  };
+  var a = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("a"));
+  };
+  exports["a"] = a;
+  exports["button"] = button;
+  exports["div"] = div;
+  exports["h2"] = h2;
+  exports["h3"] = h3;
+  exports["h3_"] = h3_;
+  exports["hr"] = hr;
+  exports["input"] = input;
+  exports["li"] = li;
+  exports["pre"] = pre;
+  exports["span"] = span;
+  exports["ul"] = ul;
+})(PS["React.Basic.DOM.Generated"] = PS["React.Basic.DOM.Generated"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["React.Basic.DOM"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Bind = PS["Control.Bind"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Nullable = PS["Data.Nullable"];
+  var Data_Unit = PS["Data.Unit"];
+  var Effect = PS["Effect"];
+  var Effect_Exception = PS["Effect.Exception"];
+  var Effect_Uncurried = PS["Effect.Uncurried"];
   var Prelude = PS["Prelude"];
-  exports["saveTextAs"] = $foreign.saveTextAs;
-})(PS["Control.Monad.Eff.Save"] = PS["Control.Monad.Eff.Save"] || {});
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];
+  var React_Basic_DOM_Internal = PS["React.Basic.DOM.Internal"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];
+  var Web_DOM = PS["Web.DOM"];                                                  
+  var text = Unsafe_Coerce.unsafeCoerce;
+  exports["text"] = text;
+})(PS["React.Basic.DOM"] = PS["React.Basic.DOM"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Level = PS["Data.Level"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Effect = PS["Effect"];
+  var Prelude = PS["Prelude"];
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM = PS["React.Basic.DOM"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];
+  var React_Basic_Events = PS["React.Basic.Events"];                 
+  var component = (function () {
+      var render = function (v) {
+          if (v.error instanceof Data_Maybe.Nothing) {
+              return React_Basic.empty;
+          };
+          if (v.error instanceof Data_Maybe.Just) {
+              return React_Basic_DOM_Generated.pre()({
+                  className: "alert alert-" + Data_Show.show(Data_Level.showLevel)(v.error.value0.value0),
+                  children: [ React_Basic_DOM_Generated.span()({
+                      className: "cursor-pointer glyphicon glyphicon-remove pull-right",
+                      onClick: React_Basic_Events.handler_(v.dismiss)
+                  }), React_Basic_DOM.text(v.error.value0.value1) ]
+              });
+          };
+          throw new Error("Failed pattern match at Components.Alert line 27, column 3 - line 27, column 40: " + [ v.constructor.name ]);
+      };
+      return React_Basic.stateless({
+          displayName: "Header",
+          render: render
+      });
+  })();
+  exports["component"] = component;
+})(PS["Components.Alert"] = PS["Components.Alert"] || {});
 (function(exports) {
     "use strict";
 
@@ -24386,21 +22905,8 @@ var PS = {};
     };
   };
 
-  var replicatePolyfill = function (count) {
-    return function (value) {
-      var result = [];
-      var n = 0;
-      for (var i = 0; i < count; i++) {
-        result[n++] = value;
-      }
-      return result;
-    };
-  };
-
   // In browsers that have Array.prototype.fill we use it, as it's faster.
-  exports.replicate = typeof Array.prototype.fill === "function" ?
-      replicate :
-      replicatePolyfill;
+  exports.replicate = typeof Array.prototype.fill === "function" ? replicate : replicatePolyfill;
 
   //------------------------------------------------------------------------------
   // Array size ------------------------------------------------------------------
@@ -24428,26 +22934,6 @@ var PS = {};
     };
   };
 
-  //------------------------------------------------------------------------------
-  // Non-indexed reads -----------------------------------------------------------
-  //------------------------------------------------------------------------------
-
-  exports["uncons'"] = function (empty) {
-    return function (next) {
-      return function (xs) {
-        return xs.length === 0 ? empty({}) : next(xs[0])(xs.slice(1));
-      };
-    };
-  };
-
-  //------------------------------------------------------------------------------
-  // Transformations -------------------------------------------------------------
-  //------------------------------------------------------------------------------
-
-  exports.reverse = function (l) {
-    return l.slice().reverse();
-  };
-
   exports.concat = function (xss) {
     if (xss.length <= 10000) {
       // This method is faster, but it crashes on big arrays.
@@ -24472,19 +22958,6 @@ var PS = {};
   };
 
   //------------------------------------------------------------------------------
-  // Sorting ---------------------------------------------------------------------
-  //------------------------------------------------------------------------------
-
-  exports.sortImpl = function (f) {
-    return function (l) {
-      // jshint maxparams: 2
-      return l.slice().sort(function (x, y) {
-        return f(x)(y);
-      });
-    };
-  };
-
-  //------------------------------------------------------------------------------
   // Subarrays -------------------------------------------------------------------
   //------------------------------------------------------------------------------
 
@@ -24497,7 +22970,111 @@ var PS = {};
   };
 })(PS["Data.Array"] = PS["Data.Array"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+    "use strict";
+
+  exports.unfoldrArrayImpl = function (isNothing) {
+    return function (fromJust) {
+      return function (fst) {
+        return function (snd) {
+          return function (f) {
+            return function (b) {
+              var result = [];
+              var value = b;
+              while (true) { // eslint-disable-line no-constant-condition
+                var maybe = f(value);
+                if (isNothing(maybe)) return result;
+                var tuple = fromJust(maybe);
+                result.push(fst(tuple));
+                value = snd(tuple);
+              }
+            };
+          };
+        };
+      };
+    };
+  };
+})(PS["Data.Unfoldable"] = PS["Data.Unfoldable"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.unfoldr1ArrayImpl = function (isNothing) {
+    return function (fromJust) {
+      return function (fst) {
+        return function (snd) {
+          return function (f) {
+            return function (b) {
+              var result = [];
+              var value = b;
+              while (true) { // eslint-disable-line no-constant-condition
+                var tuple = f(value);
+                result.push(fst(tuple));
+                var maybe = snd(tuple);
+                if (isNothing(maybe)) return result;
+                value = fromJust(maybe);
+              }
+            };
+          };
+        };
+      };
+    };
+  };
+})(PS["Data.Unfoldable1"] = PS["Data.Unfoldable1"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Unfoldable1"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup_Traversable = PS["Data.Semigroup.Traversable"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Partial_Unsafe = PS["Partial.Unsafe"];
+  var Prelude = PS["Prelude"];                 
+  var Unfoldable1 = function (unfoldr1) {
+      this.unfoldr1 = unfoldr1;
+  };
+  var unfoldr1 = function (dict) {
+      return dict.unfoldr1;
+  };
+  var unfoldable1Array = new Unfoldable1($foreign.unfoldr1ArrayImpl(Data_Maybe.isNothing)(Data_Maybe.fromJust())(Data_Tuple.fst)(Data_Tuple.snd));
+  exports["Unfoldable1"] = Unfoldable1;
+  exports["unfoldr1"] = unfoldr1;
+  exports["unfoldable1Array"] = unfoldable1Array;
+})(PS["Data.Unfoldable1"] = PS["Data.Unfoldable1"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Unfoldable"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Traversable = PS["Data.Traversable"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unfoldable1 = PS["Data.Unfoldable1"];
+  var Data_Unit = PS["Data.Unit"];
+  var Partial_Unsafe = PS["Partial.Unsafe"];
+  var Prelude = PS["Prelude"];                 
+  var Unfoldable = function (Unfoldable10, unfoldr) {
+      this.Unfoldable10 = Unfoldable10;
+      this.unfoldr = unfoldr;
+  };
+  var unfoldr = function (dict) {
+      return dict.unfoldr;
+  };
+  var unfoldableArray = new Unfoldable(function () {
+      return Data_Unfoldable1.unfoldable1Array;
+  }, $foreign.unfoldrArrayImpl(Data_Maybe.isNothing)(Data_Maybe.fromJust())(Data_Tuple.fst)(Data_Tuple.snd));
+  exports["Unfoldable"] = Unfoldable;
+  exports["unfoldr"] = unfoldr;
+  exports["unfoldableArray"] = unfoldableArray;
+})(PS["Data.Unfoldable"] = PS["Data.Unfoldable"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var $foreign = PS["Data.Array"];
   var Control_Alt = PS["Control.Alt"];
@@ -24507,10 +23084,11 @@ var PS = {};
   var Control_Bind = PS["Control.Bind"];
   var Control_Category = PS["Control.Category"];
   var Control_Lazy = PS["Control.Lazy"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
   var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
   var Control_Monad_ST = PS["Control.Monad.ST"];
+  var Control_Monad_ST_Internal = PS["Control.Monad.ST.Internal"];
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Array_NonEmpty_Internal = PS["Data.Array.NonEmpty.Internal"];
   var Data_Array_ST = PS["Data.Array.ST"];
   var Data_Array_ST_Iterator = PS["Data.Array.ST.Iterator"];
   var Data_Boolean = PS["Data.Boolean"];
@@ -24520,7 +23098,6 @@ var PS = {};
   var Data_Functor = PS["Data.Functor"];
   var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
   var Data_Maybe = PS["Data.Maybe"];
-  var Data_NonEmpty = PS["Data.NonEmpty"];
   var Data_Ord = PS["Data.Ord"];
   var Data_Ordering = PS["Data.Ordering"];
   var Data_Ring = PS["Data.Ring"];
@@ -24531,37 +23108,7 @@ var PS = {};
   var Data_Unfoldable = PS["Data.Unfoldable"];
   var Partial_Unsafe = PS["Partial.Unsafe"];
   var Prelude = PS["Prelude"];
-  var uncons = $foreign["uncons'"](Data_Function["const"](Data_Maybe.Nothing.value))(function (x) {
-      return function (xs) {
-          return new Data_Maybe.Just({
-              head: x, 
-              tail: xs
-          });
-      };
-  });
-  var sortBy = function (comp) {
-      return function (xs) {
-          var comp$prime = function (x) {
-              return function (y) {
-                  var v = comp(x)(y);
-                  if (v instanceof Data_Ordering.GT) {
-                      return 1;
-                  };
-                  if (v instanceof Data_Ordering.EQ) {
-                      return 0;
-                  };
-                  if (v instanceof Data_Ordering.LT) {
-                      return -1 | 0;
-                  };
-                  throw new Error("Failed pattern match at Data.Array line 475, column 15 - line 480, column 1: " + [ v.constructor.name ]);
-              };
-          };
-          return $foreign.sortImpl(comp$prime)(xs);
-      };
-  };
-  var singleton = function (a) {
-      return [ a ];
-  };
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];
   var some = function (dictAlternative) {
       return function (dictLazy) {
           return function (v) {
@@ -24578,445 +23125,343 @@ var PS = {};
           };
       };
   };
-  exports["many"] = many;
-  exports["singleton"] = singleton;
   exports["some"] = some;
-  exports["sortBy"] = sortBy;
-  exports["uncons"] = uncons;
-  exports["cons"] = $foreign.cons;
-  exports["filter"] = $foreign.filter;
-  exports["length"] = $foreign.length;
+  exports["many"] = many;
   exports["replicate"] = $foreign.replicate;
-  exports["reverse"] = $foreign.reverse;
+  exports["length"] = $foreign.length;
+  exports["cons"] = $foreign.cons;
   exports["snoc"] = $foreign.snoc;
+  exports["filter"] = $foreign.filter;
 })(PS["Data.Array"] = PS["Data.Array"] || {});
 (function(exports) {
-    "use strict";
-
-  // module Data.Generic
-
-  exports.zipAll = function (f) {
-    return function (xs) {
-      return function (ys) {
-        var l = xs.length < ys.length ? xs.length : ys.length;
-        for (var i = 0; i < l; i++) {
-          if (!f(xs[i])(ys[i])) {
-            return false;
-          }
-        }
-        return true;
-      };
-    };
-  };
-
-  exports.zipCompare = function (f) {
-    return function (xs) {
-      return function (ys) {
-        var i = 0;
-        var xlen = xs.length;
-        var ylen = ys.length;
-        while (i < xlen && i < ylen) {
-          var o = f(xs[i])(ys[i]);
-          if (o !== 0) {
-            return o;
-          }
-          i++;
-        }
-        if (xlen === ylen) {
-          return 0;
-        } else if (xlen > ylen) {
-          return -1;
-        } else {
-          return 1;
-        }
-      };
-    };
-  };
-})(PS["Data.Generic"] = PS["Data.Generic"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
-  var $foreign = PS["Data.Generic"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Product = (function () {
+      function Product(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      Product.create = function (value0) {
+          return function (value1) {
+              return new Product(value0, value1);
+          };
+      };
+      return Product;
+  })();
+  var Generic = function (from, to) {
+      this.from = from;
+      this.to = to;
+  };
+  var to = function (dict) {
+      return dict.to;
+  }; 
+  var from = function (dict) {
+      return dict.from;
+  };
+  exports["Generic"] = Generic;
+  exports["to"] = to;
+  exports["from"] = from;
+  exports["Product"] = Product;
+})(PS["Data.Generic.Rep"] = PS["Data.Generic.Rep"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Alt = PS["Control.Alt"];
+  var Control_Alternative = PS["Control.Alternative"];
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Category = PS["Control.Category"];
+  var Control_Comonad = PS["Control.Comonad"];
+  var Control_Extend = PS["Control.Extend"];
+  var Control_Monad = PS["Control.Monad"];
+  var Control_MonadPlus = PS["Control.MonadPlus"];
+  var Control_MonadZero = PS["Control.MonadZero"];
+  var Control_Plus = PS["Control.Plus"];
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Array = PS["Data.Array"];
-  var Data_Boolean = PS["Data.Boolean"];
-  var Data_Either = PS["Data.Either"];
   var Data_Eq = PS["Data.Eq"];
   var Data_Foldable = PS["Data.Foldable"];
+  var Data_FoldableWithIndex = PS["Data.FoldableWithIndex"];
   var Data_Function = PS["Data.Function"];
   var Data_Functor = PS["Data.Functor"];
+  var Data_FunctorWithIndex = PS["Data.FunctorWithIndex"];
   var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_List_Types = PS["Data.List.Types"];
   var Data_Maybe = PS["Data.Maybe"];
   var Data_Monoid = PS["Data.Monoid"];
+  var Data_Newtype = PS["Data.Newtype"];
   var Data_NonEmpty = PS["Data.NonEmpty"];
   var Data_Ord = PS["Data.Ord"];
   var Data_Ordering = PS["Data.Ordering"];
   var Data_Ring = PS["Data.Ring"];
   var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semigroup_Foldable = PS["Data.Semigroup.Foldable"];
+  var Data_Semigroup_Traversable = PS["Data.Semigroup.Traversable"];
+  var Data_Semiring = PS["Data.Semiring"];
   var Data_Show = PS["Data.Show"];
-  var Data_String = PS["Data.String"];
+  var Data_Traversable = PS["Data.Traversable"];
+  var Data_TraversableWithIndex = PS["Data.TraversableWithIndex"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unfoldable = PS["Data.Unfoldable"];
+  var Data_Unfoldable1 = PS["Data.Unfoldable1"];
+  var Prelude = PS["Prelude"];                 
+  var Nil = (function () {
+      function Nil() {
+
+      };
+      Nil.value = new Nil();
+      return Nil;
+  })();
+  var Cons = (function () {
+      function Cons(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      Cons.create = function (value0) {
+          return function (value1) {
+              return new Cons(value0, value1);
+          };
+      };
+      return Cons;
+  })();
+  var foldableList = new Data_Foldable.Foldable(function (dictMonoid) {
+      return function (f) {
+          return Data_Foldable.foldl(foldableList)(function (acc) {
+              return function ($174) {
+                  return Data_Semigroup.append(dictMonoid.Semigroup0())(acc)(f($174));
+              };
+          })(Data_Monoid.mempty(dictMonoid));
+      };
+  }, function (f) {
+      var go = function ($copy_b) {
+          return function ($copy_v) {
+              var $tco_var_b = $copy_b;
+              var $tco_done = false;
+              var $tco_result;
+              function $tco_loop(b, v) {
+                  if (v instanceof Nil) {
+                      $tco_done = true;
+                      return b;
+                  };
+                  if (v instanceof Cons) {
+                      $tco_var_b = f(b)(v.value0);
+                      $copy_v = v.value1;
+                      return;
+                  };
+                  throw new Error("Failed pattern match at Data.List.Types line 81, column 12 - line 83, column 30: " + [ v.constructor.name ]);
+              };
+              while (!$tco_done) {
+                  $tco_result = $tco_loop($tco_var_b, $copy_v);
+              };
+              return $tco_result;
+          };
+      };
+      return go;
+  }, function (f) {
+      return function (b) {
+          var rev = Data_Foldable.foldl(foldableList)(Data_Function.flip(Cons.create))(Nil.value);
+          return function ($175) {
+              return Data_Foldable.foldl(foldableList)(Data_Function.flip(f))(b)(rev($175));
+          };
+      };
+  });
+  var functorList = new Data_Functor.Functor(function (f) {
+      return Data_Foldable.foldr(foldableList)(function (x) {
+          return function (acc) {
+              return new Cons(f(x), acc);
+          };
+      })(Nil.value);
+  });
+  var semigroupList = new Data_Semigroup.Semigroup(function (xs) {
+      return function (ys) {
+          return Data_Foldable.foldr(foldableList)(Cons.create)(ys)(xs);
+      };
+  });
+  var unfoldable1List = new Data_Unfoldable1.Unfoldable1(function (f) {
+      return function (b) {
+          var go = function ($copy_source) {
+              return function ($copy_memo) {
+                  var $tco_var_source = $copy_source;
+                  var $tco_done = false;
+                  var $tco_result;
+                  function $tco_loop(source, memo) {
+                      var v = f(source);
+                      if (v.value1 instanceof Data_Maybe.Just) {
+                          $tco_var_source = v.value1.value0;
+                          $copy_memo = new Cons(v.value0, memo);
+                          return;
+                      };
+                      if (v.value1 instanceof Data_Maybe.Nothing) {
+                          $tco_done = true;
+                          return Data_Foldable.foldl(foldableList)(Data_Function.flip(Cons.create))(Nil.value)(new Cons(v.value0, memo));
+                      };
+                      throw new Error("Failed pattern match at Data.List.Types line 105, column 22 - line 107, column 61: " + [ v.constructor.name ]);
+                  };
+                  while (!$tco_done) {
+                      $tco_result = $tco_loop($tco_var_source, $copy_memo);
+                  };
+                  return $tco_result;
+              };
+          };
+          return go(b)(Nil.value);
+      };
+  });
+  var unfoldableList = new Data_Unfoldable.Unfoldable(function () {
+      return unfoldable1List;
+  }, function (f) {
+      return function (b) {
+          var go = function ($copy_source) {
+              return function ($copy_memo) {
+                  var $tco_var_source = $copy_source;
+                  var $tco_done = false;
+                  var $tco_result;
+                  function $tco_loop(source, memo) {
+                      var v = f(source);
+                      if (v instanceof Data_Maybe.Nothing) {
+                          $tco_done = true;
+                          return Data_Foldable.foldl(foldableList)(Data_Function.flip(Cons.create))(Nil.value)(memo);
+                      };
+                      if (v instanceof Data_Maybe.Just) {
+                          $tco_var_source = v.value0.value1;
+                          $copy_memo = new Cons(v.value0.value0, memo);
+                          return;
+                      };
+                      throw new Error("Failed pattern match at Data.List.Types line 112, column 22 - line 114, column 52: " + [ v.constructor.name ]);
+                  };
+                  while (!$tco_done) {
+                      $tco_result = $tco_loop($tco_var_source, $copy_memo);
+                  };
+                  return $tco_result;
+              };
+          };
+          return go(b)(Nil.value);
+      };
+  });
+  var applyList = new Control_Apply.Apply(function () {
+      return functorList;
+  }, function (v) {
+      return function (v1) {
+          if (v instanceof Nil) {
+              return Nil.value;
+          };
+          if (v instanceof Cons) {
+              return Data_Semigroup.append(semigroupList)(Data_Functor.map(functorList)(v.value0)(v1))(Control_Apply.apply(applyList)(v.value1)(v1));
+          };
+          throw new Error("Failed pattern match at Data.List.Types line 127, column 1 - line 127, column 33: " + [ v.constructor.name, v1.constructor.name ]);
+      };
+  });
+  var applicativeList = new Control_Applicative.Applicative(function () {
+      return applyList;
+  }, function (a) {
+      return new Cons(a, Nil.value);
+  });
+  exports["Nil"] = Nil;
+  exports["Cons"] = Cons;
+  exports["semigroupList"] = semigroupList;
+  exports["functorList"] = functorList;
+  exports["foldableList"] = foldableList;
+  exports["unfoldable1List"] = unfoldable1List;
+  exports["unfoldableList"] = unfoldableList;
+  exports["applyList"] = applyList;
+  exports["applicativeList"] = applicativeList;
+})(PS["Data.List.Types"] = PS["Data.List.Types"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Alt = PS["Control.Alt"];
+  var Control_Alternative = PS["Control.Alternative"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Apply = PS["Control.Apply"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Category = PS["Control.Category"];
+  var Control_Lazy = PS["Control.Lazy"];
+  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Bifunctor = PS["Data.Bifunctor"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Foldable = PS["Data.Foldable"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_FunctorWithIndex = PS["Data.FunctorWithIndex"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_List_Types = PS["Data.List.Types"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_NonEmpty = PS["Data.NonEmpty"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
   var Data_Traversable = PS["Data.Traversable"];
   var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unfoldable = PS["Data.Unfoldable"];
   var Data_Unit = PS["Data.Unit"];
-  var Data_Void = PS["Data.Void"];
-  var Prelude = PS["Prelude"];
-  var Type_Proxy = PS["Type.Proxy"];        
-  var SProd = (function () {
-      function SProd(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
+  var Prelude = PS["Prelude"];                                                   
+  var uncons = function (v) {
+      if (v instanceof Data_List_Types.Nil) {
+          return Data_Maybe.Nothing.value;
       };
-      SProd.create = function (value0) {
-          return function (value1) {
-              return new SProd(value0, value1);
+      if (v instanceof Data_List_Types.Cons) {
+          return new Data_Maybe.Just({
+              head: v.value0,
+              tail: v.value1
+          });
+      };
+      throw new Error("Failed pattern match at Data.List line 259, column 1 - line 259, column 66: " + [ v.constructor.name ]);
+  };
+  var toUnfoldable = function (dictUnfoldable) {
+      return Data_Unfoldable.unfoldr(dictUnfoldable)(function (xs) {
+          return Data_Functor.map(Data_Maybe.functorMaybe)(function (rec) {
+              return new Data_Tuple.Tuple(rec.head, rec.tail);
+          })(uncons(xs));
+      });
+  };
+  var tail = function (v) {
+      if (v instanceof Data_List_Types.Nil) {
+          return Data_Maybe.Nothing.value;
+      };
+      if (v instanceof Data_List_Types.Cons) {
+          return new Data_Maybe.Just(v.value1);
+      };
+      throw new Error("Failed pattern match at Data.List line 245, column 1 - line 245, column 43: " + [ v.constructor.name ]);
+  };
+  var some = function (dictAlternative) {
+      return function (dictLazy) {
+          return function (v) {
+              return Control_Apply.apply((dictAlternative.Applicative0()).Apply0())(Data_Functor.map(((dictAlternative.Plus1()).Alt0()).Functor0())(Data_List_Types.Cons.create)(v))(Control_Lazy.defer(dictLazy)(function (v1) {
+                  return many(dictAlternative)(dictLazy)(v);
+              }));
           };
       };
-      return SProd;
-  })();
-  var SRecord = (function () {
-      function SRecord(value0) {
-          this.value0 = value0;
-      };
-      SRecord.create = function (value0) {
-          return new SRecord(value0);
-      };
-      return SRecord;
-  })();
-  var SNumber = (function () {
-      function SNumber(value0) {
-          this.value0 = value0;
-      };
-      SNumber.create = function (value0) {
-          return new SNumber(value0);
-      };
-      return SNumber;
-  })();
-  var SBoolean = (function () {
-      function SBoolean(value0) {
-          this.value0 = value0;
-      };
-      SBoolean.create = function (value0) {
-          return new SBoolean(value0);
-      };
-      return SBoolean;
-  })();
-  var SInt = (function () {
-      function SInt(value0) {
-          this.value0 = value0;
-      };
-      SInt.create = function (value0) {
-          return new SInt(value0);
-      };
-      return SInt;
-  })();
-  var SString = (function () {
-      function SString(value0) {
-          this.value0 = value0;
-      };
-      SString.create = function (value0) {
-          return new SString(value0);
-      };
-      return SString;
-  })();
-  var SChar = (function () {
-      function SChar(value0) {
-          this.value0 = value0;
-      };
-      SChar.create = function (value0) {
-          return new SChar(value0);
-      };
-      return SChar;
-  })();
-  var SArray = (function () {
-      function SArray(value0) {
-          this.value0 = value0;
-      };
-      SArray.create = function (value0) {
-          return new SArray(value0);
-      };
-      return SArray;
-  })();
-  var SUnit = (function () {
-      function SUnit() {
-
-      };
-      SUnit.value = new SUnit();
-      return SUnit;
-  })();
-  var SigProd = (function () {
-      function SigProd(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
-      };
-      SigProd.create = function (value0) {
-          return function (value1) {
-              return new SigProd(value0, value1);
+  };
+  var many = function (dictAlternative) {
+      return function (dictLazy) {
+          return function (v) {
+              return Control_Alt.alt((dictAlternative.Plus1()).Alt0())(some(dictAlternative)(dictLazy)(v))(Control_Applicative.pure(dictAlternative.Applicative0())(Data_List_Types.Nil.value));
           };
       };
-      return SigProd;
-  })();
-  var SigInt = (function () {
-      function SigInt() {
-
-      };
-      SigInt.value = new SigInt();
-      return SigInt;
-  })();
-  var SigString = (function () {
-      function SigString() {
-
-      };
-      SigString.value = new SigString();
-      return SigString;
-  })();
-  var Generic = function (fromSpine, toSignature, toSpine) {
-      this.fromSpine = fromSpine;
-      this.toSignature = toSignature;
-      this.toSpine = toSpine;
   };
-  var toSpine = function (dict) {
-      return dict.toSpine;
-  };
-  var toSignature = function (dict) {
-      return dict.toSignature;
-  }; 
-  var orderingToInt = function (v) {
-      if (v instanceof Data_Ordering.EQ) {
-          return 0;
+  var head = function (v) {
+      if (v instanceof Data_List_Types.Nil) {
+          return Data_Maybe.Nothing.value;
       };
-      if (v instanceof Data_Ordering.LT) {
-          return 1;
-      };
-      if (v instanceof Data_Ordering.GT) {
-          return -1 | 0;
-      };
-      throw new Error("Failed pattern match at Data.Generic line 538, column 17 - line 541, column 10: " + [ v.constructor.name ]);
-  }; 
-  var genericString = new Generic(function (v) {
-      if (v instanceof SString) {
+      if (v instanceof Data_List_Types.Cons) {
           return new Data_Maybe.Just(v.value0);
       };
-      return Data_Maybe.Nothing.value;
-  }, function (v) {
-      return SigString.value;
-  }, SString.create);
-  var genericInt = new Generic(function (v) {
-      if (v instanceof SInt) {
-          return new Data_Maybe.Just(v.value0);
-      };
-      return Data_Maybe.Nothing.value;
-  }, function (v) {
-      return SigInt.value;
-  }, SInt.create);    
-  var fromSpine = function (dict) {
-      return dict.fromSpine;
+      throw new Error("Failed pattern match at Data.List line 230, column 1 - line 230, column 22: " + [ v.constructor.name ]);
   };
-  var force = function (f) {
-      return f(Data_Unit.unit);
-  };                                                           
-  var eqThunk = function (dictEq) {
-      return function (x) {
-          return function (y) {
-              return Data_Eq.eq(dictEq)(force(x))(force(y));
-          };
-      };
-  };
-  var eqRecordSigs = function (dictEq) {
-      return function (arr1) {
-          return function (arr2) {
-              var labelCompare = function (r1) {
-                  return function (r2) {
-                      return Data_Ord.compare(Data_Ord.ordString)(r1.recLabel)(r2.recLabel);
-                  };
-              };
-              var sorted1 = Data_Array.sortBy(labelCompare)(arr1);
-              var sorted2 = Data_Array.sortBy(labelCompare)(arr2);
-              var doCmp = function (x) {
-                  return function (y) {
-                      return x.recLabel === y.recLabel && Data_Eq.eq(dictEq)(force(x.recValue))(force(y.recValue));
-                  };
-              };
-              return Data_Array.length(arr1) === Data_Array.length(arr2) && $foreign.zipAll(doCmp)(sorted1)(sorted2);
-          };
-      };
-  };
-  var eqGenericSpine = new Data_Eq.Eq(function (v) {
-      return function (v1) {
-          if (v instanceof SProd && v1 instanceof SProd) {
-              return v.value0 === v1.value0 && (Data_Array.length(v.value1) === Data_Array.length(v1.value1) && $foreign.zipAll(eqThunk(eqGenericSpine))(v.value1)(v1.value1));
-          };
-          if (v instanceof SRecord && v1 instanceof SRecord) {
-              return eqRecordSigs(eqGenericSpine)(v.value0)(v1.value0);
-          };
-          if (v instanceof SNumber && v1 instanceof SNumber) {
-              return v.value0 === v1.value0;
-          };
-          if (v instanceof SBoolean && v1 instanceof SBoolean) {
-              return v.value0 === v1.value0;
-          };
-          if (v instanceof SInt && v1 instanceof SInt) {
-              return v.value0 === v1.value0;
-          };
-          if (v instanceof SString && v1 instanceof SString) {
-              return v.value0 === v1.value0;
-          };
-          if (v instanceof SChar && v1 instanceof SChar) {
-              return v.value0 === v1.value0;
-          };
-          if (v instanceof SArray && v1 instanceof SArray) {
-              return Data_Array.length(v.value0) === Data_Array.length(v1.value0) && $foreign.zipAll(eqThunk(eqGenericSpine))(v.value0)(v1.value0);
-          };
-          if (v instanceof SUnit && v1 instanceof SUnit) {
-              return true;
-          };
-          return false;
-      };
-  });
-  var gEq = function (dictGeneric) {
-      return function (x) {
-          return function (y) {
-              return Data_Eq.eq(eqGenericSpine)(toSpine(dictGeneric)(x))(toSpine(dictGeneric)(y));
-          };
-      };
-  };
-  var compareThunk = function (dictOrd) {
-      return function (x) {
-          return function (y) {
-              return orderingToInt(Data_Ord.compare(dictOrd)(force(x))(force(y)));
-          };
-      };
-  };
-  var ordGenericSpine = new Data_Ord.Ord(function () {
-      return eqGenericSpine;
-  }, function (v) {
-      return function (v1) {
-          if (v instanceof SProd && v1 instanceof SProd) {
-              var v2 = Data_Ord.compare(Data_Ord.ordString)(v.value0)(v1.value0);
-              if (v2 instanceof Data_Ordering.EQ) {
-                  return Data_Ord.compare(Data_Ord.ordInt)(0)($foreign.zipCompare(compareThunk(ordGenericSpine))(v.value1)(v1.value1));
-              };
-              return v2;
-          };
-          if (v instanceof SProd) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SProd) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SRecord && v1 instanceof SRecord) {
-              var go = function (x) {
-                  return function (y) {
-                      var v2 = Data_Ord.compare(Data_Ord.ordString)(x.recLabel)(y.recLabel);
-                      if (v2 instanceof Data_Ordering.EQ) {
-                          return orderingToInt(Data_Ord.compare(ordGenericSpine)(force(x.recValue))(force(y.recValue)));
-                      };
-                      return orderingToInt(v2);
-                  };
-              };
-              return Data_Ord.compare(Data_Ord.ordInt)(0)($foreign.zipCompare(go)(v.value0)(v1.value0));
-          };
-          if (v instanceof SRecord) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SRecord) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SInt && v1 instanceof SInt) {
-              return Data_Ord.compare(Data_Ord.ordInt)(v.value0)(v1.value0);
-          };
-          if (v instanceof SInt) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SInt) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SBoolean && v1 instanceof SBoolean) {
-              return Data_Ord.compare(Data_Ord.ordBoolean)(v.value0)(v1.value0);
-          };
-          if (v instanceof SBoolean) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SBoolean) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SNumber && v1 instanceof SNumber) {
-              return Data_Ord.compare(Data_Ord.ordNumber)(v.value0)(v1.value0);
-          };
-          if (v instanceof SNumber) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SNumber) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SString && v1 instanceof SString) {
-              return Data_Ord.compare(Data_Ord.ordString)(v.value0)(v1.value0);
-          };
-          if (v instanceof SString) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SString) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SChar && v1 instanceof SChar) {
-              return Data_Ord.compare(Data_Ord.ordChar)(v.value0)(v1.value0);
-          };
-          if (v instanceof SChar) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SChar) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SArray && v1 instanceof SArray) {
-              return Data_Ord.compare(Data_Ord.ordInt)(0)($foreign.zipCompare(compareThunk(ordGenericSpine))(v.value0)(v1.value0));
-          };
-          if (v instanceof SArray) {
-              return Data_Ordering.LT.value;
-          };
-          if (v1 instanceof SArray) {
-              return Data_Ordering.GT.value;
-          };
-          if (v instanceof SUnit && v1 instanceof SUnit) {
-              return Data_Ordering.EQ.value;
-          };
-          throw new Error("Failed pattern match at Data.Generic line 304, column 3 - line 307, column 15: " + [ v.constructor.name, v1.constructor.name ]);
-      };
-  });
-  var gCompare = function (dictGeneric) {
-      return function (x) {
-          return function (y) {
-              return Data_Ord.compare(ordGenericSpine)(toSpine(dictGeneric)(x))(toSpine(dictGeneric)(y));
-          };
-      };
-  };
-  exports["SigProd"] = SigProd;
-  exports["SigInt"] = SigInt;
-  exports["SigString"] = SigString;
-  exports["SProd"] = SProd;
-  exports["SRecord"] = SRecord;
-  exports["SNumber"] = SNumber;
-  exports["SBoolean"] = SBoolean;
-  exports["SInt"] = SInt;
-  exports["SString"] = SString;
-  exports["SChar"] = SChar;
-  exports["SArray"] = SArray;
-  exports["SUnit"] = SUnit;
-  exports["Generic"] = Generic;
-  exports["fromSpine"] = fromSpine;
-  exports["gCompare"] = gCompare;
-  exports["gEq"] = gEq;
-  exports["toSignature"] = toSignature;
-  exports["toSpine"] = toSpine;
-  exports["genericInt"] = genericInt;
-  exports["genericString"] = genericString;
-  exports["eqGenericSpine"] = eqGenericSpine;
-  exports["ordGenericSpine"] = ordGenericSpine;
-})(PS["Data.Generic"] = PS["Data.Generic"] || {});
+  exports["toUnfoldable"] = toUnfoldable;
+  exports["some"] = some;
+  exports["many"] = many;
+  exports["head"] = head;
+  exports["tail"] = tail;
+  exports["uncons"] = uncons;
+})(PS["Data.List"] = PS["Data.List"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
@@ -25024,8 +23469,10 @@ var PS = {};
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
   var Data_Eq = PS["Data.Eq"];
   var Data_Foldable = PS["Data.Foldable"];
+  var Data_FoldableWithIndex = PS["Data.FoldableWithIndex"];
   var Data_Function = PS["Data.Function"];
   var Data_Functor = PS["Data.Functor"];
+  var Data_FunctorWithIndex = PS["Data.FunctorWithIndex"];
   var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
   var Data_List = PS["Data.List"];
   var Data_List_Lazy = PS["Data.List.Lazy"];
@@ -25039,10 +23486,11 @@ var PS = {};
   var Data_Semiring = PS["Data.Semiring"];
   var Data_Show = PS["Data.Show"];
   var Data_Traversable = PS["Data.Traversable"];
+  var Data_TraversableWithIndex = PS["Data.TraversableWithIndex"];
   var Data_Tuple = PS["Data.Tuple"];
   var Data_Unfoldable = PS["Data.Unfoldable"];
   var Partial_Unsafe = PS["Partial.Unsafe"];
-  var Prelude = PS["Prelude"];        
+  var Prelude = PS["Prelude"];                 
   var Leaf = (function () {
       function Leaf() {
 
@@ -25225,44 +23673,52 @@ var PS = {};
       if (v instanceof Three) {
           return ((2 + size(v.value0) | 0) + size(v.value3) | 0) + size(v.value6) | 0;
       };
-      throw new Error("Failed pattern match at Data.Map line 476, column 1 - line 477, column 1: " + [ v.constructor.name ]);
+      throw new Error("Failed pattern match at Data.Map.Internal line 621, column 1 - line 621, column 35: " + [ v.constructor.name ]);
   };
   var singleton = function (k) {
       return function (v) {
           return new Two(Leaf.value, k, v, Leaf.value);
       };
-  };                                                                
+  };
   var toUnfoldable = function (dictUnfoldable) {
       return function (m) {
-          var go = function (__copy_v) {
-              var __tco_done = false;
-              var __tco_result;
-              function __tco_loop(v) {
+          var go = function ($copy_v) {
+              var $tco_done = false;
+              var $tco_result;
+              function $tco_loop(v) {
                   if (v instanceof Data_List_Types.Nil) {
-                      __tco_done = true;
+                      $tco_done = true;
                       return Data_Maybe.Nothing.value;
                   };
                   if (v instanceof Data_List_Types.Cons) {
                       if (v.value0 instanceof Leaf) {
-                          __copy_v = v.value1;
+                          $copy_v = v.value1;
                           return;
                       };
+                      if (v.value0 instanceof Two && (v.value0.value0 instanceof Leaf && v.value0.value3 instanceof Leaf)) {
+                          $tco_done = true;
+                          return Data_Maybe.Just.create(new Data_Tuple.Tuple(new Data_Tuple.Tuple(v.value0.value1, v.value0.value2), v.value1));
+                      };
+                      if (v.value0 instanceof Two && v.value0.value0 instanceof Leaf) {
+                          $tco_done = true;
+                          return Data_Maybe.Just.create(new Data_Tuple.Tuple(new Data_Tuple.Tuple(v.value0.value1, v.value0.value2), new Data_List_Types.Cons(v.value0.value3, v.value1)));
+                      };
                       if (v.value0 instanceof Two) {
-                          __tco_done = true;
-                          return Data_Maybe.Just.create(new Data_Tuple.Tuple(new Data_Tuple.Tuple(v.value0.value1, v.value0.value2), new Data_List_Types.Cons(v.value0.value0, new Data_List_Types.Cons(v.value0.value3, v.value1))));
+                          $copy_v = new Data_List_Types.Cons(v.value0.value0, new Data_List_Types.Cons(singleton(v.value0.value1)(v.value0.value2), new Data_List_Types.Cons(v.value0.value3, v.value1)));
+                          return;
                       };
                       if (v.value0 instanceof Three) {
-                          __tco_done = true;
-                          return Data_Maybe.Just.create(new Data_Tuple.Tuple(new Data_Tuple.Tuple(v.value0.value1, v.value0.value2), new Data_List_Types.Cons(singleton(v.value0.value4)(v.value0.value5), new Data_List_Types.Cons(v.value0.value0, new Data_List_Types.Cons(v.value0.value3, new Data_List_Types.Cons(v.value0.value6, v.value1))))));
+                          $copy_v = new Data_List_Types.Cons(v.value0.value0, new Data_List_Types.Cons(singleton(v.value0.value1)(v.value0.value2), new Data_List_Types.Cons(v.value0.value3, new Data_List_Types.Cons(singleton(v.value0.value4)(v.value0.value5), new Data_List_Types.Cons(v.value0.value6, v.value1)))));
+                          return;
                       };
-                      throw new Error("Failed pattern match at Data.Map line 419, column 18 - line 424, column 77: " + [ v.value0.constructor.name ]);
+                      throw new Error("Failed pattern match at Data.Map.Internal line 559, column 18 - line 568, column 71: " + [ v.value0.constructor.name ]);
                   };
-                  throw new Error("Failed pattern match at Data.Map line 417, column 18 - line 424, column 77: " + [ v.constructor.name ]);
+                  throw new Error("Failed pattern match at Data.Map.Internal line 558, column 3 - line 558, column 19: " + [ v.constructor.name ]);
               };
-              while (!__tco_done) {
-                  __tco_result = __tco_loop(__copy_v);
+              while (!$tco_done) {
+                  $tco_result = $tco_loop($copy_v);
               };
-              return __tco_result;
+              return $tco_result;
           };
           return Data_Unfoldable.unfoldr(dictUnfoldable)(go)(new Data_List_Types.Cons(m, Data_List_Types.Nil.value));
       };
@@ -25270,55 +23726,55 @@ var PS = {};
   var lookup = function (dictOrd) {
       return function (k) {
           var comp = Data_Ord.compare(dictOrd);
-          var go = function (__copy_v) {
-              var __tco_done = false;
-              var __tco_result;
-              function __tco_loop(v) {
+          var go = function ($copy_v) {
+              var $tco_done = false;
+              var $tco_result;
+              function $tco_loop(v) {
                   if (v instanceof Leaf) {
-                      __tco_done = true;
+                      $tco_done = true;
                       return Data_Maybe.Nothing.value;
                   };
                   if (v instanceof Two) {
                       var v2 = comp(k)(v.value1);
                       if (v2 instanceof Data_Ordering.EQ) {
-                          __tco_done = true;
+                          $tco_done = true;
                           return new Data_Maybe.Just(v.value2);
                       };
                       if (v2 instanceof Data_Ordering.LT) {
-                          __copy_v = v.value0;
+                          $copy_v = v.value0;
                           return;
                       };
-                      __copy_v = v.value3;
+                      $copy_v = v.value3;
                       return;
                   };
                   if (v instanceof Three) {
                       var v3 = comp(k)(v.value1);
                       if (v3 instanceof Data_Ordering.EQ) {
-                          __tco_done = true;
+                          $tco_done = true;
                           return new Data_Maybe.Just(v.value2);
                       };
                       var v4 = comp(k)(v.value4);
                       if (v4 instanceof Data_Ordering.EQ) {
-                          __tco_done = true;
+                          $tco_done = true;
                           return new Data_Maybe.Just(v.value5);
                       };
                       if (v3 instanceof Data_Ordering.LT) {
-                          __copy_v = v.value0;
+                          $copy_v = v.value0;
                           return;
                       };
                       if (v4 instanceof Data_Ordering.GT) {
-                          __copy_v = v.value6;
+                          $copy_v = v.value6;
                           return;
                       };
-                      __copy_v = v.value3;
+                      $copy_v = v.value3;
                       return;
                   };
-                  throw new Error("Failed pattern match at Data.Map line 155, column 12 - line 174, column 29: " + [ v.constructor.name ]);
+                  throw new Error("Failed pattern match at Data.Map.Internal line 193, column 5 - line 193, column 22: " + [ v.constructor.name ]);
               };
-              while (!__tco_done) {
-                  __tco_result = __tco_loop(__copy_v);
+              while (!$tco_done) {
+                  $tco_result = $tco_loop($copy_v);
               };
-              return __tco_result;
+              return $tco_result;
           };
           return go;
       };
@@ -25340,7 +23796,13 @@ var PS = {};
       if (v instanceof Three) {
           return Data_Semigroup.append(Data_List_Types.semigroupList)(keys(v.value0))(Data_Semigroup.append(Data_List_Types.semigroupList)(Control_Applicative.pure(Data_List_Types.applicativeList)(v.value1))(Data_Semigroup.append(Data_List_Types.semigroupList)(keys(v.value3))(Data_Semigroup.append(Data_List_Types.semigroupList)(Control_Applicative.pure(Data_List_Types.applicativeList)(v.value4))(keys(v.value6)))));
       };
-      throw new Error("Failed pattern match at Data.Map line 443, column 1 - line 443, column 16: " + [ v.constructor.name ]);
+      throw new Error("Failed pattern match at Data.Map.Internal line 588, column 1 - line 588, column 38: " + [ v.constructor.name ]);
+  };
+  var isEmpty = function (v) {
+      if (v instanceof Leaf) {
+          return true;
+      };
+      return false;
   };
   var functorMap = new Data_Functor.Functor(function (v) {
       return function (v1) {
@@ -25353,167 +23815,167 @@ var PS = {};
           if (v1 instanceof Three) {
               return new Three(Data_Functor.map(functorMap)(v)(v1.value0), v1.value1, v(v1.value2), Data_Functor.map(functorMap)(v)(v1.value3), v1.value4, v(v1.value5), Data_Functor.map(functorMap)(v)(v1.value6));
           };
-          throw new Error("Failed pattern match at Data.Map line 86, column 3 - line 86, column 20: " + [ v.constructor.name, v1.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Map.Internal line 89, column 1 - line 89, column 39: " + [ v.constructor.name, v1.constructor.name ]);
       };
   });
-  var fromZipper = function (__copy_dictOrd) {
-      return function (__copy_v) {
-          return function (__copy_tree) {
-              var __tco_dictOrd = __copy_dictOrd;
-              var __tco_v = __copy_v;
-              var __tco_done = false;
-              var __tco_result;
-              function __tco_loop(dictOrd, v, tree) {
+  var fromZipper = function ($copy_dictOrd) {
+      return function ($copy_v) {
+          return function ($copy_tree) {
+              var $tco_var_dictOrd = $copy_dictOrd;
+              var $tco_var_v = $copy_v;
+              var $tco_done = false;
+              var $tco_result;
+              function $tco_loop(dictOrd, v, tree) {
                   if (v instanceof Data_List_Types.Nil) {
-                      __tco_done = true;
+                      $tco_done = true;
                       return tree;
                   };
                   if (v instanceof Data_List_Types.Cons) {
                       if (v.value0 instanceof TwoLeft) {
-                          __tco_dictOrd = dictOrd;
-                          __tco_v = v.value1;
-                          __copy_tree = new Two(tree, v.value0.value0, v.value0.value1, v.value0.value2);
+                          $tco_var_dictOrd = dictOrd;
+                          $tco_var_v = v.value1;
+                          $copy_tree = new Two(tree, v.value0.value0, v.value0.value1, v.value0.value2);
                           return;
                       };
                       if (v.value0 instanceof TwoRight) {
-                          __tco_dictOrd = dictOrd;
-                          __tco_v = v.value1;
-                          __copy_tree = new Two(v.value0.value0, v.value0.value1, v.value0.value2, tree);
+                          $tco_var_dictOrd = dictOrd;
+                          $tco_var_v = v.value1;
+                          $copy_tree = new Two(v.value0.value0, v.value0.value1, v.value0.value2, tree);
                           return;
                       };
                       if (v.value0 instanceof ThreeLeft) {
-                          __tco_dictOrd = dictOrd;
-                          __tco_v = v.value1;
-                          __copy_tree = new Three(tree, v.value0.value0, v.value0.value1, v.value0.value2, v.value0.value3, v.value0.value4, v.value0.value5);
+                          $tco_var_dictOrd = dictOrd;
+                          $tco_var_v = v.value1;
+                          $copy_tree = new Three(tree, v.value0.value0, v.value0.value1, v.value0.value2, v.value0.value3, v.value0.value4, v.value0.value5);
                           return;
                       };
                       if (v.value0 instanceof ThreeMiddle) {
-                          __tco_dictOrd = dictOrd;
-                          __tco_v = v.value1;
-                          __copy_tree = new Three(v.value0.value0, v.value0.value1, v.value0.value2, tree, v.value0.value3, v.value0.value4, v.value0.value5);
+                          $tco_var_dictOrd = dictOrd;
+                          $tco_var_v = v.value1;
+                          $copy_tree = new Three(v.value0.value0, v.value0.value1, v.value0.value2, tree, v.value0.value3, v.value0.value4, v.value0.value5);
                           return;
                       };
                       if (v.value0 instanceof ThreeRight) {
-                          __tco_dictOrd = dictOrd;
-                          __tco_v = v.value1;
-                          __copy_tree = new Three(v.value0.value0, v.value0.value1, v.value0.value2, v.value0.value3, v.value0.value4, v.value0.value5, tree);
+                          $tco_var_dictOrd = dictOrd;
+                          $tco_var_v = v.value1;
+                          $copy_tree = new Three(v.value0.value0, v.value0.value1, v.value0.value2, v.value0.value3, v.value0.value4, v.value0.value5, tree);
                           return;
                       };
-                      throw new Error("Failed pattern match at Data.Map line 271, column 3 - line 276, column 88: " + [ v.value0.constructor.name ]);
+                      throw new Error("Failed pattern match at Data.Map.Internal line 411, column 3 - line 416, column 88: " + [ v.value0.constructor.name ]);
                   };
-                  throw new Error("Failed pattern match at Data.Map line 269, column 1 - line 269, column 27: " + [ v.constructor.name, tree.constructor.name ]);
+                  throw new Error("Failed pattern match at Data.Map.Internal line 408, column 1 - line 408, column 80: " + [ v.constructor.name, tree.constructor.name ]);
               };
-              while (!__tco_done) {
-                  __tco_result = __tco_loop(__tco_dictOrd, __tco_v, __copy_tree);
+              while (!$tco_done) {
+                  $tco_result = $tco_loop($tco_var_dictOrd, $tco_var_v, $copy_tree);
               };
-              return __tco_result;
+              return $tco_result;
           };
       };
   };
   var insert = function (dictOrd) {
       return function (k) {
           return function (v) {
-              var up = function (__copy_v1) {
-                  return function (__copy_v2) {
-                      var __tco_v1 = __copy_v1;
-                      var __tco_done = false;
-                      var __tco_result;
-                      function __tco_loop(v1, v2) {
+              var up = function ($copy_v1) {
+                  return function ($copy_v2) {
+                      var $tco_var_v1 = $copy_v1;
+                      var $tco_done = false;
+                      var $tco_result;
+                      function $tco_loop(v1, v2) {
                           if (v1 instanceof Data_List_Types.Nil) {
-                              __tco_done = true;
+                              $tco_done = true;
                               return new Two(v2.value0, v2.value1, v2.value2, v2.value3);
                           };
                           if (v1 instanceof Data_List_Types.Cons) {
                               if (v1.value0 instanceof TwoLeft) {
-                                  __tco_done = true;
+                                  $tco_done = true;
                                   return fromZipper(dictOrd)(v1.value1)(new Three(v2.value0, v2.value1, v2.value2, v2.value3, v1.value0.value0, v1.value0.value1, v1.value0.value2));
                               };
                               if (v1.value0 instanceof TwoRight) {
-                                  __tco_done = true;
+                                  $tco_done = true;
                                   return fromZipper(dictOrd)(v1.value1)(new Three(v1.value0.value0, v1.value0.value1, v1.value0.value2, v2.value0, v2.value1, v2.value2, v2.value3));
                               };
                               if (v1.value0 instanceof ThreeLeft) {
-                                  __tco_v1 = v1.value1;
-                                  __copy_v2 = new KickUp(new Two(v2.value0, v2.value1, v2.value2, v2.value3), v1.value0.value0, v1.value0.value1, new Two(v1.value0.value2, v1.value0.value3, v1.value0.value4, v1.value0.value5));
+                                  $tco_var_v1 = v1.value1;
+                                  $copy_v2 = new KickUp(new Two(v2.value0, v2.value1, v2.value2, v2.value3), v1.value0.value0, v1.value0.value1, new Two(v1.value0.value2, v1.value0.value3, v1.value0.value4, v1.value0.value5));
                                   return;
                               };
                               if (v1.value0 instanceof ThreeMiddle) {
-                                  __tco_v1 = v1.value1;
-                                  __copy_v2 = new KickUp(new Two(v1.value0.value0, v1.value0.value1, v1.value0.value2, v2.value0), v2.value1, v2.value2, new Two(v2.value3, v1.value0.value3, v1.value0.value4, v1.value0.value5));
+                                  $tco_var_v1 = v1.value1;
+                                  $copy_v2 = new KickUp(new Two(v1.value0.value0, v1.value0.value1, v1.value0.value2, v2.value0), v2.value1, v2.value2, new Two(v2.value3, v1.value0.value3, v1.value0.value4, v1.value0.value5));
                                   return;
                               };
                               if (v1.value0 instanceof ThreeRight) {
-                                  __tco_v1 = v1.value1;
-                                  __copy_v2 = new KickUp(new Two(v1.value0.value0, v1.value0.value1, v1.value0.value2, v1.value0.value3), v1.value0.value4, v1.value0.value5, new Two(v2.value0, v2.value1, v2.value2, v2.value3));
+                                  $tco_var_v1 = v1.value1;
+                                  $copy_v2 = new KickUp(new Two(v1.value0.value0, v1.value0.value1, v1.value0.value2, v1.value0.value3), v1.value0.value4, v1.value0.value5, new Two(v2.value0, v2.value1, v2.value2, v2.value3));
                                   return;
                               };
-                              throw new Error("Failed pattern match at Data.Map line 307, column 5 - line 312, column 108: " + [ v1.value0.constructor.name, v2.constructor.name ]);
+                              throw new Error("Failed pattern match at Data.Map.Internal line 447, column 5 - line 452, column 108: " + [ v1.value0.constructor.name, v2.constructor.name ]);
                           };
-                          throw new Error("Failed pattern match at Data.Map line 305, column 3 - line 305, column 58: " + [ v1.constructor.name, v2.constructor.name ]);
+                          throw new Error("Failed pattern match at Data.Map.Internal line 444, column 3 - line 444, column 56: " + [ v1.constructor.name, v2.constructor.name ]);
                       };
-                      while (!__tco_done) {
-                          __tco_result = __tco_loop(__tco_v1, __copy_v2);
+                      while (!$tco_done) {
+                          $tco_result = $tco_loop($tco_var_v1, $copy_v2);
                       };
-                      return __tco_result;
+                      return $tco_result;
                   };
               };
               var comp = Data_Ord.compare(dictOrd);
-              var down = function (__copy_ctx) {
-                  return function (__copy_v1) {
-                      var __tco_ctx = __copy_ctx;
-                      var __tco_done = false;
-                      var __tco_result;
-                      function __tco_loop(ctx, v1) {
+              var down = function ($copy_ctx) {
+                  return function ($copy_v1) {
+                      var $tco_var_ctx = $copy_ctx;
+                      var $tco_done = false;
+                      var $tco_result;
+                      function $tco_loop(ctx, v1) {
                           if (v1 instanceof Leaf) {
-                              __tco_done = true;
+                              $tco_done = true;
                               return up(ctx)(new KickUp(Leaf.value, k, v, Leaf.value));
                           };
                           if (v1 instanceof Two) {
                               var v2 = comp(k)(v1.value1);
                               if (v2 instanceof Data_Ordering.EQ) {
-                                  __tco_done = true;
+                                  $tco_done = true;
                                   return fromZipper(dictOrd)(ctx)(new Two(v1.value0, k, v, v1.value3));
                               };
                               if (v2 instanceof Data_Ordering.LT) {
-                                  __tco_ctx = new Data_List_Types.Cons(new TwoLeft(v1.value1, v1.value2, v1.value3), ctx);
-                                  __copy_v1 = v1.value0;
+                                  $tco_var_ctx = new Data_List_Types.Cons(new TwoLeft(v1.value1, v1.value2, v1.value3), ctx);
+                                  $copy_v1 = v1.value0;
                                   return;
                               };
-                              __tco_ctx = new Data_List_Types.Cons(new TwoRight(v1.value0, v1.value1, v1.value2), ctx);
-                              __copy_v1 = v1.value3;
+                              $tco_var_ctx = new Data_List_Types.Cons(new TwoRight(v1.value0, v1.value1, v1.value2), ctx);
+                              $copy_v1 = v1.value3;
                               return;
                           };
                           if (v1 instanceof Three) {
                               var v3 = comp(k)(v1.value1);
                               if (v3 instanceof Data_Ordering.EQ) {
-                                  __tco_done = true;
+                                  $tco_done = true;
                                   return fromZipper(dictOrd)(ctx)(new Three(v1.value0, k, v, v1.value3, v1.value4, v1.value5, v1.value6));
                               };
                               var v4 = comp(k)(v1.value4);
                               if (v4 instanceof Data_Ordering.EQ) {
-                                  __tco_done = true;
+                                  $tco_done = true;
                                   return fromZipper(dictOrd)(ctx)(new Three(v1.value0, v1.value1, v1.value2, v1.value3, k, v, v1.value6));
                               };
                               if (v3 instanceof Data_Ordering.LT) {
-                                  __tco_ctx = new Data_List_Types.Cons(new ThreeLeft(v1.value1, v1.value2, v1.value3, v1.value4, v1.value5, v1.value6), ctx);
-                                  __copy_v1 = v1.value0;
+                                  $tco_var_ctx = new Data_List_Types.Cons(new ThreeLeft(v1.value1, v1.value2, v1.value3, v1.value4, v1.value5, v1.value6), ctx);
+                                  $copy_v1 = v1.value0;
                                   return;
                               };
                               if (v3 instanceof Data_Ordering.GT && v4 instanceof Data_Ordering.LT) {
-                                  __tco_ctx = new Data_List_Types.Cons(new ThreeMiddle(v1.value0, v1.value1, v1.value2, v1.value4, v1.value5, v1.value6), ctx);
-                                  __copy_v1 = v1.value3;
+                                  $tco_var_ctx = new Data_List_Types.Cons(new ThreeMiddle(v1.value0, v1.value1, v1.value2, v1.value4, v1.value5, v1.value6), ctx);
+                                  $copy_v1 = v1.value3;
                                   return;
                               };
-                              __tco_ctx = new Data_List_Types.Cons(new ThreeRight(v1.value0, v1.value1, v1.value2, v1.value3, v1.value4, v1.value5), ctx);
-                              __copy_v1 = v1.value6;
+                              $tco_var_ctx = new Data_List_Types.Cons(new ThreeRight(v1.value0, v1.value1, v1.value2, v1.value3, v1.value4, v1.value5), ctx);
+                              $copy_v1 = v1.value6;
                               return;
                           };
-                          throw new Error("Failed pattern match at Data.Map line 288, column 3 - line 288, column 48: " + [ ctx.constructor.name, v1.constructor.name ]);
+                          throw new Error("Failed pattern match at Data.Map.Internal line 427, column 3 - line 427, column 55: " + [ ctx.constructor.name, v1.constructor.name ]);
                       };
-                      while (!__tco_done) {
-                          __tco_result = __tco_loop(__tco_ctx, __copy_v1);
+                      while (!$tco_done) {
+                          $tco_result = $tco_loop($tco_var_ctx, $copy_v1);
                       };
-                      return __tco_result;
+                      return $tco_result;
                   };
               };
               return down(Data_List_Types.Nil.value);
@@ -25528,12 +23990,12 @@ var PS = {};
                       return tree;
                   };
                   if (ctxs instanceof Data_List_Types.Cons) {
-                      var __unused = function (dictPartial1) {
-                          return function ($dollar50) {
-                              return $dollar50;
+                      var $__unused = function (dictPartial1) {
+                          return function ($dollar55) {
+                              return $dollar55;
                           };
                       };
-                      return __unused()((function () {
+                      return $__unused()((function () {
                           if (ctxs.value0 instanceof TwoLeft && (ctxs.value0.value2 instanceof Leaf && tree instanceof Leaf)) {
                               return fromZipper(dictOrd)(ctxs.value1)(new Two(Leaf.value, ctxs.value0.value0, ctxs.value0.value1, Leaf.value));
                           };
@@ -25585,20 +24047,20 @@ var PS = {};
                           if (ctxs.value0 instanceof ThreeRight && ctxs.value0.value3 instanceof Three) {
                               return fromZipper(dictOrd)(ctxs.value1)(new Three(ctxs.value0.value0, ctxs.value0.value1, ctxs.value0.value2, new Two(ctxs.value0.value3.value0, ctxs.value0.value3.value1, ctxs.value0.value3.value2, ctxs.value0.value3.value3), ctxs.value0.value3.value4, ctxs.value0.value3.value5, new Two(ctxs.value0.value3.value6, ctxs.value0.value4, ctxs.value0.value5, tree)));
                           };
-                          throw new Error("Failed pattern match at Data.Map line 357, column 9 - line 374, column 136: " + [ ctxs.value0.constructor.name, tree.constructor.name ]);
+                          throw new Error("Failed pattern match at Data.Map.Internal line 497, column 9 - line 514, column 136: " + [ ctxs.value0.constructor.name, tree.constructor.name ]);
                       })());
                   };
-                  throw new Error("Failed pattern match at Data.Map line 354, column 5 - line 374, column 136: " + [ ctxs.constructor.name ]);
+                  throw new Error("Failed pattern match at Data.Map.Internal line 494, column 5 - line 514, column 136: " + [ ctxs.constructor.name ]);
               };
           };
           var removeMaxNode = function (ctx) {
               return function (m) {
-                  var __unused = function (dictPartial1) {
-                      return function ($dollar52) {
-                          return $dollar52;
+                  var $__unused = function (dictPartial1) {
+                      return function ($dollar57) {
+                          return $dollar57;
                       };
                   };
-                  return __unused()((function () {
+                  return $__unused()((function () {
                       if (m instanceof Two && (m.value0 instanceof Leaf && m.value3 instanceof Leaf)) {
                           return up(ctx)(Leaf.value);
                       };
@@ -25611,20 +24073,20 @@ var PS = {};
                       if (m instanceof Three) {
                           return removeMaxNode(new Data_List_Types.Cons(new ThreeRight(m.value0, m.value1, m.value2, m.value3, m.value4, m.value5), ctx))(m.value6);
                       };
-                      throw new Error("Failed pattern match at Data.Map line 386, column 5 - line 390, column 107: " + [ m.constructor.name ]);
+                      throw new Error("Failed pattern match at Data.Map.Internal line 526, column 5 - line 530, column 107: " + [ m.constructor.name ]);
                   })());
               };
           };
           var maxNode = function (m) {
-              var __unused = function (dictPartial1) {
-                  return function ($dollar54) {
-                      return $dollar54;
+              var $__unused = function (dictPartial1) {
+                  return function ($dollar59) {
+                      return $dollar59;
                   };
               };
-              return __unused()((function () {
+              return $__unused()((function () {
                   if (m instanceof Two && m.value3 instanceof Leaf) {
                       return {
-                          key: m.value1, 
+                          key: m.value1,
                           value: m.value2
                       };
                   };
@@ -25633,45 +24095,45 @@ var PS = {};
                   };
                   if (m instanceof Three && m.value6 instanceof Leaf) {
                       return {
-                          key: m.value4, 
+                          key: m.value4,
                           value: m.value5
                       };
                   };
                   if (m instanceof Three) {
                       return maxNode(m.value6);
                   };
-                  throw new Error("Failed pattern match at Data.Map line 377, column 33 - line 381, column 45: " + [ m.constructor.name ]);
+                  throw new Error("Failed pattern match at Data.Map.Internal line 517, column 33 - line 521, column 45: " + [ m.constructor.name ]);
               })());
           };
           var comp = Data_Ord.compare(dictOrd);
-          var down = function (__copy_ctx) {
-              return function (__copy_m) {
-                  var __tco_ctx = __copy_ctx;
-                  var __tco_done = false;
-                  var __tco_result;
-                  function __tco_loop(ctx, m) {
+          var down = function ($copy_ctx) {
+              return function ($copy_m) {
+                  var $tco_var_ctx = $copy_ctx;
+                  var $tco_done = false;
+                  var $tco_result;
+                  function $tco_loop(ctx, m) {
                       if (m instanceof Leaf) {
-                          __tco_done = true;
+                          $tco_done = true;
                           return Data_Maybe.Nothing.value;
                       };
                       if (m instanceof Two) {
                           var v = comp(k)(m.value1);
                           if (m.value3 instanceof Leaf && v instanceof Data_Ordering.EQ) {
-                              __tco_done = true;
+                              $tco_done = true;
                               return new Data_Maybe.Just(new Data_Tuple.Tuple(m.value2, up(ctx)(Leaf.value)));
                           };
                           if (v instanceof Data_Ordering.EQ) {
                               var max = maxNode(m.value0);
-                              __tco_done = true;
+                              $tco_done = true;
                               return new Data_Maybe.Just(new Data_Tuple.Tuple(m.value2, removeMaxNode(new Data_List_Types.Cons(new TwoLeft(max.key, max.value, m.value3), ctx))(m.value0)));
                           };
                           if (v instanceof Data_Ordering.LT) {
-                              __tco_ctx = new Data_List_Types.Cons(new TwoLeft(m.value1, m.value2, m.value3), ctx);
-                              __copy_m = m.value0;
+                              $tco_var_ctx = new Data_List_Types.Cons(new TwoLeft(m.value1, m.value2, m.value3), ctx);
+                              $copy_m = m.value0;
                               return;
                           };
-                          __tco_ctx = new Data_List_Types.Cons(new TwoRight(m.value0, m.value1, m.value2), ctx);
-                          __copy_m = m.value3;
+                          $tco_var_ctx = new Data_List_Types.Cons(new TwoRight(m.value0, m.value1, m.value2), ctx);
+                          $copy_m = m.value3;
                           return;
                       };
                       if (m instanceof Three) {
@@ -25684,43 +24146,43 @@ var PS = {};
                           var v = comp(k)(m.value4);
                           var v3 = comp(k)(m.value1);
                           if (leaves && v3 instanceof Data_Ordering.EQ) {
-                              __tco_done = true;
+                              $tco_done = true;
                               return new Data_Maybe.Just(new Data_Tuple.Tuple(m.value2, fromZipper(dictOrd)(ctx)(new Two(Leaf.value, m.value4, m.value5, Leaf.value))));
                           };
                           if (leaves && v instanceof Data_Ordering.EQ) {
-                              __tco_done = true;
+                              $tco_done = true;
                               return new Data_Maybe.Just(new Data_Tuple.Tuple(m.value5, fromZipper(dictOrd)(ctx)(new Two(Leaf.value, m.value1, m.value2, Leaf.value))));
                           };
                           if (v3 instanceof Data_Ordering.EQ) {
                               var max = maxNode(m.value0);
-                              __tco_done = true;
+                              $tco_done = true;
                               return new Data_Maybe.Just(new Data_Tuple.Tuple(m.value2, removeMaxNode(new Data_List_Types.Cons(new ThreeLeft(max.key, max.value, m.value3, m.value4, m.value5, m.value6), ctx))(m.value0)));
                           };
                           if (v instanceof Data_Ordering.EQ) {
                               var max = maxNode(m.value3);
-                              __tco_done = true;
+                              $tco_done = true;
                               return new Data_Maybe.Just(new Data_Tuple.Tuple(m.value5, removeMaxNode(new Data_List_Types.Cons(new ThreeMiddle(m.value0, m.value1, m.value2, max.key, max.value, m.value6), ctx))(m.value3)));
                           };
                           if (v3 instanceof Data_Ordering.LT) {
-                              __tco_ctx = new Data_List_Types.Cons(new ThreeLeft(m.value1, m.value2, m.value3, m.value4, m.value5, m.value6), ctx);
-                              __copy_m = m.value0;
+                              $tco_var_ctx = new Data_List_Types.Cons(new ThreeLeft(m.value1, m.value2, m.value3, m.value4, m.value5, m.value6), ctx);
+                              $copy_m = m.value0;
                               return;
                           };
                           if (v3 instanceof Data_Ordering.GT && v instanceof Data_Ordering.LT) {
-                              __tco_ctx = new Data_List_Types.Cons(new ThreeMiddle(m.value0, m.value1, m.value2, m.value4, m.value5, m.value6), ctx);
-                              __copy_m = m.value3;
+                              $tco_var_ctx = new Data_List_Types.Cons(new ThreeMiddle(m.value0, m.value1, m.value2, m.value4, m.value5, m.value6), ctx);
+                              $copy_m = m.value3;
                               return;
                           };
-                          __tco_ctx = new Data_List_Types.Cons(new ThreeRight(m.value0, m.value1, m.value2, m.value3, m.value4, m.value5), ctx);
-                          __copy_m = m.value6;
+                          $tco_var_ctx = new Data_List_Types.Cons(new ThreeRight(m.value0, m.value1, m.value2, m.value3, m.value4, m.value5), ctx);
+                          $copy_m = m.value6;
                           return;
                       };
-                      throw new Error("Failed pattern match at Data.Map line 327, column 34 - line 350, column 80: " + [ m.constructor.name ]);
+                      throw new Error("Failed pattern match at Data.Map.Internal line 467, column 34 - line 490, column 80: " + [ m.constructor.name ]);
                   };
-                  while (!__tco_done) {
-                      __tco_result = __tco_loop(__tco_ctx, __copy_m);
+                  while (!$tco_done) {
+                      $tco_result = $tco_loop($tco_var_ctx, $copy_m);
                   };
-                  return __tco_result;
+                  return $tco_result;
               };
           };
           return down(Data_List_Types.Nil.value);
@@ -25742,7 +24204,7 @@ var PS = {};
               return Data_Maybe.maybe(m)(Data_Tuple.snd)(pop(dictOrd)(k)(m));
           };
       };
-  };
+  }; 
   var alter = function (dictOrd) {
       return function (f) {
           return function (k) {
@@ -25754,7 +24216,7 @@ var PS = {};
                   if (v instanceof Data_Maybe.Just) {
                       return insert(dictOrd)(k)(v.value0)(m);
                   };
-                  throw new Error("Failed pattern match at Data.Map line 395, column 15 - line 397, column 25: " + [ v.constructor.name ]);
+                  throw new Error("Failed pattern match at Data.Map.Internal line 535, column 15 - line 537, column 25: " + [ v.constructor.name ]);
               };
           };
       };
@@ -25765,8 +24227,8 @@ var PS = {};
               return function (m2) {
                   var go = function (m) {
                       return function (v) {
-                          return alter(dictOrd)(function ($683) {
-                              return Data_Maybe.Just.create(Data_Maybe.maybe(v.value1)(f(v.value1))($683));
+                          return alter(dictOrd)(function ($738) {
+                              return Data_Maybe.Just.create(Data_Maybe.maybe(v.value1)(f(v.value1))($738));
                           })(v.value0)(m);
                       };
                   };
@@ -25778,53 +24240,43 @@ var PS = {};
   var union = function (dictOrd) {
       return unionWith(dictOrd)(Data_Function["const"]);
   };
-  exports["alter"] = alter;
-  exports["delete"] = $$delete;
   exports["empty"] = empty;
-  exports["fromFoldable"] = fromFoldable;
-  exports["insert"] = insert;
-  exports["keys"] = keys;
-  exports["lookup"] = lookup;
-  exports["member"] = member;
-  exports["pop"] = pop;
+  exports["isEmpty"] = isEmpty;
   exports["singleton"] = singleton;
-  exports["size"] = size;
+  exports["insert"] = insert;
+  exports["lookup"] = lookup;
+  exports["fromFoldable"] = fromFoldable;
   exports["toUnfoldable"] = toUnfoldable;
+  exports["delete"] = $$delete;
+  exports["pop"] = pop;
+  exports["member"] = member;
+  exports["alter"] = alter;
+  exports["keys"] = keys;
   exports["union"] = union;
   exports["unionWith"] = unionWith;
+  exports["size"] = size;
   exports["functorMap"] = functorMap;
-})(PS["Data.Map"] = PS["Data.Map"] || {});
+})(PS["Data.Map.Internal"] = PS["Data.Map.Internal"] || {});
 (function(exports) {
-    "use strict";
-
-  exports.toCharCode = function (c) {
-    return c.charCodeAt(0);
-  };
-})(PS["Data.Char"] = PS["Data.Char"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Char"];
-  exports["toCharCode"] = $foreign.toCharCode;
-})(PS["Data.Char"] = PS["Data.Char"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Bind = PS["Control.Bind"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
   var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
   var Control_Monad_ST = PS["Control.Monad.ST"];
+  var Control_Monad_ST_Internal = PS["Control.Monad.ST.Internal"];
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
   var Data_Array = PS["Data.Array"];
   var Data_Array_ST = PS["Data.Array.ST"];
   var Data_Eq = PS["Data.Eq"];
   var Data_Foldable = PS["Data.Foldable"];
   var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
   var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
   var Data_List = PS["Data.List"];
   var Data_List_Types = PS["Data.List.Types"];
-  var Data_Map = PS["Data.Map"];
+  var Data_Map_Internal = PS["Data.Map.Internal"];
+  var Data_Maybe = PS["Data.Maybe"];
   var Data_Monoid = PS["Data.Monoid"];
   var Data_Ord = PS["Data.Ord"];
   var Data_Ordering = PS["Data.Ordering"];
@@ -25834,49 +24286,62 @@ var PS = {};
   var Data_Unfoldable = PS["Data.Unfoldable"];
   var Data_Unit = PS["Data.Unit"];
   var Partial_Unsafe = PS["Partial.Unsafe"];
-  var Prelude = PS["Prelude"];        
-  var $$Set = (function () {
-      function $$Set(value0) {
-          this.value0 = value0;
-      };
-      $$Set.create = function (value0) {
-          return new $$Set(value0);
-      };
-      return $$Set;
-  })();
+  var Prelude = PS["Prelude"];
   var union = function (dictOrd) {
       return function (v) {
           return function (v1) {
-              return new $$Set(Data_Map.union(dictOrd)(v.value0)(v1.value0));
+              return Data_Map_Internal.union(dictOrd)(v)(v1);
           };
       };
   };
   var toList = function (v) {
-      return Data_Map.keys(v.value0);
+      return Data_Map_Internal.keys(v);
   };
   var toUnfoldable = function (dictUnfoldable) {
-      return function ($62) {
-          return Data_List.toUnfoldable(dictUnfoldable)(toList($62));
+      return function ($58) {
+          return Data_List.toUnfoldable(dictUnfoldable)(toList($58));
       };
   };
   var size = function (v) {
-      return Data_Map.size(v.value0);
+      return Data_Map_Internal.size(v);
   };
   var member = function (dictOrd) {
       return function (a) {
           return function (v) {
-              return Data_Map.member(dictOrd)(a)(v.value0);
+              return Data_Map_Internal.member(dictOrd)(a)(v);
           };
       };
+  };
+  var isEmpty = function (v) {
+      return Data_Map_Internal.isEmpty(v);
   };
   var insert = function (dictOrd) {
       return function (a) {
           return function (v) {
-              return new $$Set(Data_Map.insert(dictOrd)(a)(Data_Unit.unit)(v.value0));
+              return Data_Map_Internal.insert(dictOrd)(a)(Data_Unit.unit)(v);
           };
       };
-  }; 
-  var empty = new $$Set(Data_Map.empty);
+  };
+  var foldableSet = new Data_Foldable.Foldable(function (dictMonoid) {
+      return function (f) {
+          return function ($59) {
+              return Data_Foldable.foldMap(Data_List_Types.foldableList)(dictMonoid)(f)(toList($59));
+          };
+      };
+  }, function (f) {
+      return function (x) {
+          return function ($60) {
+              return Data_Foldable.foldl(Data_List_Types.foldableList)(f)(x)(toList($60));
+          };
+      };
+  }, function (f) {
+      return function (x) {
+          return function ($61) {
+              return Data_Foldable.foldr(Data_List_Types.foldableList)(f)(x)(toList($61));
+          };
+      };
+  });
+  var empty = Data_Map_Internal.empty;
   var fromFoldable = function (dictFoldable) {
       return function (dictOrd) {
           return Data_Foldable.foldl(dictFoldable)(function (m) {
@@ -25889,7 +24354,7 @@ var PS = {};
   var $$delete = function (dictOrd) {
       return function (a) {
           return function (v) {
-              return new $$Set(Data_Map["delete"](dictOrd)(a)(v.value0));
+              return Data_Map_Internal["delete"](dictOrd)(a)(v);
           };
       };
   };
@@ -25900,19 +24365,400 @@ var PS = {};
           };
       };
   };
-  exports["difference"] = difference;
-  exports["empty"] = empty;
   exports["fromFoldable"] = fromFoldable;
+  exports["toUnfoldable"] = toUnfoldable;
+  exports["empty"] = empty;
+  exports["isEmpty"] = isEmpty;
   exports["insert"] = insert;
   exports["member"] = member;
   exports["size"] = size;
-  exports["toUnfoldable"] = toUnfoldable;
   exports["union"] = union;
+  exports["difference"] = difference;
+  exports["foldableSet"] = foldableSet;
 })(PS["Data.Set"] = PS["Data.Set"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Map_Internal = PS["Data.Map.Internal"];
+  var Data_Set = PS["Data.Set"];
+  var Prelude = PS["Prelude"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];                 
+  var keys = function ($0) {
+      return Data_Functor["void"](Data_Map_Internal.functorMap)($0);
+  };
+  exports["keys"] = keys;
+})(PS["Data.Map"] = PS["Data.Map"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.toCharCode = function (c) {
+    return c.charCodeAt(0);
+  };
+
+  exports.fromCharCode = function (c) {
+    return String.fromCharCode(c);
+  };
+})(PS["Data.Enum"] = PS["Data.Enum"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Enum"];
   var Control_Apply = PS["Control.Apply"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_MonadPlus = PS["Control.MonadPlus"];
+  var Control_MonadZero = PS["Control.MonadZero"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Bounded = PS["Data.Bounded"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unfoldable = PS["Data.Unfoldable"];
+  var Data_Unfoldable1 = PS["Data.Unfoldable1"];
+  var Data_Unit = PS["Data.Unit"];
+  var Partial_Unsafe = PS["Partial.Unsafe"];
+  var Prelude = PS["Prelude"];
+  var Enum = function (Ord0, pred, succ) {
+      this.Ord0 = Ord0;
+      this.pred = pred;
+      this.succ = succ;
+  };
+  var BoundedEnum = function (Bounded0, Enum1, cardinality, fromEnum, toEnum) {
+      this.Bounded0 = Bounded0;
+      this.Enum1 = Enum1;
+      this.cardinality = cardinality;
+      this.fromEnum = fromEnum;
+      this.toEnum = toEnum;
+  };
+  var toEnum = function (dict) {
+      return dict.toEnum;
+  };
+  var succ = function (dict) {
+      return dict.succ;
+  }; 
+  var pred = function (dict) {
+      return dict.pred;
+  };              
+  var fromEnum = function (dict) {
+      return dict.fromEnum;
+  };
+  var toEnumWithDefaults = function (dictBoundedEnum) {
+      return function (low) {
+          return function (high) {
+              return function (x) {
+                  var v = toEnum(dictBoundedEnum)(x);
+                  if (v instanceof Data_Maybe.Just) {
+                      return v.value0;
+                  };
+                  if (v instanceof Data_Maybe.Nothing) {
+                      var $51 = x < fromEnum(dictBoundedEnum)(Data_Bounded.bottom(dictBoundedEnum.Bounded0()));
+                      if ($51) {
+                          return low;
+                      };
+                      return high;
+                  };
+                  throw new Error("Failed pattern match at Data.Enum line 158, column 33 - line 160, column 62: " + [ v.constructor.name ]);
+              };
+          };
+      };
+  };
+  var defaultSucc = function (toEnum$prime) {
+      return function (fromEnum$prime) {
+          return function (a) {
+              return toEnum$prime(fromEnum$prime(a) + 1 | 0);
+          };
+      };
+  };
+  var defaultPred = function (toEnum$prime) {
+      return function (fromEnum$prime) {
+          return function (a) {
+              return toEnum$prime(fromEnum$prime(a) - 1 | 0);
+          };
+      };
+  };
+  var charToEnum = function (v) {
+      if (v >= Data_Bounded.bottom(Data_Bounded.boundedInt) && v <= Data_Bounded.top(Data_Bounded.boundedInt)) {
+          return new Data_Maybe.Just($foreign.fromCharCode(v));
+      };
+      return Data_Maybe.Nothing.value;
+  };
+  var enumChar = new Enum(function () {
+      return Data_Ord.ordChar;
+  }, defaultPred(charToEnum)($foreign.toCharCode), defaultSucc(charToEnum)($foreign.toCharCode));
+  var cardinality = function (dict) {
+      return dict.cardinality;
+  }; 
+  var boundedEnumChar = new BoundedEnum(function () {
+      return Data_Bounded.boundedChar;
+  }, function () {
+      return enumChar;
+  }, $foreign.toCharCode(Data_Bounded.top(Data_Bounded.boundedChar)) - $foreign.toCharCode(Data_Bounded.bottom(Data_Bounded.boundedChar)) | 0, $foreign.toCharCode, charToEnum);
+  exports["Enum"] = Enum;
+  exports["succ"] = succ;
+  exports["pred"] = pred;
+  exports["BoundedEnum"] = BoundedEnum;
+  exports["cardinality"] = cardinality;
+  exports["toEnum"] = toEnum;
+  exports["fromEnum"] = fromEnum;
+  exports["toEnumWithDefaults"] = toEnumWithDefaults;
+  exports["defaultSucc"] = defaultSucc;
+  exports["defaultPred"] = defaultPred;
+  exports["enumChar"] = enumChar;
+  exports["boundedEnumChar"] = boundedEnumChar;
+})(PS["Data.Enum"] = PS["Data.Enum"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Enum = PS["Data.Enum"];
+  var Data_Maybe = PS["Data.Maybe"];                 
+  var toCharCode = Data_Enum.fromEnum(Data_Enum.boundedEnumChar);
+  exports["toCharCode"] = toCharCode;
+})(PS["Data.Char"] = PS["Data.Char"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Generic_Rep = PS["Data.Generic.Rep"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Prelude = PS["Prelude"];                 
+  var GenericEq = function (genericEq$prime) {
+      this["genericEq'"] = genericEq$prime;
+  }; 
+  var genericEqArgument = function (dictEq) {
+      return new GenericEq(function (v) {
+          return function (v1) {
+              return Data_Eq.eq(dictEq)(v)(v1);
+          };
+      });
+  };
+  var genericEq$prime = function (dict) {
+      return dict["genericEq'"];
+  };
+  var genericEqConstructor = function (dictGenericEq) {
+      return new GenericEq(function (v) {
+          return function (v1) {
+              return genericEq$prime(dictGenericEq)(v)(v1);
+          };
+      });
+  };
+  var genericEqProduct = function (dictGenericEq) {
+      return function (dictGenericEq1) {
+          return new GenericEq(function (v) {
+              return function (v1) {
+                  return genericEq$prime(dictGenericEq)(v.value0)(v1.value0) && genericEq$prime(dictGenericEq1)(v.value1)(v1.value1);
+              };
+          });
+      };
+  };
+  var genericEq = function (dictGeneric) {
+      return function (dictGenericEq) {
+          return function (x) {
+              return function (y) {
+                  return genericEq$prime(dictGenericEq)(Data_Generic_Rep.from(dictGeneric)(x))(Data_Generic_Rep.from(dictGeneric)(y));
+              };
+          };
+      };
+  };
+  exports["GenericEq"] = GenericEq;
+  exports["genericEq"] = genericEq;
+  exports["genericEqProduct"] = genericEqProduct;
+  exports["genericEqConstructor"] = genericEqConstructor;
+  exports["genericEqArgument"] = genericEqArgument;
+})(PS["Data.Generic.Rep.Eq"] = PS["Data.Generic.Rep.Eq"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Generic_Rep = PS["Data.Generic.Rep"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Prelude = PS["Prelude"];                 
+  var GenericOrd = function (genericCompare$prime) {
+      this["genericCompare'"] = genericCompare$prime;
+  }; 
+  var genericOrdArgument = function (dictOrd) {
+      return new GenericOrd(function (v) {
+          return function (v1) {
+              return Data_Ord.compare(dictOrd)(v)(v1);
+          };
+      });
+  };
+  var genericCompare$prime = function (dict) {
+      return dict["genericCompare'"];
+  };
+  var genericOrdConstructor = function (dictGenericOrd) {
+      return new GenericOrd(function (v) {
+          return function (v1) {
+              return genericCompare$prime(dictGenericOrd)(v)(v1);
+          };
+      });
+  };
+  var genericOrdProduct = function (dictGenericOrd) {
+      return function (dictGenericOrd1) {
+          return new GenericOrd(function (v) {
+              return function (v1) {
+                  var v2 = genericCompare$prime(dictGenericOrd)(v.value0)(v1.value0);
+                  if (v2 instanceof Data_Ordering.EQ) {
+                      return genericCompare$prime(dictGenericOrd1)(v.value1)(v1.value1);
+                  };
+                  return v2;
+              };
+          });
+      };
+  };
+  var genericCompare = function (dictGeneric) {
+      return function (dictGenericOrd) {
+          return function (x) {
+              return function (y) {
+                  return genericCompare$prime(dictGenericOrd)(Data_Generic_Rep.from(dictGeneric)(x))(Data_Generic_Rep.from(dictGeneric)(y));
+              };
+          };
+      };
+  };
+  exports["GenericOrd"] = GenericOrd;
+  exports["genericCompare"] = genericCompare;
+  exports["genericOrdProduct"] = genericOrdProduct;
+  exports["genericOrdConstructor"] = genericOrdConstructor;
+  exports["genericOrdArgument"] = genericOrdArgument;
+})(PS["Data.Generic.Rep.Ord"] = PS["Data.Generic.Rep.Ord"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.fromCharArray = function (a) {
+    return a.join("");
+  };
+
+  exports.toCharArray = function (s) {
+    return s.split("");
+  };
+
+  exports.singleton = function (c) {
+    return c;
+  };
+
+  exports._charAt = function (just) {
+    return function (nothing) {
+      return function (i) {
+        return function (s) {
+          return i >= 0 && i < s.length ? just(s.charAt(i)) : nothing;
+        };
+      };
+    };
+  };
+
+  exports.length = function (s) {
+    return s.length;
+  };
+
+  exports._indexOf = function (just) {
+    return function (nothing) {
+      return function (x) {
+        return function (s) {
+          var i = s.indexOf(x);
+          return i === -1 ? nothing : just(i);
+        };
+      };
+    };
+  };
+
+  exports.take = function (n) {
+    return function (s) {
+      return s.substr(0, n);
+    };
+  };
+
+  exports.drop = function (n) {
+    return function (s) {
+      return s.substring(n);
+    };
+  };
+})(PS["Data.String.CodeUnits"] = PS["Data.String.CodeUnits"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];
+  var Prelude = PS["Prelude"];
+  var Pattern = function (x) {
+      return x;
+  };              
+  var newtypePattern = new Data_Newtype.Newtype(function (n) {
+      return n;
+  }, Pattern);
+  exports["Pattern"] = Pattern;
+  exports["newtypePattern"] = newtypePattern;
+})(PS["Data.String.Pattern"] = PS["Data.String.Pattern"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.charAt = function (i) {
+    return function (s) {
+      if (i >= 0 && i < s.length) return s.charAt(i);
+      throw new Error("Data.String.Unsafe.charAt: Invalid index.");
+    };
+  };
+})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.String.Unsafe"];
+  exports["charAt"] = $foreign.charAt;
+})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.String.CodeUnits"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Function = PS["Data.Function"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_String_Pattern = PS["Data.String.Pattern"];
+  var Data_String_Unsafe = PS["Data.String.Unsafe"];
+  var Prelude = PS["Prelude"];                 
+  var uncons = function (v) {
+      if (v === "") {
+          return Data_Maybe.Nothing.value;
+      };
+      return new Data_Maybe.Just({
+          head: Data_String_Unsafe.charAt(0)(v),
+          tail: $foreign.drop(1)(v)
+      });
+  };                                                                                          
+  var indexOf = $foreign._indexOf(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
+  var charAt = $foreign._charAt(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
+  exports["charAt"] = charAt;
+  exports["uncons"] = uncons;
+  exports["indexOf"] = indexOf;
+  exports["singleton"] = $foreign.singleton;
+  exports["fromCharArray"] = $foreign.fromCharArray;
+  exports["toCharArray"] = $foreign.toCharArray;
+  exports["length"] = $foreign.length;
+  exports["take"] = $foreign.take;
+  exports["drop"] = $foreign.drop;
+})(PS["Data.String.CodeUnits"] = PS["Data.String.CodeUnits"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
   var Data_Array = PS["Data.Array"];
   var Data_Boolean = PS["Data.Boolean"];
@@ -25921,19 +24767,19 @@ var PS = {};
   var Data_EuclideanRing = PS["Data.EuclideanRing"];
   var Data_Foldable = PS["Data.Foldable"];
   var Data_Functor = PS["Data.Functor"];
-  var Data_Generic = PS["Data.Generic"];
+  var Data_Generic_Rep = PS["Data.Generic.Rep"];
+  var Data_Generic_Rep_Eq = PS["Data.Generic.Rep.Eq"];
+  var Data_Generic_Rep_Ord = PS["Data.Generic.Rep.Ord"];
   var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Maybe = PS["Data.Maybe"];
   var Data_Ord = PS["Data.Ord"];
   var Data_Ring = PS["Data.Ring"];
   var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Semiring = PS["Data.Semiring"];
   var Data_Set = PS["Data.Set"];
   var Data_Show = PS["Data.Show"];
-  var Data_String = PS["Data.String"];
-  var Data_Unit = PS["Data.Unit"];
+  var Data_String_CodeUnits = PS["Data.String.CodeUnits"];
   var Partial_Unsafe = PS["Partial.Unsafe"];
-  var Prelude = PS["Prelude"];        
+  var Prelude = PS["Prelude"];                 
   var Name = (function () {
       function Name(value0, value1) {
           this.value0 = value0;
@@ -25957,15 +24803,15 @@ var PS = {};
           if (Data_Boolean.otherwise) {
               return 0;
           };
-          throw new Error("Failed pattern match at Data.Name line 67, column 3 - line 67, column 32: " + [ c.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Name line 70, column 3 - line 75, column 1: " + [ c.constructor.name ]);
       };
       var step = function (n) {
           return function (c) {
               return (10 * n | 0) + toDigit(c) | 0;
           };
       };
-      return function ($27) {
-          return Data_Foldable.foldl(Data_Foldable.foldableArray)(step)(0)(Data_String.toCharArray($27));
+      return function ($22) {
+          return Data_Foldable.foldl(Data_Foldable.foldableArray)(step)(0)(Data_String_CodeUnits.toCharArray($22));
       };
   })();
   var subscriptTable = [ "\u2080", "\u2081", "\u2082", "\u2083", "\u2084", "\u2085", "\u2086", "\u2087", "\u2088", "\u2089" ];
@@ -25980,44 +24826,28 @@ var PS = {};
   var isSubscriptChar = function (v) {
       return Data_Set.member(Data_Ord.ordChar)(v)(subscriptChars);
   };
-  var genericName = new Data_Generic.Generic(function (v) {
-      if (v instanceof Data_Generic.SProd && (v.value0 === "Data.Name.Name" && v.value1.length === 2)) {
-          return Control_Apply.apply(Data_Maybe.applyMaybe)(Control_Apply.apply(Data_Maybe.applyMaybe)(new Data_Maybe.Just(Name.create))(Data_Generic.fromSpine(Data_Generic.genericString)(v["value1"][0](Data_Unit.unit))))(Data_Generic.fromSpine(Data_Generic.genericInt)(v["value1"][1](Data_Unit.unit)));
-      };
-      return Data_Maybe.Nothing.value;
-  }, function ($dollarq) {
-      return new Data_Generic.SigProd("Data.Name.Name", [ {
-          sigConstructor: "Data.Name.Name", 
-          sigValues: [ function ($dollarq1) {
-              return Data_Generic.toSignature(Data_Generic.genericString)(Data_Generic.anyProxy);
-          }, function ($dollarq1) {
-              return Data_Generic.toSignature(Data_Generic.genericInt)(Data_Generic.anyProxy);
-          } ]
-      } ]);
-  }, function (v) {
-      return new Data_Generic.SProd("Data.Name.Name", [ function ($dollarq) {
-          return Data_Generic.toSpine(Data_Generic.genericString)(v.value0);
-      }, function ($dollarq) {
-          return Data_Generic.toSpine(Data_Generic.genericInt)(v.value1);
-      } ]);
+  var genericName = new Data_Generic_Rep.Generic(function (x) {
+      return new Data_Generic_Rep.Product(x.value0, x.value1);
+  }, function (x) {
+      return new Name(x.value0, x.value1);
   });
-  var eqName = new Data_Eq.Eq(Data_Generic.gEq(genericName));
+  var eqName = new Data_Eq.Eq(Data_Generic_Rep_Eq.genericEq(genericName)(Data_Generic_Rep_Eq.genericEqConstructor(Data_Generic_Rep_Eq.genericEqProduct(Data_Generic_Rep_Eq.genericEqArgument(Data_Eq.eqString))(Data_Generic_Rep_Eq.genericEqArgument(Data_Eq.eqInt)))));
   var ordName = new Data_Ord.Ord(function () {
       return eqName;
-  }, Data_Generic.gCompare(genericName));
+  }, Data_Generic_Rep_Ord.genericCompare(genericName)(Data_Generic_Rep_Ord.genericOrdConstructor(Data_Generic_Rep_Ord.genericOrdProduct(Data_Generic_Rep_Ord.genericOrdArgument(Data_Ord.ordString))(Data_Generic_Rep_Ord.genericOrdArgument(Data_Ord.ordInt)))));
   var digits = function (n) {
       if (n < 10) {
           return [ n ];
       };
       if (Data_Boolean.otherwise) {
-          return Data_Semigroup.append(Data_Semigroup.semigroupArray)(digits(n / 10 | 0))([ n % 10 ]);
+          return Data_Semigroup.append(Data_Semigroup.semigroupArray)(digits(Data_EuclideanRing.div(Data_EuclideanRing.euclideanRingInt)(n)(10)))([ Data_EuclideanRing.mod(Data_EuclideanRing.euclideanRingInt)(n)(10) ]);
       };
-      throw new Error("Failed pattern match at Data.Name line 86, column 1 - line 88, column 51: " + [ n.constructor.name ]);
+      throw new Error("Failed pattern match at Data.Name line 87, column 1 - line 87, column 27: " + [ n.constructor.name ]);
   };
-  var intToSubscript = function ($28) {
-      return Data_String.fromCharArray(Data_Functor.map(Data_Functor.functorArray)(function (v) {
+  var intToSubscript = function ($23) {
+      return Data_String_CodeUnits.fromCharArray(Data_Functor.map(Data_Functor.functorArray)(function (v) {
           return subscriptTable[v];
-      })(digits($28)));
+      })(digits($23)));
   };
   var showName = new Data_Show.Show(function (v) {
       if (v.value1 === 0) {
@@ -26026,21 +24856,21 @@ var PS = {};
       if (Data_Boolean.otherwise) {
           return v.value0 + intToSubscript(v.value1);
       };
-      throw new Error("Failed pattern match at Data.Name line 51, column 3 - line 53, column 40: " + [ v.constructor.name ]);
+      throw new Error("Failed pattern match at Data.Name line 52, column 1 - line 52, column 31: " + [ v.constructor.name ]);
   });
-  exports["intToSubscript"] = intToSubscript;
   exports["isSubscriptChar"] = isSubscriptChar;
+  exports["intToSubscript"] = intToSubscript;
+  exports["subscriptToInt"] = subscriptToInt;
   exports["name"] = name;
   exports["name_"] = name_;
   exports["next"] = next;
-  exports["subscriptToInt"] = subscriptToInt;
   exports["genericName"] = genericName;
   exports["showName"] = showName;
   exports["eqName"] = eqName;
   exports["ordName"] = ordName;
 })(PS["Data.Name"] = PS["Data.Name"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
@@ -26048,7 +24878,21 @@ var PS = {};
   var Data_Functor = PS["Data.Functor"];
   var Data_Monoid = PS["Data.Monoid"];
   var Data_Semigroup = PS["Data.Semigroup"];
-  var Prelude = PS["Prelude"];        
+  var Prelude = PS["Prelude"];                 
+  var Sugar = (function () {
+      function Sugar() {
+
+      };
+      Sugar.value = new Sugar();
+      return Sugar;
+  })();
+  var Raw = (function () {
+      function Raw() {
+
+      };
+      Raw.value = new Raw();
+      return Raw;
+  })();
   var Doc = (function () {
       function Doc(value0, value1) {
           this.value0 = value0;
@@ -26073,6 +24917,23 @@ var PS = {};
   var prettyPrint = function (dict) {
       return dict.prettyPrint;
   };
+  var ifSugar = function (v) {
+      return function (v1) {
+          return function (v2) {
+              if (v2 instanceof Sugar) {
+                  return v;
+              };
+              if (v2 instanceof Raw) {
+                  return v1;
+              };
+              throw new Error("Failed pattern match at Data.PrettyPrint line 40, column 1 - line 40, column 40: " + [ v.constructor.name, v1.constructor.name, v2.constructor.name ]);
+          };
+      };
+  };
+  var selectRep = function (v) {
+      return ifSugar(v.value0)(v.value1);
+  };
+  var toggleRep = ifSugar(Raw.value)(Sugar.value);
   var docFunctor = new Data_Functor.Functor(function (f) {
       return function (v) {
           return new Doc(f(v.value0), f(v.value1));
@@ -26105,34 +24966,39 @@ var PS = {};
           if (Data_Boolean.otherwise) {
               return d;
           };
-          throw new Error("Failed pattern match at Data.PrettyPrint line 60, column 1 - line 62, column 17: " + [ cond.constructor.name, d.constructor.name ]);
+          throw new Error("Failed pattern match at Data.PrettyPrint line 76, column 1 - line 76, column 48: " + [ cond.constructor.name, d.constructor.name ]);
       };
   };
   var doc = function (o) {
       return new Doc(o.sugar, o.raw);
   };
-  exports["PrettyPrint"] = PrettyPrint;
+  exports["Sugar"] = Sugar;
+  exports["Raw"] = Raw;
+  exports["ifSugar"] = ifSugar;
+  exports["selectRep"] = selectRep;
+  exports["toggleRep"] = toggleRep;
   exports["doc"] = doc;
-  exports["parensIf"] = parensIf;
-  exports["prettyPrint"] = prettyPrint;
-  exports["raw"] = raw;
   exports["sugar"] = sugar;
+  exports["raw"] = raw;
+  exports["PrettyPrint"] = PrettyPrint;
+  exports["prettyPrint"] = prettyPrint;
+  exports["parensIf"] = parensIf;
   exports["docFunctor"] = docFunctor;
   exports["docApply"] = docApply;
   exports["docApplicative"] = docApplicative;
   exports["docSemigroup"] = docSemigroup;
 })(PS["Data.PrettyPrint"] = PS["Data.PrettyPrint"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
   var Data_Boolean = PS["Data.Boolean"];
   var Data_Eq = PS["Data.Eq"];
   var Data_Foldable = PS["Data.Foldable"];
   var Data_Functor = PS["Data.Functor"];
-  var Data_Generic = PS["Data.Generic"];
+  var Data_Generic_Rep = PS["Data.Generic.Rep"];
+  var Data_Generic_Rep_Show = PS["Data.Generic.Rep.Show"];
   var Data_List = PS["Data.List"];
   var Data_List_Types = PS["Data.List.Types"];
   var Data_Maybe = PS["Data.Maybe"];
@@ -26142,8 +25008,8 @@ var PS = {};
   var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Semiring = PS["Data.Semiring"];
   var Data_Show = PS["Data.Show"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
+  var Data_Symbol = PS["Data.Symbol"];
+  var Prelude = PS["Prelude"];                 
   var Var = (function () {
       function Var(value0) {
           this.value0 = value0;
@@ -26254,14 +25120,14 @@ var PS = {};
                   var simple = Data_PrettyPrint.parensIf(inApp)(Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(Control_Applicative.pure(Data_PrettyPrint.docApplicative)("\u03bb"))(Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(Control_Applicative.pure(Data_PrettyPrint.docApplicative)(Data_Show.show(Data_Name.showName)(e.value0)))(Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(Control_Applicative.pure(Data_PrettyPrint.docApplicative)(". "))(walk(false)(e.value1)))));
                   var literal = Control_Alt.alt(Data_Maybe.altMaybe)(tryFromChurch(e))(tryFromList(e));
                   return Data_PrettyPrint.doc({
-                      raw: Data_PrettyPrint.raw(simple), 
+                      raw: Data_PrettyPrint.raw(simple),
                       sugar: Data_Maybe.fromMaybe(Data_PrettyPrint.sugar(simple))(literal)
                   });
               };
               if (e instanceof Apply) {
                   return Data_PrettyPrint.parensIf(inApp)(Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(walk(isLambda(e.value0))(e.value0))(Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(Control_Applicative.pure(Data_PrettyPrint.docApplicative)(" "))(walk(isComposite(e.value1))(e.value1))));
               };
-              throw new Error("Failed pattern match at Data.Syntax line 82, column 5 - line 92, column 83: " + [ e.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Syntax line 85, column 5 - line 95, column 83: " + [ e.constructor.name ]);
           };
       };
       return walk(false);
@@ -26279,15 +25145,15 @@ var PS = {};
       };
       return Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(Control_Applicative.pure(Data_PrettyPrint.docApplicative)(Data_Show.show(Data_Name.showName)(def.name)))(Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(prettyArgs(def.args))(Data_Semigroup.append(Data_PrettyPrint.docSemigroup(Data_Semigroup.semigroupString))(Control_Applicative.pure(Data_PrettyPrint.docApplicative)(" = "))(Data_PrettyPrint.prettyPrint(prettyPrintSyntax)(def.syntax))));
   };
+  exports["defToSyntax"] = defToSyntax;
+  exports["defToDoc"] = defToDoc;
   exports["Var"] = Var;
   exports["Lambda"] = Lambda;
   exports["Apply"] = Apply;
-  exports["defToDoc"] = defToDoc;
-  exports["defToSyntax"] = defToSyntax;
   exports["prettyPrintSyntax"] = prettyPrintSyntax;
 })(PS["Data.Syntax"] = PS["Data.Syntax"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Applicative = PS["Control.Applicative"];
@@ -26298,10 +25164,12 @@ var PS = {};
   var Data_Eq = PS["Data.Eq"];
   var Data_Foldable = PS["Data.Foldable"];
   var Data_Functor = PS["Data.Functor"];
-  var Data_Generic = PS["Data.Generic"];
+  var Data_Generic_Rep = PS["Data.Generic.Rep"];
+  var Data_Generic_Rep_Show = PS["Data.Generic.Rep.Show"];
   var Data_List = PS["Data.List"];
   var Data_List_Types = PS["Data.List.Types"];
   var Data_Map = PS["Data.Map"];
+  var Data_Map_Internal = PS["Data.Map.Internal"];
   var Data_Maybe = PS["Data.Maybe"];
   var Data_Monoid = PS["Data.Monoid"];
   var Data_Name = PS["Data.Name"];
@@ -26310,11 +25178,11 @@ var PS = {};
   var Data_Semiring = PS["Data.Semiring"];
   var Data_Set = PS["Data.Set"];
   var Data_Show = PS["Data.Show"];
+  var Data_Symbol = PS["Data.Symbol"];
   var Data_Syntax = PS["Data.Syntax"];
   var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unit = PS["Data.Unit"];
   var Partial_Unsafe = PS["Partial.Unsafe"];
-  var Prelude = PS["Prelude"];        
+  var Prelude = PS["Prelude"];                 
   var Bound = (function () {
       function Bound(value0) {
           this.value0 = value0;
@@ -26377,7 +25245,7 @@ var PS = {};
               if (e instanceof App) {
                   return new App(walk(index)(e.value0), walk(index)(e.value1));
               };
-              throw new Error("Failed pattern match at Data.Expr line 171, column 5 - line 177, column 50: " + [ e.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 172, column 5 - line 178, column 50: " + [ e.constructor.name ]);
           };
       };
       return walk(0);
@@ -26394,38 +25262,38 @@ var PS = {};
               return Data_Functor.map(Data_Maybe.functorMaybe)(Bind.create(e.value0))(step(env)(e.value1));
           };
           if (e instanceof Free) {
-              return Data_Map.lookup(Data_Name.ordName)(e.value0)(env);
+              return Data_Map_Internal.lookup(Data_Name.ordName)(e.value0)(env);
           };
           if (e instanceof Bound) {
               return Data_Maybe.Nothing.value;
           };
-          throw new Error("Failed pattern match at Data.Expr line 155, column 3 - line 165, column 14: " + [ e.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Expr line 156, column 3 - line 166, column 14: " + [ e.constructor.name ]);
       };
   };    
-  var globalNames = function ($97) {
-      return Data_Set.fromFoldable(Data_List_Types.foldableList)(Data_Name.ordName)(Data_Map.keys($97));
-  };                                                                 
-  var fresh = function (__copy_env) {
-      return function (__copy_n) {
-          var __tco_env = __copy_env;
-          var __tco_done = false;
-          var __tco_result;
-          function __tco_loop(env, n) {
+  var globalNames = function ($89) {
+      return Data_Set.fromFoldable(Data_Set.foldableSet)(Data_Name.ordName)(Data_Map.keys($89));
+  }; 
+  var fresh = function ($copy_env) {
+      return function ($copy_n) {
+          var $tco_var_env = $copy_env;
+          var $tco_done = false;
+          var $tco_result;
+          function $tco_loop(env, n) {
               if (Data_Set.member(Data_Name.ordName)(n)(env)) {
-                  __tco_env = env;
-                  __copy_n = Data_Name.next(n);
+                  $tco_var_env = env;
+                  $copy_n = Data_Name.next(n);
                   return;
               };
               if (Data_Boolean.otherwise) {
-                  __tco_done = true;
+                  $tco_done = true;
                   return new Data_Tuple.Tuple(Data_Set.insert(Data_Name.ordName)(n)(env), n);
               };
-              throw new Error("Failed pattern match at Data.Expr line 75, column 1 - line 77, column 52: " + [ env.constructor.name, n.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 75, column 1 - line 75, column 59: " + [ env.constructor.name, n.constructor.name ]);
           };
-          while (!__tco_done) {
-              __tco_result = __tco_loop(__tco_env, __copy_n);
+          while (!$tco_done) {
+              $tco_result = $tco_loop($tco_var_env, $copy_n);
           };
-          return __tco_result;
+          return $tco_result;
       };
   };
   var freeVars = (function () {
@@ -26443,13 +25311,13 @@ var PS = {};
               if (e instanceof App) {
                   return walk(walk(vars)(e.value0))(e.value1);
               };
-              throw new Error("Failed pattern match at Data.Expr line 98, column 5 - line 106, column 29: " + [ e.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 99, column 5 - line 107, column 29: " + [ e.constructor.name ]);
           };
       };
       return walk(Data_Set.empty);
   })();
   var namesReferencing = function (name) {
-      var toList = Data_Map.toUnfoldable(Data_List_Types.unfoldableList);
+      var toList = Data_Map_Internal.toUnfoldable(Data_List_Types.unfoldableList);
       var step$prime = function (keys) {
           return function (v) {
               if (Data_Set.member(Data_Name.ordName)(name)(freeVars(v.value1))) {
@@ -26458,11 +25326,11 @@ var PS = {};
               if (Data_Boolean.otherwise) {
                   return keys;
               };
-              throw new Error("Failed pattern match at Data.Expr line 116, column 3 - line 122, column 45: " + [ keys.constructor.name, v.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 121, column 3 - line 123, column 45: " + [ keys.constructor.name, v.constructor.name ]);
           };
       };
-      return function ($98) {
-          return Data_Foldable.foldl(Data_List_Types.foldableList)(step$prime)(Data_Set.empty)(toList($98));
+      return function ($90) {
+          return Data_Foldable.foldl(Data_List_Types.foldableList)(step$prime)(Data_Set.empty)(toList($90));
       };
   };
   var undefinedNames = function (expr) {
@@ -26472,8 +25340,8 @@ var PS = {};
   };
   var formatNames = (function () {
       var toList = Data_Set.toUnfoldable(Data_List_Types.unfoldableList);
-      return function ($99) {
-          return Data_Foldable.intercalate(Data_List_Types.foldableList)(Data_Monoid.monoidString)(", ")(Data_Functor.map(Data_List_Types.functorList)(Data_Show.show(Data_Name.showName))(toList($99)));
+      return function ($91) {
+          return Data_Foldable.intercalate(Data_List_Types.foldableList)(Data_Monoid.monoidString)(", ")(Data_Functor.map(Data_List_Types.functorList)(Data_Show.show(Data_Name.showName))(toList($91)));
       };
   })();
   var formatUndefinedError = function (text) {
@@ -26502,7 +25370,7 @@ var PS = {};
               if (e instanceof App) {
                   return new Data_Syntax.Apply(loop(env)(e.value0), loop(env)(e.value1));
               };
-              throw new Error("Failed pattern match at Data.Expr line 83, column 5 - line 92, column 40: " + [ e.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 84, column 5 - line 93, column 40: " + [ e.constructor.name ]);
           };
       };
       return loop([  ]);
@@ -26523,7 +25391,7 @@ var PS = {};
               if (e1 instanceof App) {
                   return new App(loop(env)(e1.value0), loop(env)(e1.value1));
               };
-              throw new Error("Failed pattern match at Data.Expr line 63, column 5 - line 72, column 38: " + [ e1.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 64, column 5 - line 73, column 38: " + [ e1.constructor.name ]);
           };
       };
       return loop(freeVars(e0))(e0);
@@ -26532,10 +25400,10 @@ var PS = {};
       var loop = function (env) {
           return function (s) {
               if (s instanceof Data_Syntax.Var) {
-                  return Data_Maybe.maybe(new Free(s.value0))(Bound.create)(Data_Map.lookup(Data_Name.ordName)(s.value0)(env));
+                  return Data_Maybe.maybe(new Free(s.value0))(Bound.create)(Data_Map_Internal.lookup(Data_Name.ordName)(s.value0)(env));
               };
               if (s instanceof Data_Syntax.Lambda) {
-                  var env$prime = Data_Map.insert(Data_Name.ordName)(s.value0)(0)(Data_Functor.map(Data_Map.functorMap)(function (v) {
+                  var env$prime = Data_Map_Internal.insert(Data_Name.ordName)(s.value0)(0)(Data_Functor.map(Data_Map_Internal.functorMap)(function (v) {
                       return v + 1 | 0;
                   })(env));
                   return new Bind(s.value0, loop(env$prime)(s.value1));
@@ -26543,31 +25411,571 @@ var PS = {};
               if (s instanceof Data_Syntax.Apply) {
                   return new App(loop(env)(s.value0), loop(env)(s.value1));
               };
-              throw new Error("Failed pattern match at Data.Expr line 50, column 5 - line 57, column 38: " + [ s.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 51, column 5 - line 58, column 38: " + [ s.constructor.name ]);
           };
       };
-      return function ($100) {
-          return alpha(loop(Data_Map.empty)($100));
+      return function ($92) {
+          return alpha(loop(Data_Map_Internal.empty)($92));
       };
   })();
   exports["Bound"] = Bound;
   exports["Free"] = Free;
   exports["Bind"] = Bind;
   exports["App"] = App;
-  exports["alpha"] = alpha;
+  exports["syntaxToExpr"] = syntaxToExpr;
   exports["exprToSyntax"] = exprToSyntax;
-  exports["formatUndefinedError"] = formatUndefinedError;
-  exports["formatUndefinedWarning"] = formatUndefinedWarning;
   exports["freeVars"] = freeVars;
   exports["globalNames"] = globalNames;
-  exports["namesReferencing"] = namesReferencing;
-  exports["step"] = step;
-  exports["substitute"] = substitute;
-  exports["syntaxToExpr"] = syntaxToExpr;
   exports["undefinedNames"] = undefinedNames;
+  exports["namesReferencing"] = namesReferencing;
+  exports["formatUndefinedError"] = formatUndefinedError;
+  exports["formatUndefinedWarning"] = formatUndefinedWarning;
+  exports["substitute"] = substitute;
+  exports["step"] = step;
+  exports["alpha"] = alpha;
 })(PS["Data.Expr"] = PS["Data.Expr"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Expr = PS["Data.Expr"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_PrettyPrint = PS["Data.PrettyPrint"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Effect = PS["Effect"];
+  var Prelude = PS["Prelude"];
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM = PS["React.Basic.DOM"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];
+  var React_Basic_Events = PS["React.Basic.Events"];                 
+  var component = (function () {
+      var render = function (v) {
+          if (v.expr instanceof Data_Maybe.Nothing) {
+              return React_Basic.empty;
+          };
+          if (v.expr instanceof Data_Maybe.Just) {
+              return React_Basic_DOM_Generated.div()({
+                  className: "add-margin-medium btn-group pull-right",
+                  children: [ React_Basic_DOM_Generated.button()({
+                      className: "btn btn-default",
+                      onClick: React_Basic_Events.handler_(v.onStep(v.expr.value0)),
+                      children: [ React_Basic_DOM.text("Step") ]
+                  }), React_Basic_DOM_Generated.button()({
+                      className: "btn btn-default",
+                      onClick: React_Basic_Events.handler_(v.onClear),
+                      children: [ React_Basic_DOM.text("Clear") ]
+                  }), React_Basic_DOM_Generated.button()({
+                      className: "btn btn-default",
+                      onClick: React_Basic_Events.handler_(v.onSave),
+                      children: [ React_Basic_DOM.text("Save") ]
+                  }), React_Basic_DOM_Generated.button()({
+                      className: "btn " + Data_PrettyPrint.ifSugar("btn-danger")("btn-success")(v.rep),
+                      onClick: React_Basic_Events.handler_(v.onSugar),
+                      children: [ React_Basic_DOM.text(Data_PrettyPrint.ifSugar("Raw")("Sugar")(v.rep)) ]
+                  }) ]
+              });
+          };
+          throw new Error("Failed pattern match at Components.Controls line 29, column 3 - line 29, column 39: " + [ v.constructor.name ]);
+      };
+      return React_Basic.stateless({
+          displayName: "Controls",
+          render: render
+      });
+  })();
+  exports["component"] = component;
+})(PS["Components.Controls"] = PS["Components.Controls"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Name = PS["Data.Name"];
+  var Data_PrettyPrint = PS["Data.PrettyPrint"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Syntax = PS["Data.Syntax"];
+  var Effect = PS["Effect"];
+  var Prelude = PS["Prelude"];
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM = PS["React.Basic.DOM"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];
+  var React_Basic_Events = PS["React.Basic.Events"];                 
+  var component = (function () {
+      var renderDef = function (rep) {
+          return function (onDelete) {
+              return function (def) {
+                  return React_Basic_DOM_Generated.li()({
+                      className: "definition",
+                      children: [ React_Basic_DOM_Generated.span()({
+                          className: "cursor-pointer glyphicon glyphicon-remove",
+                          onClick: React_Basic_Events.handler_(onDelete(def.name)),
+                          children: [  ]
+                      }), React_Basic_DOM.text(" " + Data_PrettyPrint.selectRep(Data_Syntax.defToDoc(def))(rep)) ]
+                  });
+              };
+          };
+      };
+      var render = function (v) {
+          return React_Basic_DOM_Generated.ul()({
+              className: "unstyled",
+              children: Data_Functor.map(Data_Functor.functorArray)(renderDef(v.rep)(v.onDelete))(v.defs)
+          });
+      };
+      return React_Basic.stateless({
+          displayName: "Definitions",
+          render: render
+      });
+  })();
+  exports["component"] = component;
+})(PS["Components.Definitions"] = PS["Components.Definitions"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_PrettyPrint = PS["Data.PrettyPrint"];
+  var Prelude = PS["Prelude"];
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM = PS["React.Basic.DOM"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];                 
+  var component = (function () {
+      var renderExpr = function (rep) {
+          return function (expr) {
+              return React_Basic_DOM_Generated.li()({
+                  className: "expression",
+                  children: [ React_Basic_DOM.text(Data_PrettyPrint.selectRep(expr)(rep)) ]
+              });
+          };
+      };
+      var render = function (v) {
+          return React_Basic_DOM_Generated.ul()({
+              className: "unstyled scroll-overflow",
+              children: Data_Functor.map(Data_Functor.functorArray)(renderExpr(v.rep))(v.history)
+          });
+      };
+      return React_Basic.stateless({
+          displayName: "Expressions",
+          render: render
+      });
+  })();
+  exports["component"] = component;
+})(PS["Components.Expressions"] = PS["Components.Expressions"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM = PS["React.Basic.DOM"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];                 
+  var component = (function () {
+      var render = function (v) {
+          return React_Basic.fragment([ React_Basic_DOM_Generated.hr()({}), React_Basic_DOM_Generated.a()({
+              className: "pull-right",
+              href: "https://github.com/cdparks/lambda-machine",
+              children: [ React_Basic_DOM.text("Source on GitHub") ]
+          }) ]);
+      };
+      return React_Basic.stateless({
+          displayName: "Footer",
+          render: render
+      });
+  })();
+  exports["component"] = component;
+})(PS["Components.Footer"] = PS["Components.Footer"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Bind = PS["Control.Bind"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Nullable = PS["Data.Nullable"];
+  var Effect = PS["Effect"];
+  var Effect_Unsafe = PS["Effect.Unsafe"];
+  var Prelude = PS["Prelude"];
+  var React_Basic_Events = PS["React.Basic.Events"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];
+  var Web_Event_Internal_Types = PS["Web.Event.Internal.Types"];
+  var targetValue = React_Basic_Events.unsafeEventFn(function (e) {
+      return Data_Nullable.toMaybe(e.target.value);
+  });
+  var target = React_Basic_Events.unsafeEventFn(function (e) {
+      return e.target;
+  });
+  var key = React_Basic_Events.unsafeEventFn(function (e) {
+      return Data_Nullable.toMaybe(e.key);
+  });
+  exports["target"] = target;
+  exports["targetValue"] = targetValue;
+  exports["key"] = key;
+})(PS["React.Basic.DOM.Events"] = PS["React.Basic.DOM.Events"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Applicative = PS["Control.Applicative"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Symbol = PS["Data.Symbol"];
+  var Data_Unit = PS["Data.Unit"];
+  var Effect = PS["Effect"];
+  var Prelude = PS["Prelude"];
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM = PS["React.Basic.DOM"];
+  var React_Basic_DOM_Events = PS["React.Basic.DOM.Events"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];
+  var React_Basic_Events = PS["React.Basic.Events"];                 
+  var events = React_Basic_Events.merge()(React_Basic_Events.mergeCons(new Data_Symbol.IsSymbol(function () {
+      return "key";
+  }))()()()()(React_Basic_Events.mergeCons(new Data_Symbol.IsSymbol(function () {
+      return "targetValue";
+  }))()()()()(React_Basic_Events.mergeNil)))({
+      key: React_Basic_DOM_Events.key,
+      targetValue: React_Basic_DOM_Events.targetValue
+  });
+  var dispatch = function (onChange) {
+      return function (onSubmit) {
+          return function (v) {
+              if (v.key instanceof Data_Maybe.Just && v.key.value0 === "Enter") {
+                  return onSubmit;
+              };
+              if (v.targetValue instanceof Data_Maybe.Just) {
+                  return onChange(v.targetValue.value0);
+              };
+              return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
+          };
+      };
+  };
+  var component = (function () {
+      var render = function (v) {
+          return React_Basic_DOM_Generated.div()({
+              className: "input-group",
+              children: [ React_Basic_DOM_Generated.input()({
+                  className: "form-control monospace-font",
+                  placeholder: "<definition> or <expression>",
+                  onChange: React_Basic_Events.handler(events)(dispatch(v.onChange)(v.onSubmit)),
+                  value: v.text
+              }), React_Basic_DOM_Generated.span()({
+                  className: "input-group-btn",
+                  children: [ React_Basic_DOM_Generated.button()({
+                      className: "btn btn-default",
+                      onClick: React_Basic_Events.handler_(v.onSubmit),
+                      children: [ React_Basic_DOM.text("Parse") ]
+                  }) ]
+              }) ]
+          });
+      };
+      return React_Basic.stateless({
+          displayName: "Input",
+          render: render
+      });
+  })();
+  exports["component"] = component;
+})(PS["Components.Input"] = PS["Components.Input"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Alt = PS["Control.Alt"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Apply = PS["Control.Apply"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Comonad = PS["Control.Comonad"];
+  var Control_Extend = PS["Control.Extend"];
+  var Control_Lazy = PS["Control.Lazy"];
+  var Control_Monad = PS["Control.Monad"];
+  var Data_BooleanAlgebra = PS["Data.BooleanAlgebra"];
+  var Data_Bounded = PS["Data.Bounded"];
+  var Data_CommutativeRing = PS["Data.CommutativeRing"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_EuclideanRing = PS["Data.EuclideanRing"];
+  var Data_Foldable = PS["Data.Foldable"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Functor_Invariant = PS["Data.Functor.Invariant"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Monoid = PS["Data.Monoid"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Traversable = PS["Data.Traversable"];
+  var Prelude = PS["Prelude"];                 
+  var Identity = function (x) {
+      return x;
+  };
+  var newtypeIdentity = new Data_Newtype.Newtype(function (n) {
+      return n;
+  }, Identity);
+  var functorIdentity = new Data_Functor.Functor(function (f) {
+      return function (m) {
+          return f(m);
+      };
+  });
+  var applyIdentity = new Control_Apply.Apply(function () {
+      return functorIdentity;
+  }, function (v) {
+      return function (v1) {
+          return v(v1);
+      };
+  });
+  var bindIdentity = new Control_Bind.Bind(function () {
+      return applyIdentity;
+  }, function (v) {
+      return function (f) {
+          return f(v);
+      };
+  });
+  var applicativeIdentity = new Control_Applicative.Applicative(function () {
+      return applyIdentity;
+  }, Identity);
+  var monadIdentity = new Control_Monad.Monad(function () {
+      return applicativeIdentity;
+  }, function () {
+      return bindIdentity;
+  });
+  exports["Identity"] = Identity;
+  exports["newtypeIdentity"] = newtypeIdentity;
+  exports["functorIdentity"] = functorIdentity;
+  exports["applyIdentity"] = applyIdentity;
+  exports["applicativeIdentity"] = applicativeIdentity;
+  exports["bindIdentity"] = bindIdentity;
+  exports["monadIdentity"] = monadIdentity;
+})(PS["Data.Identity"] = PS["Data.Identity"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.fromStringAsImpl = function (just) {
+    return function (nothing) {
+      return function (radix) {
+        var digits;
+        if (radix < 11) {
+          digits = "[0-" + (radix - 1).toString() + "]";
+        } else if (radix === 11) {
+          digits = "[0-9a]";
+        } else {
+          digits = "[0-9a-" + String.fromCharCode(86 + radix) + "]";
+        }
+        var pattern = new RegExp("^[\\+\\-]?" + digits + "+$", "i");
+
+        return function (s) {
+          /* jshint bitwise: false */
+          if (pattern.test(s)) {
+            var i = parseInt(s, radix);
+            return (i | 0) === i ? just(i) : nothing;
+          } else {
+            return nothing;
+          }
+        };
+      };
+    };
+  };
+})(PS["Data.Int"] = PS["Data.Int"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.Int"];
+  var Control_Category = PS["Control.Category"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Bounded = PS["Data.Bounded"];
+  var Data_CommutativeRing = PS["Data.CommutativeRing"];
+  var Data_DivisionRing = PS["Data.DivisionRing"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_EuclideanRing = PS["Data.EuclideanRing"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Int_Bits = PS["Data.Int.Bits"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
+  var Global = PS["Global"];
+  var $$Math = PS["Math"];
+  var Prelude = PS["Prelude"];
+  var fromStringAs = $foreign.fromStringAsImpl(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
+  var fromString = fromStringAs(10);
+  exports["fromString"] = fromString;
+  exports["fromStringAs"] = fromStringAs;
+})(PS["Data.Int"] = PS["Data.Int"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Unit = PS["Data.Unit"];
+  var Prelude = PS["Prelude"];                 
+  var MonadThrow = function (Monad0, throwError) {
+      this.Monad0 = Monad0;
+      this.throwError = throwError;
+  };
+  var throwError = function (dict) {
+      return dict.throwError;
+  };
+  exports["throwError"] = throwError;
+  exports["MonadThrow"] = MonadThrow;
+})(PS["Control.Monad.Error.Class"] = PS["Control.Monad.Error.Class"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unit = PS["Data.Unit"];
+  var Prelude = PS["Prelude"];                 
+  var MonadState = function (Monad0, state) {
+      this.Monad0 = Monad0;
+      this.state = state;
+  };
+  var state = function (dict) {
+      return dict.state;
+  };
+  var modify_ = function (dictMonadState) {
+      return function (f) {
+          return state(dictMonadState)(function (s) {
+              return new Data_Tuple.Tuple(Data_Unit.unit, f(s));
+          });
+      };
+  };
+  var gets = function (dictMonadState) {
+      return function (f) {
+          return state(dictMonadState)(function (s) {
+              return new Data_Tuple.Tuple(f(s), s);
+          });
+      };
+  };
+  exports["state"] = state;
+  exports["MonadState"] = MonadState;
+  exports["gets"] = gets;
+  exports["modify_"] = modify_;
+})(PS["Control.Monad.State.Class"] = PS["Control.Monad.State.Class"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Prelude = PS["Prelude"];                 
+  var MonadTrans = function (lift) {
+      this.lift = lift;
+  };
+  var lift = function (dict) {
+      return dict.lift;
+  };
+  exports["lift"] = lift;
+  exports["MonadTrans"] = MonadTrans;
+})(PS["Control.Monad.Trans.Class"] = PS["Control.Monad.Trans.Class"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Control_Alt = PS["Control.Alt"];
+  var Control_Alternative = PS["Control.Alternative"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Apply = PS["Control.Apply"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Category = PS["Control.Category"];
+  var Control_Monad = PS["Control.Monad"];
+  var Control_Monad_Cont_Class = PS["Control.Monad.Cont.Class"];
+  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
+  var Control_Monad_Reader_Class = PS["Control.Monad.Reader.Class"];
+  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
+  var Control_Monad_State_Class = PS["Control.Monad.State.Class"];
+  var Control_Monad_Trans_Class = PS["Control.Monad.Trans.Class"];
+  var Control_Monad_Writer_Class = PS["Control.Monad.Writer.Class"];
+  var Control_MonadPlus = PS["Control.MonadPlus"];
+  var Control_MonadZero = PS["Control.MonadZero"];
+  var Control_Plus = PS["Control.Plus"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_Monoid = PS["Data.Monoid"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Effect_Class = PS["Effect.Class"];
+  var Prelude = PS["Prelude"];                 
+  var ExceptT = function (x) {
+      return x;
+  };
+  var runExceptT = function (v) {
+      return v;
+  };          
+  var monadTransExceptT = new Control_Monad_Trans_Class.MonadTrans(function (dictMonad) {
+      return function (m) {
+          return Control_Bind.bind(dictMonad.Bind1())(m)(function (v) {
+              return Control_Applicative.pure(dictMonad.Applicative0())(new Data_Either.Right(v));
+          });
+      };
+  });
+  var mapExceptT = function (f) {
+      return function (v) {
+          return f(v);
+      };
+  };
+  var functorExceptT = function (dictFunctor) {
+      return new Data_Functor.Functor(function (f) {
+          return mapExceptT(Data_Functor.map(dictFunctor)(Data_Functor.map(Data_Either.functorEither)(f)));
+      });
+  };
+  var monadExceptT = function (dictMonad) {
+      return new Control_Monad.Monad(function () {
+          return applicativeExceptT(dictMonad);
+      }, function () {
+          return bindExceptT(dictMonad);
+      });
+  };
+  var bindExceptT = function (dictMonad) {
+      return new Control_Bind.Bind(function () {
+          return applyExceptT(dictMonad);
+      }, function (v) {
+          return function (k) {
+              return Control_Bind.bind(dictMonad.Bind1())(v)(Data_Either.either(function ($97) {
+                  return Control_Applicative.pure(dictMonad.Applicative0())(Data_Either.Left.create($97));
+              })(function (a) {
+                  var v1 = k(a);
+                  return v1;
+              }));
+          };
+      });
+  };
+  var applyExceptT = function (dictMonad) {
+      return new Control_Apply.Apply(function () {
+          return functorExceptT(((dictMonad.Bind1()).Apply0()).Functor0());
+      }, Control_Monad.ap(monadExceptT(dictMonad)));
+  };
+  var applicativeExceptT = function (dictMonad) {
+      return new Control_Applicative.Applicative(function () {
+          return applyExceptT(dictMonad);
+      }, function ($98) {
+          return ExceptT(Control_Applicative.pure(dictMonad.Applicative0())(Data_Either.Right.create($98)));
+      });
+  };
+  var monadStateExceptT = function (dictMonadState) {
+      return new Control_Monad_State_Class.MonadState(function () {
+          return monadExceptT(dictMonadState.Monad0());
+      }, function (f) {
+          return Control_Monad_Trans_Class.lift(monadTransExceptT)(dictMonadState.Monad0())(Control_Monad_State_Class.state(dictMonadState)(f));
+      });
+  };
+  var monadThrowExceptT = function (dictMonad) {
+      return new Control_Monad_Error_Class.MonadThrow(function () {
+          return monadExceptT(dictMonad);
+      }, function ($102) {
+          return ExceptT(Control_Applicative.pure(dictMonad.Applicative0())(Data_Either.Left.create($102)));
+      });
+  };
+  exports["ExceptT"] = ExceptT;
+  exports["runExceptT"] = runExceptT;
+  exports["mapExceptT"] = mapExceptT;
+  exports["functorExceptT"] = functorExceptT;
+  exports["applyExceptT"] = applyExceptT;
+  exports["applicativeExceptT"] = applicativeExceptT;
+  exports["bindExceptT"] = bindExceptT;
+  exports["monadExceptT"] = monadExceptT;
+  exports["monadTransExceptT"] = monadTransExceptT;
+  exports["monadThrowExceptT"] = monadThrowExceptT;
+  exports["monadStateExceptT"] = monadStateExceptT;
+})(PS["Control.Monad.Except.Trans"] = PS["Control.Monad.Except.Trans"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Alternative = PS["Control.Alternative"];
@@ -26577,7 +25985,6 @@ var PS = {};
   var Control_Lazy = PS["Control.Lazy"];
   var Control_Monad = PS["Control.Monad"];
   var Control_Monad_Cont_Class = PS["Control.Monad.Cont.Class"];
-  var Control_Monad_Eff_Class = PS["Control.Monad.Eff.Class"];
   var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
   var Control_Monad_Reader_Class = PS["Control.Monad.Reader.Class"];
   var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
@@ -26593,7 +26000,8 @@ var PS = {};
   var Data_Newtype = PS["Data.Newtype"];
   var Data_Tuple = PS["Data.Tuple"];
   var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];        
+  var Effect_Class = PS["Effect.Class"];
+  var Prelude = PS["Prelude"];                 
   var StateT = function (x) {
       return x;
   };
@@ -26669,8 +26077,8 @@ var PS = {};
       });
   };
   exports["StateT"] = StateT;
-  exports["evalStateT"] = evalStateT;
   exports["runStateT"] = runStateT;
+  exports["evalStateT"] = evalStateT;
   exports["functorStateT"] = functorStateT;
   exports["applyStateT"] = applyStateT;
   exports["applicativeStateT"] = applicativeStateT;
@@ -26680,7 +26088,30 @@ var PS = {};
   exports["monadStateStateT"] = monadStateStateT;
 })(PS["Control.Monad.State.Trans"] = PS["Control.Monad.State.Trans"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+    "use strict";
+
+  exports.split = function (sep) {
+    return function (s) {
+      return s.split(sep);
+    };
+  };
+})(PS["Data.String.Common"] = PS["Data.String.Common"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.String.Common"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_String_Pattern = PS["Data.String.Pattern"];
+  var Prelude = PS["Prelude"];                 
+  var $$null = function (s) {
+      return s === "";
+  };
+  exports["null"] = $$null;
+  exports["split"] = $foreign.split;
+})(PS["Data.String.Common"] = PS["Data.String.Common"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var Data_Eq = PS["Data.Eq"];
   var Data_EuclideanRing = PS["Data.EuclideanRing"];
@@ -26694,6 +26125,8 @@ var PS = {};
   var Data_Semiring = PS["Data.Semiring"];
   var Data_Show = PS["Data.Show"];
   var Data_String = PS["Data.String"];
+  var Data_String_Common = PS["Data.String.Common"];
+  var Data_String_Pattern = PS["Data.String.Pattern"];
   var Prelude = PS["Prelude"];
   var updatePosString = function (pos$prime) {
       return function (str) {
@@ -26701,40 +26134,40 @@ var PS = {};
               return function (c) {
                   if (c === "\x0a") {
                       return {
-                          line: v.line + 1 | 0, 
+                          line: v.line + 1 | 0,
                           column: 1
                       };
                   };
                   if (c === "\x0d") {
                       return {
-                          line: v.line + 1 | 0, 
+                          line: v.line + 1 | 0,
                           column: 1
                       };
                   };
                   if (c === "\x09") {
                       return {
-                          line: v.line, 
-                          column: (v.column + 8 | 0) - (v.column - 1 | 0) % 8 | 0
+                          line: v.line,
+                          column: (v.column + 8 | 0) - Data_EuclideanRing.mod(Data_EuclideanRing.euclideanRingInt)(v.column - 1 | 0)(8) | 0
                       };
                   };
                   return {
-                      line: v.line, 
+                      line: v.line,
                       column: v.column + 1 | 0
                   };
               };
           };
-          return Data_Foldable.foldl(Data_Foldable.foldableArray)(updatePosChar)(pos$prime)(Data_String.split(Data_Newtype.wrap(Data_String.newtypePattern)(""))(str));
+          return Data_Foldable.foldl(Data_Foldable.foldableArray)(updatePosChar)(pos$prime)(Data_String_Common.split(Data_Newtype.wrap(Data_String_Pattern.newtypePattern)(""))(str));
       };
   }; 
   var initialPos = {
-      line: 1, 
+      line: 1,
       column: 1
   };
   exports["initialPos"] = initialPos;
   exports["updatePosString"] = updatePosString;
 })(PS["Text.Parsing.Parser.Pos"] = PS["Text.Parsing.Parser.Pos"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Alternative = PS["Control.Alternative"];
@@ -26768,7 +26201,7 @@ var PS = {};
   var Data_Show = PS["Data.Show"];
   var Data_Tuple = PS["Data.Tuple"];
   var Prelude = PS["Prelude"];
-  var Text_Parsing_Parser_Pos = PS["Text.Parsing.Parser.Pos"];        
+  var Text_Parsing_Parser_Pos = PS["Text.Parsing.Parser.Pos"];                 
   var ParseState = (function () {
       function ParseState(value0, value1, value2) {
           this.value0 = value0;
@@ -26827,6 +26260,11 @@ var PS = {};
   var monadStateParserT = function (dictMonad) {
       return Control_Monad_Except_Trans.monadStateExceptT(Control_Monad_State_Trans.monadStateStateT(dictMonad));
   };
+  var position = function (dictMonad) {
+      return Control_Monad_State_Class.gets(monadStateParserT(dictMonad))(function (v) {
+          return v.value1;
+      });
+  };
   var lazyParserT = new Control_Lazy.Lazy(function (f) {
       return Control_Lazy.defer(Control_Monad_State_Trans.lazyStateT)(function ($93) {
           return Control_Monad_Except_Trans.runExceptT(Data_Newtype.unwrap(newtypeParserT)(f($93)));
@@ -26835,16 +26273,19 @@ var PS = {};
   var functorParserT = function (dictFunctor) {
       return Control_Monad_Except_Trans.functorExceptT(Control_Monad_State_Trans.functorStateT(dictFunctor));
   };
+  var failWithPosition = function (dictMonad) {
+      return function (message) {
+          return function (pos) {
+              return Control_Monad_Error_Class.throwError(monadThrowParserT(dictMonad))(new ParseError(message, pos));
+          };
+      };
+  };
   var bindParserT = function (dictMonad) {
       return Control_Monad_Except_Trans.bindExceptT(Control_Monad_State_Trans.monadStateT(dictMonad));
   };
   var fail = function (dictMonad) {
       return function (message) {
-          return Control_Bind.bind(bindParserT(dictMonad))(Control_Monad_State_Class.gets(monadStateParserT(dictMonad))(function (v) {
-              return v.value1;
-          }))(function (v) {
-              return Control_Monad_Error_Class.throwError(monadThrowParserT(dictMonad))(new ParseError(message, v));
-          });
+          return Control_Bind.bindFlipped(bindParserT(dictMonad))(failWithPosition(dictMonad)(message))(position(dictMonad));
       };
   };
   var applyParserT = function (dictMonad) {
@@ -26881,13 +26322,16 @@ var PS = {};
           return plusParserT(dictMonad);
       });
   };
-  exports["ParseState"] = ParseState;
-  exports["ParserT"] = ParserT;
-  exports["fail"] = fail;
+  exports["ParseError"] = ParseError;
   exports["parseErrorMessage"] = parseErrorMessage;
   exports["parseErrorPosition"] = parseErrorPosition;
+  exports["ParseState"] = ParseState;
+  exports["ParserT"] = ParserT;
   exports["runParser"] = runParser;
   exports["runParserT"] = runParserT;
+  exports["position"] = position;
+  exports["fail"] = fail;
+  exports["failWithPosition"] = failWithPosition;
   exports["newtypeParserT"] = newtypeParserT;
   exports["lazyParserT"] = lazyParserT;
   exports["functorParserT"] = functorParserT;
@@ -26901,7 +26345,7 @@ var PS = {};
   exports["alternativeParserT"] = alternativeParserT;
 })(PS["Text.Parsing.Parser"] = PS["Text.Parsing.Parser"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Applicative = PS["Control.Applicative"];
@@ -26925,12 +26369,24 @@ var PS = {};
   var Data_Tuple = PS["Data.Tuple"];
   var Data_Unit = PS["Data.Unit"];
   var Prelude = PS["Prelude"];
-  var Text_Parsing_Parser = PS["Text.Parsing.Parser"];        
+  var Text_Parsing_Parser = PS["Text.Parsing.Parser"];                 
   var withErrorMessage = function (dictMonad) {
       return function (p) {
           return function (msg) {
               return Control_Alt.alt(Text_Parsing_Parser.altParserT(dictMonad))(p)(Text_Parsing_Parser.fail(dictMonad)("Expected " + msg));
           };
+      };
+  };
+  var tryRethrow = function (dictMonad) {
+      return function (p) {
+          return Text_Parsing_Parser.ParserT(Control_Monad_Except_Trans.ExceptT(Control_Monad_State_Trans.StateT(function (v) {
+              return Control_Bind.bind(dictMonad.Bind1())(Control_Monad_State_Trans.runStateT(Control_Monad_Except_Trans.runExceptT(Data_Newtype.unwrap(Text_Parsing_Parser.newtypeParserT)(p)))(v))(function (v1) {
+                  if (v1.value0 instanceof Data_Either.Left) {
+                      return Control_Applicative.pure(dictMonad.Applicative0())(new Data_Tuple.Tuple(new Data_Either.Left(new Text_Parsing_Parser.ParseError(v1.value0.value0.value0, v.value1)), new Text_Parsing_Parser.ParseState(v1.value1.value0, v1.value1.value1, v.value2)));
+                  };
+                  return Control_Applicative.pure(dictMonad.Applicative0())(new Data_Tuple.Tuple(v1.value0, v1.value1));
+              });
+          })));
       };
   };
   var $$try = function (dictMonad) {
@@ -26972,14 +26428,197 @@ var PS = {};
           };
       };
   };
+  exports["withErrorMessage"] = withErrorMessage;
   exports["between"] = between;
+  exports["try"] = $$try;
+  exports["tryRethrow"] = tryRethrow;
   exports["sepBy"] = sepBy;
   exports["sepBy1"] = sepBy1;
-  exports["try"] = $$try;
-  exports["withErrorMessage"] = withErrorMessage;
 })(PS["Text.Parsing.Parser.Combinators"] = PS["Text.Parsing.Parser.Combinators"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+    "use strict";
+  /* global Symbol */
+
+  var hasArrayFrom = typeof Array.from === "function";
+  var hasStringIterator =
+    typeof Symbol !== "undefined" &&
+    Symbol != null &&
+    typeof Symbol.iterator !== "undefined" &&
+    typeof String.prototype[Symbol.iterator] === "function";
+  var hasFromCodePoint = typeof String.prototype.fromCodePoint === "function";
+  var hasCodePointAt = typeof String.prototype.codePointAt === "function";
+
+  exports._unsafeCodePointAt0 = function (fallback) {
+    return hasCodePointAt
+      ? function (str) { return str.codePointAt(0); }
+      : fallback;
+  };
+
+  exports._singleton = function (fallback) {
+    return hasFromCodePoint ? String.fromCodePoint : fallback;
+  };
+
+  exports._take = function (fallback) {
+    return function (n) {
+      if (hasStringIterator) {
+        return function (str) {
+          var accum = "";
+          var iter = str[Symbol.iterator]();
+          for (var i = 0; i < n; ++i) {
+            var o = iter.next();
+            if (o.done) return accum;
+            accum += o.value;
+          }
+          return accum;
+        };
+      }
+      return fallback(n);
+    };
+  };
+
+  exports._toCodePointArray = function (fallback) {
+    return function (unsafeCodePointAt0) {
+      if (hasArrayFrom) {
+        return function (str) {
+          return Array.from(str, unsafeCodePointAt0);
+        };
+      }
+      return fallback;
+    };
+  };
+})(PS["Data.String.CodePoints"] = PS["Data.String.CodePoints"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var $foreign = PS["Data.String.CodePoints"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Array = PS["Data.Array"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Bounded = PS["Data.Bounded"];
+  var Data_Enum = PS["Data.Enum"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_EuclideanRing = PS["Data.EuclideanRing"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Int = PS["Data.Int"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
+  var Data_String_CodeUnits = PS["Data.String.CodeUnits"];
+  var Data_String_Common = PS["Data.String.Common"];
+  var Data_String_Pattern = PS["Data.String.Pattern"];
+  var Data_String_Unsafe = PS["Data.String.Unsafe"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unfoldable = PS["Data.Unfoldable"];
+  var Prelude = PS["Prelude"];
+  var unsurrogate = function (lead) {
+      return function (trail) {
+          return (((lead - 55296 | 0) * 1024 | 0) + (trail - 56320 | 0) | 0) + 65536 | 0;
+      };
+  }; 
+  var isTrail = function (cu) {
+      return 56320 <= cu && cu <= 57343;
+  };
+  var isLead = function (cu) {
+      return 55296 <= cu && cu <= 56319;
+  };
+  var uncons = function (s) {
+      var v = Data_String_CodeUnits.length(s);
+      if (v === 0) {
+          return Data_Maybe.Nothing.value;
+      };
+      if (v === 1) {
+          return new Data_Maybe.Just({
+              head: Data_Enum.fromEnum(Data_Enum.boundedEnumChar)(Data_String_Unsafe.charAt(0)(s)),
+              tail: ""
+          });
+      };
+      var cu1 = Data_Enum.fromEnum(Data_Enum.boundedEnumChar)(Data_String_Unsafe.charAt(1)(s));
+      var cu0 = Data_Enum.fromEnum(Data_Enum.boundedEnumChar)(Data_String_Unsafe.charAt(0)(s));
+      var $21 = isLead(cu0) && isTrail(cu1);
+      if ($21) {
+          return new Data_Maybe.Just({
+              head: unsurrogate(cu0)(cu1),
+              tail: Data_String_CodeUnits.drop(2)(s)
+          });
+      };
+      return new Data_Maybe.Just({
+          head: cu0,
+          tail: Data_String_CodeUnits.drop(1)(s)
+      });
+  };
+  var unconsButWithTuple = function (s) {
+      return Data_Functor.map(Data_Maybe.functorMaybe)(function (v) {
+          return new Data_Tuple.Tuple(v.head, v.tail);
+      })(uncons(s));
+  };
+  var toCodePointArrayFallback = function (s) {
+      return Data_Unfoldable.unfoldr(Data_Unfoldable.unfoldableArray)(unconsButWithTuple)(s);
+  };
+  var unsafeCodePointAt0Fallback = function (s) {
+      var cu1 = Data_Enum.fromEnum(Data_Enum.boundedEnumChar)(Data_String_Unsafe.charAt(1)(s));
+      var cu0 = Data_Enum.fromEnum(Data_Enum.boundedEnumChar)(Data_String_Unsafe.charAt(0)(s));
+      var $25 = isLead(cu0) && isTrail(cu1);
+      if ($25) {
+          return unsurrogate(cu0)(cu1);
+      };
+      return cu0;
+  };
+  var unsafeCodePointAt0 = $foreign._unsafeCodePointAt0(unsafeCodePointAt0Fallback);
+  var toCodePointArray = $foreign._toCodePointArray(toCodePointArrayFallback)(unsafeCodePointAt0);
+  var length = function ($51) {
+      return Data_Array.length(toCodePointArray($51));
+  };
+  var indexOf = function (p) {
+      return function (s) {
+          return Data_Functor.map(Data_Maybe.functorMaybe)(function (i) {
+              return length(Data_String_CodeUnits.take(i)(s));
+          })(Data_String_CodeUnits.indexOf(p)(s));
+      };
+  };
+  var fromCharCode = function ($52) {
+      return Data_String_CodeUnits.singleton(Data_Enum.toEnumWithDefaults(Data_Enum.boundedEnumChar)(Data_Bounded.bottom(Data_Bounded.boundedChar))(Data_Bounded.top(Data_Bounded.boundedChar))($52));
+  };
+  var singletonFallback = function (v) {
+      if (v <= 65535) {
+          return fromCharCode(v);
+      };
+      var lead = Data_EuclideanRing.div(Data_EuclideanRing.euclideanRingInt)(v - 65536 | 0)(1024) + 55296 | 0;
+      var trail = Data_EuclideanRing.mod(Data_EuclideanRing.euclideanRingInt)(v - 65536 | 0)(1024) + 56320 | 0;
+      return fromCharCode(lead) + fromCharCode(trail);
+  };                                                                       
+  var singleton = $foreign._singleton(singletonFallback);
+  var takeFallback = function (n) {
+      return function (v) {
+          if (n < 1) {
+              return "";
+          };
+          var v1 = uncons(v);
+          if (v1 instanceof Data_Maybe.Just) {
+              return singleton(v1.value0.head) + takeFallback(n - 1 | 0)(v1.value0.tail);
+          };
+          return v;
+      };
+  };
+  var take = $foreign._take(takeFallback);
+  var drop = function (n) {
+      return function (s) {
+          return Data_String_CodeUnits.drop(Data_String_CodeUnits.length(take(n)(s)))(s);
+      };
+  };
+  exports["singleton"] = singleton;
+  exports["toCodePointArray"] = toCodePointArray;
+  exports["uncons"] = uncons;
+  exports["length"] = length;
+  exports["indexOf"] = indexOf;
+  exports["take"] = take;
+  exports["drop"] = drop;
+})(PS["Data.String.CodePoints"] = PS["Data.String.CodePoints"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Bind = PS["Control.Bind"];
@@ -26996,10 +26635,14 @@ var PS = {};
   var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Show = PS["Data.Show"];
   var Data_String = PS["Data.String"];
+  var Data_String_CodePoints = PS["Data.String.CodePoints"];
+  var Data_String_CodeUnits = PS["Data.String.CodeUnits"];
+  var Data_String_Common = PS["Data.String.Common"];
+  var Data_String_Pattern = PS["Data.String.Pattern"];
   var Prelude = PS["Prelude"];
   var Text_Parsing_Parser = PS["Text.Parsing.Parser"];
   var Text_Parsing_Parser_Combinators = PS["Text.Parsing.Parser.Combinators"];
-  var Text_Parsing_Parser_Pos = PS["Text.Parsing.Parser.Pos"];        
+  var Text_Parsing_Parser_Pos = PS["Text.Parsing.Parser.Pos"];                 
   var StringLike = function (drop, indexOf, $$null, uncons) {
       this.drop = drop;
       this.indexOf = indexOf;
@@ -27009,7 +26652,7 @@ var PS = {};
   var uncons = function (dict) {
       return dict.uncons;
   };
-  var stringLikeString = new StringLike(Data_String.drop, Data_String.indexOf, Data_String["null"], Data_String.uncons);
+  var stringLikeString = new StringLike(Data_String_CodePoints.drop, Data_String_CodePoints.indexOf, Data_String_Common["null"], Data_String_CodeUnits.uncons);
   var $$null = function (dict) {
       return dict["null"];
   };
@@ -27034,10 +26677,10 @@ var PS = {};
               return Control_Bind.bind(Text_Parsing_Parser.bindParserT(dictMonad))(Control_Monad_State_Class.gets(Text_Parsing_Parser.monadStateParserT(dictMonad))(function (v) {
                   return v.value0;
               }))(function (v) {
-                  var v1 = indexOf(dictStringLike)(Data_Newtype.wrap(Data_String.newtypePattern)(str))(v);
+                  var v1 = indexOf(dictStringLike)(Data_Newtype.wrap(Data_String_Pattern.newtypePattern)(str))(v);
                   if (v1 instanceof Data_Maybe.Just && v1.value0 === 0) {
-                      return Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(dictMonad))(Control_Monad_State_Class.modify(Text_Parsing_Parser.monadStateParserT(dictMonad))(function (v2) {
-                          return new Text_Parsing_Parser.ParseState(drop(dictStringLike)(Data_String.length(str))(v), Text_Parsing_Parser_Pos.updatePosString(v2.value1)(str), true);
+                      return Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(dictMonad))(Control_Monad_State_Class.modify_(Text_Parsing_Parser.monadStateParserT(dictMonad))(function (v2) {
+                          return new Text_Parsing_Parser.ParseState(drop(dictStringLike)(Data_String_CodePoints.length(str))(v), Text_Parsing_Parser_Pos.updatePosString(v2.value1)(str), true);
                       }))(function () {
                           return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(dictMonad))(str);
                       });
@@ -27057,25 +26700,25 @@ var PS = {};
                   return Text_Parsing_Parser.fail(dictMonad)("Unexpected EOF");
               };
               if (v1 instanceof Data_Maybe.Just) {
-                  return Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(dictMonad))(Control_Monad_State_Class.modify(Text_Parsing_Parser.monadStateParserT(dictMonad))(function (v2) {
-                      return new Text_Parsing_Parser.ParseState(v1.value0.tail, Text_Parsing_Parser_Pos.updatePosString(v2.value1)(Data_String.singleton(v1.value0.head)), true);
+                  return Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(dictMonad))(Control_Monad_State_Class.modify_(Text_Parsing_Parser.monadStateParserT(dictMonad))(function (v2) {
+                      return new Text_Parsing_Parser.ParseState(v1.value0.tail, Text_Parsing_Parser_Pos.updatePosString(v2.value1)(Data_String_CodeUnits.singleton(v1.value0.head)), true);
                   }))(function () {
                       return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(dictMonad))(v1.value0.head);
                   });
               };
-              throw new Error("Failed pattern match at Text.Parsing.Parser.String line 54, column 3 - line 61, column 16: " + [ v1.constructor.name ]);
+              throw new Error("Failed pattern match at Text.Parsing.Parser.String line 56, column 3 - line 63, column 16: " + [ v1.constructor.name ]);
           });
       };
   };
   var satisfy = function (dictStringLike) {
       return function (dictMonad) {
           return function (f) {
-              return Text_Parsing_Parser_Combinators["try"](dictMonad)(Control_Bind.bind(Text_Parsing_Parser.bindParserT(dictMonad))(anyChar(dictStringLike)(dictMonad))(function (v) {
+              return Text_Parsing_Parser_Combinators.tryRethrow(dictMonad)(Control_Bind.bind(Text_Parsing_Parser.bindParserT(dictMonad))(anyChar(dictStringLike)(dictMonad))(function (v) {
                   var $61 = f(v);
                   if ($61) {
                       return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(dictMonad))(v);
                   };
-                  return Text_Parsing_Parser.fail(dictMonad)("Character '" + (Data_String.singleton(v) + "' did not satisfy predicate"));
+                  return Text_Parsing_Parser.fail(dictMonad)("Character '" + (Data_String_CodeUnits.singleton(v) + "' did not satisfy predicate"));
               }));
           };
       };
@@ -27094,7 +26737,7 @@ var PS = {};
           return Control_Bind.bind(Text_Parsing_Parser.bindParserT(dictMonad))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(dictMonad))(Text_Parsing_Parser.lazyParserT)(satisfy(dictStringLike)(dictMonad)(function (c) {
               return c === "\x0a" || (c === "\x0d" || (c === " " || c === "\x09"));
           })))(function (v) {
-              return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(dictMonad))(Data_String.fromCharArray(v));
+              return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(dictMonad))(Data_String_CodeUnits.fromCharArray(v));
           });
       };
   };
@@ -27103,21 +26746,21 @@ var PS = {};
           return Data_Functor["void"](Text_Parsing_Parser.functorParserT(((dictMonad.Bind1()).Apply0()).Functor0()))(whiteSpace(dictStringLike)(dictMonad));
       };
   };
-  exports["StringLike"] = StringLike;
-  exports["anyChar"] = anyChar;
-  exports["char"] = $$char;
   exports["drop"] = drop;
-  exports["eof"] = eof;
   exports["indexOf"] = indexOf;
-  exports["satisfy"] = satisfy;
-  exports["skipSpaces"] = skipSpaces;
-  exports["string"] = string;
   exports["uncons"] = uncons;
+  exports["StringLike"] = StringLike;
+  exports["eof"] = eof;
+  exports["string"] = string;
+  exports["anyChar"] = anyChar;
+  exports["satisfy"] = satisfy;
+  exports["char"] = $$char;
   exports["whiteSpace"] = whiteSpace;
+  exports["skipSpaces"] = skipSpaces;
   exports["stringLikeString"] = stringLikeString;
 })(PS["Text.Parsing.Parser.String"] = PS["Text.Parsing.Parser.String"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+  // Generated by purs version 0.12.0
   "use strict";
   var Control_Alt = PS["Control.Alt"];
   var Control_Applicative = PS["Control.Applicative"];
@@ -27130,6 +26773,7 @@ var PS = {};
   var Data_Either = PS["Data.Either"];
   var Data_Eq = PS["Data.Eq"];
   var Data_Foldable = PS["Data.Foldable"];
+  var Data_Function = PS["Data.Function"];
   var Data_Functor = PS["Data.Functor"];
   var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
   var Data_Identity = PS["Data.Identity"];
@@ -27142,14 +26786,14 @@ var PS = {};
   var Data_Ring = PS["Data.Ring"];
   var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Show = PS["Data.Show"];
-  var Data_String = PS["Data.String"];
+  var Data_String_CodeUnits = PS["Data.String.CodeUnits"];
   var Data_Syntax = PS["Data.Syntax"];
   var Partial_Unsafe = PS["Partial.Unsafe"];
   var Prelude = PS["Prelude"];
   var Text_Parsing_Parser = PS["Text.Parsing.Parser"];
   var Text_Parsing_Parser_Combinators = PS["Text.Parsing.Parser.Combinators"];
   var Text_Parsing_Parser_Pos = PS["Text.Parsing.Parser.Pos"];
-  var Text_Parsing_Parser_String = PS["Text.Parsing.Parser.String"];        
+  var Text_Parsing_Parser_String = PS["Text.Parsing.Parser.String"];                 
   var token = function (p) {
       return Control_Apply.applyFirst(Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(p)(Text_Parsing_Parser_String.skipSpaces(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity));
   };
@@ -27161,7 +26805,7 @@ var PS = {};
           if (v instanceof Data_List_Types.Cons) {
               return new Data_Syntax.Apply(new Data_Syntax.Apply(new Data_Syntax.Var(Data_Name.name_("cons")), v.value0), loop(v.value1));
           };
-          throw new Error("Failed pattern match at Data.Parse line 105, column 13 - line 108, column 68: " + [ v.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Parse line 105, column 3 - line 105, column 31: " + [ v.constructor.name ]);
       };
       return new Data_Syntax.Lambda(Data_Name.name_("cons"), new Data_Syntax.Lambda(Data_Name.name_("nil"), loop(xs)));
   };
@@ -27173,24 +26817,24 @@ var PS = {};
           if (Data_Boolean.otherwise) {
               return new Data_Syntax.Apply(new Data_Syntax.Var(Data_Name.name_("s")), loop(k - 1 | 0));
           };
-          throw new Error("Failed pattern match at Data.Parse line 111, column 14 - line 115, column 57: " + [ k.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Parse line 111, column 3 - line 113, column 57: " + [ k.constructor.name ]);
       };
       return new Data_Syntax.Lambda(Data_Name.name_("s"), new Data_Syntax.Lambda(Data_Name.name_("z"), loop(n)));
   };
   var positionColumn = function (v) {
       return v.column;
   };
-  var parseSubscript = Data_Functor.map(Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(function ($33) {
-      return Data_Name.subscriptToInt(Data_String.fromCharArray($33));
+  var parseSubscript = Data_Functor.map(Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(function ($35) {
+      return Data_Name.subscriptToInt(Data_String_CodeUnits.fromCharArray($35));
   })(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)(Data_Name.isSubscriptChar)));
   var parsePrimes = Data_Functor.map(Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Array.length)(Data_Array.some(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)(function (v) {
       return v === "'";
   })));
   var parseList = function (p) {
-      return token(Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String["char"](Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("["))(function (v) {
-          return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_Combinators.sepBy(Data_Identity.monadIdentity)(p)(token(Text_Parsing_Parser_String["char"](Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)(","))))(function (v1) {
-              return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String["char"](Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("]"))(function (v2) {
-                  return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(toList(v1));
+      return token(Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Functor["void"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Text_Parsing_Parser_String["char"](Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("[")))(function () {
+          return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_Combinators.sepBy(Data_Identity.monadIdentity)(p)(token(Text_Parsing_Parser_String["char"](Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)(","))))(function (v) {
+              return Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Functor["void"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Text_Parsing_Parser_String["char"](Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("]")))(function () {
+                  return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(toList(v));
               });
           });
       }));
@@ -27213,14 +26857,14 @@ var PS = {};
       return "0" <= c && c <= "9";
   };
   var parseNat = token(Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.some(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)(isDigit)))(function (v) {
-      var n = Data_Maybe.fromJust()(Data_Int.fromString(Data_String.fromCharArray(v)));
+      var n = Data_Maybe.fromJust()(Data_Int.fromString(Data_String_CodeUnits.fromCharArray(v)));
       return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(toChurch(n));
   }));
   var formatParseError = function (text) {
       return function (err) {
           var message = Text_Parsing_Parser.parseErrorMessage(err);
           var column = positionColumn(Text_Parsing_Parser.parseErrorPosition(err));
-          var caretLine = Data_String.fromCharArray(Data_Array.replicate(column - 1 | 0)(" ")) + "^";
+          var caretLine = Data_String_CodeUnits.fromCharArray(Data_Array.replicate(column - 1 | 0)(" ")) + "^";
           return "Parse error: " + (message + (" at column " + (Data_Show.show(Data_Show.showInt)(column) + ("\x0a" + (text + ("\x0a" + caretLine))))));
       };
   };
@@ -27234,7 +26878,7 @@ var PS = {};
       return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(Text_Parsing_Parser_String.satisfy(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)(bodyChar)))(function (v1) {
           return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("?"))(Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))("")))(function (v2) {
               return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(parsePrimes)(parseSubscript))(function (v3) {
-                  return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(Data_Name.name(Data_String.fromCharArray(Data_Semigroup.append(Data_Semigroup.semigroupArray)([ v ])(v1)) + v2)(v3));
+                  return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(Data_Name.name(Data_String_CodeUnits.fromCharArray(Data_Semigroup.append(Data_Semigroup.semigroupArray)([ v ])(v1)) + v2)(v3));
               });
           });
       });
@@ -27242,7 +26886,15 @@ var PS = {};
   var parseVar = Data_Functor.map(Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Syntax.Var.create)(parseName);
   var parseSyntax = (function () {
       var parseApply = function (p) {
-          var parseLambda = Control_Apply.apply(Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(Data_Functor.map(Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Syntax.Lambda.create)(Control_Apply.applySecond(Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(token(Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("\\"))(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("\u03bb"))))(parseName)))(Control_Apply.applySecond(Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(token(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)(".")))(p));
+          var parseLambda = Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Functor["void"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(token(Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("\\"))(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("\u03bb")))))(function () {
+              return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.some(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(parseName))(function (v) {
+                  return Control_Bind.discard(Control_Bind.discardUnit)(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Functor["void"](Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(token(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("."))))(function () {
+                      return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(p)(function (v1) {
+                          return Control_Applicative.pure(Text_Parsing_Parser.applicativeParserT(Data_Identity.monadIdentity))(Data_Foldable.foldr(Data_Foldable.foldableArray)(Data_Syntax.Lambda.create)(v1)(v));
+                      });
+                  });
+              });
+          });
           var parseAtom = Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(parseLambda)(parseNat))(parseList(p)))(parens(p)))(parseVar);
           return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(parseAtom)(function (v) {
               return Control_Bind.bind(Text_Parsing_Parser.bindParserT(Data_Identity.monadIdentity))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(parseAtom))(function (v1) {
@@ -27259,698 +26911,33 @@ var PS = {};
       return function (v1) {
           return function (v2) {
               return {
-                  name: v, 
-                  args: v1, 
+                  name: v,
+                  args: v1,
                   syntax: v2
               };
           };
       };
   })(parseName))(Data_Array.many(Text_Parsing_Parser.alternativeParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser.lazyParserT)(parseName)))(Control_Apply.applySecond(Text_Parsing_Parser.applyParserT(Data_Identity.monadIdentity))(token(Text_Parsing_Parser_String.string(Text_Parsing_Parser_String.stringLikeString)(Data_Identity.monadIdentity)("=")))(parseSyntax));
   var parseEither = Control_Alt.alt(Text_Parsing_Parser.altParserT(Data_Identity.monadIdentity))(Text_Parsing_Parser_Combinators["try"](Data_Identity.monadIdentity)(Data_Functor.map(Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Either.Left.create)(parseDefinition)))(Data_Functor.map(Text_Parsing_Parser.functorParserT(Data_Identity.functorIdentity))(Data_Either.Right.create)(parseSyntax));
-  exports["formatParseError"] = formatParseError;
   exports["parseAll"] = parseAll;
   exports["parseDefinition"] = parseDefinition;
-  exports["parseEither"] = parseEither;
   exports["parseSyntax"] = parseSyntax;
+  exports["parseEither"] = parseEither;
   exports["unsafeParse"] = unsafeParse;
+  exports["formatParseError"] = formatParseError;
 })(PS["Data.Parse"] = PS["Data.Parse"] || {});
 (function(exports) {
-  /* global exports */
+  // Generated by purs version 0.12.0
   "use strict";
-  var React =require("react"); 
-
-  function getProps(this_) {
-    return function(){
-      return this_.props;
-    };
-  }
-  exports.getProps = getProps;
-
-  function getRefs(this_) {
-    return function(){
-      return this_.refs;
-    };
-  }                         
-
-  function childrenToArray(children) {
-    var result = [];
-
-    React.Children.forEach(children, function(child){
-      result.push(child);
-    });
-
-    return result;
-  }                                         
-
-  function getChildren(this_) {
-    return function(){
-      var children = this_.props.children;
-
-      var result = childrenToArray(children);
-
-      return result;
-    };
-  }
-  exports.getChildren = getChildren;
-
-  function writeState(this_) {
-    return function(state){
-      return function(){
-        this_.setState({
-          state: state
-        });
-        return state;
-      };
-    };
-  }                               
-
-  function writeStateWithCallback(this_, cb) {
-    return function(state){
-      return function(cb){
-        return function() {
-          this_.setState({
-            state: state
-          }, cb);
-          return state;
-        };
-      };
-    };
-  }
-  exports.writeStateWithCallback = writeStateWithCallback;
-
-  function readState(this_) {
-    return function(){
-      return this_.state.state;
-    };
-  }
-  exports.readState = readState;
-
-  function transformState(this_){
-    return function(update){
-      return function(){
-        this_.setState(function(old, props){
-          return {state: update(old.state)};
-        });
-      };
-    };
-  }                                       
-
-  function createClass(spec) {
-    var result = {
-      displayName: spec.displayName,
-      render: function(){
-        return spec.render(this)();
-      },
-      getInitialState: function(){
-        return {
-          state: spec.getInitialState(this)()
-        };
-      },
-      componentWillMount: function(){
-        return spec.componentWillMount(this)();
-      },
-      componentDidMount: function(){
-        return spec.componentDidMount(this)();
-      },
-      componentWillReceiveProps: function(nextProps){
-        return spec.componentWillReceiveProps(this)(nextProps)();
-      },
-      shouldComponentUpdate: function(nextProps, nextState){
-        return spec.shouldComponentUpdate(this)(nextProps)(nextState.state)();
-      },
-      componentWillUpdate: function(nextProps, nextState){
-        return spec.componentWillUpdate(this)(nextProps)(nextState.state)();
-      },
-      componentDidUpdate: function(prevProps, prevState){
-        return spec.componentDidUpdate(this)(prevProps)(prevState.state)();
-      },
-      componentWillUnmount: function(){
-        return spec.componentWillUnmount(this)();
-      }
-    };
-
-    return React.createClass(result);
-  }
-  exports.createClass = createClass;
-
-  function handle(f) {
-    return function(e){
-      return f(e)();
-    };
-  };
-  exports.handle = handle;
-
-  function createElement(class_) {
-    return function(props){
-      return function(children){
-        return React.createElement.apply(React, [class_, props].concat(children));
-      };
-    };
-  }
-  exports.createElement = createElement;
-  exports.createElementTagName = createElement;
-
-  function createElementDynamic(class_) {
-    return function(props) {
-      return function(children){
-        return React.createElement(class_, props, children);
-      };
-    };
-  };
-  exports.createElementDynamic = createElementDynamic;
-  exports.createElementTagNameDynamic = createElementDynamic;
-
-  function createFactory(class_) {
-    return React.createFactory(class_);
-  }
-  exports.createFactory = createFactory;
-
-  function preventDefault(event) {
-    return function() { return event.preventDefault();}
-  };                                      
-
-  function stopPropagation(event) {
-    return function() { return event.stopPropagation();}
-  };
-})(PS["React"] = PS["React"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["React"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];
-  var Unsafe_Coerce = PS["Unsafe.Coerce"];        
-  var spec$prime = function (getInitialState) {
-      return function (renderFn) {
-          return {
-              render: renderFn, 
-              displayName: "", 
-              getInitialState: getInitialState, 
-              componentWillMount: function (v) {
-                  return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit);
-              }, 
-              componentDidMount: function (v) {
-                  return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit);
-              }, 
-              componentWillReceiveProps: function (v) {
-                  return function (v1) {
-                      return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit);
-                  };
-              }, 
-              shouldComponentUpdate: function (v) {
-                  return function (v1) {
-                      return function (v2) {
-                          return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(true);
-                      };
-                  };
-              }, 
-              componentWillUpdate: function (v) {
-                  return function (v1) {
-                      return function (v2) {
-                          return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit);
-                      };
-                  };
-              }, 
-              componentDidUpdate: function (v) {
-                  return function (v1) {
-                      return function (v2) {
-                          return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit);
-                      };
-                  };
-              }, 
-              componentWillUnmount: function (v) {
-                  return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit);
-              }
-          };
-      };
-  };
-  var spec = function (state) {
-      return spec$prime(function (v) {
-          return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(state);
-      });
-  };
-  exports["spec"] = spec;
-  exports["createClass"] = $foreign.createClass;
-  exports["createElementTagName"] = $foreign.createElementTagName;
-  exports["createElementTagNameDynamic"] = $foreign.createElementTagNameDynamic;
-  exports["createFactory"] = $foreign.createFactory;
-  exports["getChildren"] = $foreign.getChildren;
-  exports["getProps"] = $foreign.getProps;
-  exports["handle"] = $foreign.handle;
-  exports["readState"] = $foreign.readState;
-  exports["writeStateWithCallback"] = $foreign.writeStateWithCallback;
-})(PS["React"] = PS["React"] || {});
-(function(exports) {
-  /* global exports */
-  "use strict";
-  var React =require("react"); 
-
-  function unsafeMkProps(key) {
-    return function(value){
-      var result = {};
-      result[key] = value;
-      return result;
-    };
-  }
-  exports.unsafeMkProps = unsafeMkProps;
-
-  function unsafeUnfoldProps(key) {
-    return function(value){
-      var result = {};
-      var props = {};
-      props[key] = result;
-
-      for (var subprop in value) {
-        if (value.hasOwnProperty(subprop)) {
-          result[subprop] = value[subprop];
-        }
-      }
-
-      return props;
-    };
-  }                                             
-
-  function unsafePrefixProps(prefix) {
-    return function(value){
-      var result = {};
-
-      for (var prop in value) {
-        if (value.hasOwnProperty(prop)) {
-          result[prefix + prop] = value[prop];
-        }
-      }
-
-      return result;
-    };
-  }                                             
-
-  function unsafeFromPropsArray(props) {
-    var result = {};
-
-    for (var i = 0, len = props.length; i < len; i++) {
-      var prop = props[i];
-
-      for (var key in prop) {
-        if (prop.hasOwnProperty(key)) {
-          result[key] = prop[key];
-        }
-      }
-    }
-
-    return result;
-  };
-  exports.unsafeFromPropsArray = unsafeFromPropsArray;
-})(PS["React.DOM.Props"] = PS["React.DOM.Props"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["React.DOM.Props"];
-  var React = PS["React"];                    
-  var value = $foreign.unsafeMkProps("value");  
-  var placeholder = $foreign.unsafeMkProps("placeholder");
-  var onKeyUp = function (f) {
-      return $foreign.unsafeMkProps("onKeyUp")(React.handle(f));
-  };
-  var onClick = function (f) {
-      return $foreign.unsafeMkProps("onClick")(React.handle(f));
-  };
-  var onChange = function (f) {
-      return $foreign.unsafeMkProps("onChange")(React.handle(f));
-  };                                                
-  var href = $foreign.unsafeMkProps("href");      
-  var className = $foreign.unsafeMkProps("className");
-  exports["className"] = className;
-  exports["href"] = href;
-  exports["onChange"] = onChange;
-  exports["onClick"] = onClick;
-  exports["onKeyUp"] = onKeyUp;
-  exports["placeholder"] = placeholder;
-  exports["value"] = value;
-  exports["unsafeFromPropsArray"] = $foreign.unsafeFromPropsArray;
-})(PS["React.DOM.Props"] = PS["React.DOM.Props"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var React = PS["React"];
-  var React_DOM_Props = PS["React.DOM.Props"];
-  var Unsafe_Coerce = PS["Unsafe.Coerce"];
-  var text = Unsafe_Coerce.unsafeCoerce;
-  var mkDOM = function (dynamic) {
-      return function (tag) {
-          return function (props) {
-              var createElement = (function () {
-                  if (!dynamic) {
-                      return React.createElementTagName;
-                  };
-                  if (dynamic) {
-                      return React.createElementTagNameDynamic;
-                  };
-                  throw new Error("Failed pattern match at React.DOM line 15, column 5 - line 17, column 55: " + [ dynamic.constructor.name ]);
-              })();
-              return createElement(tag)(React_DOM_Props.unsafeFromPropsArray(props));
-          };
-      };
-  };                                
-  var pre = mkDOM(false)("pre");  
-  var span = mkDOM(false)("span");
-  var input = mkDOM(false)("input");
-  var hr = mkDOM(false)("hr");
-  var hr$prime = hr([  ]);
-  var h4 = mkDOM(false)("h4");
-  var h4$prime = h4([  ]);
-  var h3 = mkDOM(false)("h3");
-  var h3$prime = h3([  ]);
-  var h2 = mkDOM(false)("h2");
-  var h2$prime = h2([  ]);
-  var div = mkDOM(false)("div");
-  var div$prime = div([  ]);      
-  var button = mkDOM(false)("button");
-  var a = mkDOM(false)("a");
-  exports["a"] = a;
-  exports["button"] = button;
-  exports["div"] = div;
-  exports["div'"] = div$prime;
-  exports["h2"] = h2;
-  exports["h2'"] = h2$prime;
-  exports["h3"] = h3;
-  exports["h3'"] = h3$prime;
-  exports["h4"] = h4;
-  exports["h4'"] = h4$prime;
-  exports["hr"] = hr;
-  exports["hr'"] = hr$prime;
-  exports["input"] = input;
-  exports["mkDOM"] = mkDOM;
-  exports["pre"] = pre;
-  exports["span"] = span;
-  exports["text"] = text;
-})(PS["React.DOM"] = PS["React.DOM"] || {});
-(function(exports) {
-  /* global window */
-  "use strict";
-
-  exports.window = function () {
-    return window;
-  };
-})(PS["DOM.HTML"] = PS["DOM.HTML"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["DOM.HTML.Types"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var DOM_Event_Types = PS["DOM.Event.Types"];
-  var DOM_Node_Types = PS["DOM.Node.Types"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Foreign = PS["Data.Foreign"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_List_Types = PS["Data.List.Types"];
-  var Prelude = PS["Prelude"];
-  var Unsafe_Coerce = PS["Unsafe.Coerce"];                  
-  var htmlElementToElement = Unsafe_Coerce.unsafeCoerce;
-  exports["htmlElementToElement"] = htmlElementToElement;
-})(PS["DOM.HTML.Types"] = PS["DOM.HTML.Types"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["DOM.HTML"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var DOM = PS["DOM"];
-  var DOM_HTML_Types = PS["DOM.HTML.Types"];
-  exports["window"] = $foreign.window;
-})(PS["DOM.HTML"] = PS["DOM.HTML"] || {});
-(function(exports) {
-    "use strict";
-
-  exports._body = function (doc) {
-    return function () {
-      return doc.body;
-    };
-  };
-})(PS["DOM.HTML.Document"] = PS["DOM.HTML.Document"] || {});
-(function(exports) {
-    "use strict";        
-
-  exports.nullable = function (a, r, f) {
-    return a == null ? r : f(a);
-  };
-})(PS["Data.Nullable"] = PS["Data.Nullable"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Nullable"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Show = PS["Data.Show"];
-  var Prelude = PS["Prelude"];                                          
-  var toMaybe = function (n) {
-      return $foreign.nullable(n, Data_Maybe.Nothing.value, Data_Maybe.Just.create);
-  };
-  exports["toMaybe"] = toMaybe;
-})(PS["Data.Nullable"] = PS["Data.Nullable"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["DOM.HTML.Document"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var DOM = PS["DOM"];
-  var DOM_HTML_Types = PS["DOM.HTML.Types"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Nullable = PS["Data.Nullable"];
-  var Prelude = PS["Prelude"];        
-  var body = function ($0) {
-      return Data_Functor.map(Control_Monad_Eff.functorEff)(Data_Nullable.toMaybe)($foreign._body($0));
-  };
-  exports["body"] = body;
-})(PS["DOM.HTML.Document"] = PS["DOM.HTML.Document"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.document = function (window) {
-    return function () {
-      return window.document;
-    };
-  };
-})(PS["DOM.HTML.Window"] = PS["DOM.HTML.Window"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["DOM.HTML.Window"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var DOM = PS["DOM"];
-  var DOM_HTML_Types = PS["DOM.HTML.Types"];
-  var DOM_WebStorage_Types = PS["DOM.WebStorage.Types"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Nullable = PS["Data.Nullable"];
-  var Data_Ord = PS["Data.Ord"];
-  var Prelude = PS["Prelude"];
-  exports["document"] = $foreign.document;
-})(PS["DOM.HTML.Window"] = PS["DOM.HTML.Window"] || {});
-(function(exports) {
-  /* global exports */
-  "use strict";
-  var ReactDOM =require("react-dom");
-  var ReactDOMServer =require("react-dom/server"); 
-
-  exports.renderImpl = function (nothing, just, element, container) {
-    var result = ReactDOM.render(element, container);
-    return result === null ? nothing : just(result);
-  };
-})(PS["ReactDOM"] = PS["ReactDOM"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.runEffFn4 = function runEffFn4(fn) {
-    return function(a) {
-      return function(b) {
-        return function(c) {
-          return function(d) {
-            return function() {
-              return fn(a, b, c, d);
-            };
-          };
-        };
-      };
-    };
-  };
-})(PS["Control.Monad.Eff.Uncurried"] = PS["Control.Monad.Eff.Uncurried"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Control.Monad.Eff.Uncurried"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  exports["runEffFn4"] = $foreign.runEffFn4;
-})(PS["Control.Monad.Eff.Uncurried"] = PS["Control.Monad.Eff.Uncurried"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["ReactDOM"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Monad_Eff_Uncurried = PS["Control.Monad.Eff.Uncurried"];
-  var DOM = PS["DOM"];
-  var DOM_Node_Types = PS["DOM.Node.Types"];
-  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var React = PS["React"];                                                                     
-  var render = Control_Monad_Eff_Uncurried.runEffFn4($foreign.renderImpl)(Data_Maybe.Nothing.value)(Data_Maybe.Just.create);
-  exports["render"] = render;
-})(PS["ReactDOM"] = PS["ReactDOM"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Coroutine = PS["Control.Coroutine"];
-  var Control_Monad_Aff = PS["Control.Monad.Aff"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Monad_Eff_Class = PS["Control.Monad.Eff.Class"];
-  var Control_Monad_Eff_Unsafe = PS["Control.Monad.Eff.Unsafe"];
-  var Control_Monad_Free_Trans = PS["Control.Monad.Free.Trans"];
-  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var DOM = PS["DOM"];
-  var DOM_HTML = PS["DOM.HTML"];
-  var DOM_HTML_Document = PS["DOM.HTML.Document"];
-  var DOM_HTML_Types = PS["DOM.HTML.Types"];
-  var DOM_HTML_Window = PS["DOM.HTML.Window"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_Lens = PS["Data.Lens"];
-  var Data_Lens_Fold = PS["Data.Lens.Fold"];
-  var Data_Lens_Getter = PS["Data.Lens.Getter"];
-  var Data_Lens_Internal_Forget = PS["Data.Lens.Internal.Forget"];
-  var Data_Lens_Internal_Market = PS["Data.Lens.Internal.Market"];
-  var Data_Lens_Internal_Tagged = PS["Data.Lens.Internal.Tagged"];
-  var Data_Lens_Lens = PS["Data.Lens.Lens"];
-  var Data_Lens_Prism = PS["Data.Lens.Prism"];
-  var Data_Lens_Setter = PS["Data.Lens.Setter"];
-  var Data_List = PS["Data.List"];
-  var Data_List_Types = PS["Data.List.Types"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Maybe_First = PS["Data.Maybe.First"];
-  var Data_Monoid = PS["Data.Monoid"];
-  var Data_Profunctor_Choice = PS["Data.Profunctor.Choice"];
-  var Data_Profunctor_Strong = PS["Data.Profunctor.Strong"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];
-  var React = PS["React"];
-  var React_DOM = PS["React.DOM"];
-  var ReactDOM = PS["ReactDOM"];
-  var simpleSpec = function (performAction) {
-      return function (render) {
-          return {
-              performAction: performAction, 
-              render: render
-          };
-      };
-  };  
-  var modifyState = Control_Coroutine.cotransform(Control_Monad_Aff.monadAff);
-  var createReactSpec$prime = function (wrap) {
-      return function (v) {
-          var dispatcher = function ($$this) {
-              return function (action) {
-                  return Data_Functor["void"](Control_Monad_Eff.functorEff)(function __do() {
-                      var v1 = React.getProps($$this)();
-                      var v2 = React.readState($$this)();
-                      var cotransformer = v.performAction(action)(v1)(v2);
-                      var step = function (cot) {
-                          return Control_Bind.bind(Control_Monad_Aff.bindAff)(Control_Monad_Free_Trans.resume(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.monadRecAff)(cot))(function (v3) {
-                              if (v3 instanceof Data_Either.Left) {
-                                  return Control_Applicative.pure(Control_Monad_Aff.applicativeAff)(new Control_Monad_Rec_Class.Done(Data_Unit.unit));
-                              };
-                              if (v3 instanceof Data_Either.Right) {
-                                  return Control_Bind.bind(Control_Monad_Aff.bindAff)(Control_Monad_Eff_Class.liftEff(Control_Monad_Aff.monadEffAff)(Control_Monad_Eff_Unsafe.unsafeCoerceEff(React.readState($$this))))(function (v4) {
-                                      var newState = v3.value0.value0(v4);
-                                      return Control_Bind.bind(Control_Monad_Aff.bindAff)(Control_Monad_Aff.makeAff(function (v5) {
-                                          return function (k1) {
-                                              return Control_Monad_Eff_Unsafe.unsafeCoerceEff(Data_Functor["void"](Control_Monad_Eff.functorEff)(React.writeStateWithCallback($$this)(newState)(Control_Monad_Eff_Unsafe.unsafeCoerceEff(k1(newState)))));
-                                          };
-                                      }))(function (v5) {
-                                          return Control_Applicative.pure(Control_Monad_Aff.applicativeAff)(new Control_Monad_Rec_Class.Loop(v3.value0.value1(new Data_Maybe.Just(newState))));
-                                      });
-                                  });
-                              };
-                              throw new Error("Failed pattern match at Thermite line 250, column 13 - line 257, column 48: " + [ v3.constructor.name ]);
-                          });
-                      };
-                      return Control_Monad_Eff_Unsafe.unsafeCoerceEff(Control_Monad_Aff.launchAff(Control_Monad_Rec_Class.tailRecM(Control_Monad_Aff.monadRecAff)(step)(cotransformer)))();
-                  });
-              };
-          };
-          var render = function ($$this) {
-              return Data_Functor.map(Control_Monad_Eff.functorEff)(wrap)(Control_Apply.apply(Control_Monad_Eff.applyEff)(Control_Apply.apply(Control_Monad_Eff.applyEff)(Data_Functor.map(Control_Monad_Eff.functorEff)(v.render(dispatcher($$this)))(React.getProps($$this)))(React.readState($$this)))(React.getChildren($$this)));
-          };
-          return function (state) {
-              return {
-                  spec: React.spec(state)(render), 
-                  dispatcher: dispatcher
-              };
-          };
-      };
-  };
-  var createReactSpec = createReactSpec$prime(React_DOM["div'"]);
-  var createClass = function (spec) {
-      return function (state) {
-          return React.createClass((function (v) {
-              return v.spec;
-          })(createReactSpec(spec)(state)));
-      };
-  };
-  var defaultMain = function (spec) {
-      return function (initialState) {
-          return function (props) {
-              return Data_Functor["void"](Control_Monad_Eff.functorEff)((function () {
-                  var component = createClass(spec)(initialState);
-                  return function __do() {
-                      var v = Control_Bind.bind(Control_Monad_Eff.bindEff)(DOM_HTML.window)(DOM_HTML_Window.document)();
-                      var v1 = DOM_HTML_Document.body(v)();
-                      return Data_Foldable.traverse_(Control_Monad_Eff.applicativeEff)(Data_Foldable.foldableMaybe)(function ($108) {
-                          return ReactDOM.render(React.createFactory(component)(props))(DOM_HTML_Types.htmlElementToElement($108));
-                      })(v1)();
-                  };
-              })());
-          };
-      };
-  };
-  exports["createClass"] = createClass;
-  exports["createReactSpec"] = createReactSpec;
-  exports["defaultMain"] = defaultMain;
-  exports["modifyState"] = modifyState;
-  exports["simpleSpec"] = simpleSpec;
-})(PS["Thermite"] = PS["Thermite"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Component_Event = PS["Component.Event"];
+  var Components_Alert = PS["Components.Alert"];
+  var Components_Controls = PS["Components.Controls"];
+  var Components_Definitions = PS["Components.Definitions"];
+  var Components_Expressions = PS["Components.Expressions"];
+  var Components_Footer = PS["Components.Footer"];
+  var Components_Input = PS["Components.Input"];
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Coroutine = PS["Control.Coroutine"];
-  var Control_Monad_Aff = PS["Control.Monad.Aff"];
-  var Control_Monad_Eff_Class = PS["Control.Monad.Eff.Class"];
-  var Control_Monad_Eff_Save = PS["Control.Monad.Eff.Save"];
-  var Control_Monad_Free_Trans = PS["Control.Monad.Free.Trans"];
-  var Control_Monad_Trans_Class = PS["Control.Monad.Trans.Class"];
+  var Control_MonadZero = PS["Control.MonadZero"];
   var Control_Semigroupoid = PS["Control.Semigroupoid"];
   var Data_Array = PS["Data.Array"];
   var Data_Either = PS["Data.Either"];
@@ -27959,475 +26946,311 @@ var PS = {};
   var Data_Foldable = PS["Data.Foldable"];
   var Data_Function = PS["Data.Function"];
   var Data_Functor = PS["Data.Functor"];
+  var Data_Level = PS["Data.Level"];
   var Data_Map = PS["Data.Map"];
+  var Data_Map_Internal = PS["Data.Map.Internal"];
   var Data_Maybe = PS["Data.Maybe"];
-  var Data_Monoid = PS["Data.Monoid"];
   var Data_Name = PS["Data.Name"];
   var Data_Parse = PS["Data.Parse"];
   var Data_PrettyPrint = PS["Data.PrettyPrint"];
-  var Data_Semigroup = PS["Data.Semigroup"];
   var Data_Set = PS["Data.Set"];
-  var Data_Show = PS["Data.Show"];
   var Data_Syntax = PS["Data.Syntax"];
-  var Data_Traversable = PS["Data.Traversable"];
   var Data_Tuple = PS["Data.Tuple"];
   var Data_Unit = PS["Data.Unit"];
+  var Effect = PS["Effect"];
   var Prelude = PS["Prelude"];
-  var React = PS["React"];
-  var React_DOM = PS["React.DOM"];
-  var React_DOM_Props = PS["React.DOM.Props"];
-  var Thermite = PS["Thermite"];        
-  var Warning = (function () {
-      function Warning() {
-
-      };
-      Warning.value = new Warning();
-      return Warning;
-  })();
-  var Danger = (function () {
-      function Danger() {
-
-      };
-      Danger.value = new Danger();
-      return Danger;
-  })();
-  var DoNothing = (function () {
-      function DoNothing() {
-
-      };
-      DoNothing.value = new DoNothing();
-      return DoNothing;
-  })();
-  var NewText = (function () {
-      function NewText(value0) {
-          this.value0 = value0;
-      };
-      NewText.create = function (value0) {
-          return new NewText(value0);
-      };
-      return NewText;
-  })();
-  var ParseText = (function () {
-      function ParseText() {
-
-      };
-      ParseText.value = new ParseText();
-      return ParseText;
-  })();
-  var Reduce = (function () {
-      function Reduce(value0) {
-          this.value0 = value0;
-      };
-      Reduce.create = function (value0) {
-          return new Reduce(value0);
-      };
-      return Reduce;
-  })();
-  var DismissAlert = (function () {
-      function DismissAlert() {
-
-      };
-      DismissAlert.value = new DismissAlert();
-      return DismissAlert;
-  })();
-  var Remove = (function () {
-      function Remove(value0) {
-          this.value0 = value0;
-      };
-      Remove.create = function (value0) {
-          return new Remove(value0);
-      };
-      return Remove;
-  })();
-  var Clear = (function () {
-      function Clear() {
-
-      };
-      Clear.value = new Clear();
-      return Clear;
-  })();
-  var Save = (function () {
-      function Save() {
-
-      };
-      Save.value = new Save();
-      return Save;
-  })();
-  var ToggleSugar = (function () {
-      function ToggleSugar() {
-
-      };
-      ToggleSugar.value = new ToggleSugar();
-      return ToggleSugar;
-  })();
-  var showLevel = new Data_Show.Show(function (v) {
-      if (v instanceof Warning) {
-          return "warning";
-      };
-      if (v instanceof Danger) {
-          return "danger";
-      };
-      throw new Error("Failed pattern match at Component.App line 68, column 3 - line 69, column 3: " + [ v.constructor.name ]);
-  });
-  var save = function (s) {
-      var allDefs = Data_Semigroup.append(Data_Semigroup.semigroupArray)(Data_Functor.map(Data_Functor.functorArray)(Data_Syntax.defToDoc)(s.defs))(Data_Array.reverse(s.history));
-      var text = Data_Foldable.intercalate(Data_Foldable.foldableArray)(Data_Monoid.monoidString)("\x0a")(Data_Functor.map(Data_Functor.functorArray)(s.rep)(allDefs));
-      return Control_Monad_Aff.forkAff(Control_Monad_Eff_Class.liftEff(Control_Monad_Aff.monadEffAff)(Control_Monad_Eff_Save.saveTextAs(text)("evaluation.txt")));
-  };
-  var renderSyntax = function (syntax) {
-      return React_DOM.h4([ React_DOM_Props.className("text-muted") ])([ React_DOM.text(syntax) ]);
-  };
-  var renderHistory = function (rep) {
-      return function (hs) {
-          var v = Data_Array.uncons(hs);
-          if (v instanceof Data_Maybe.Nothing) {
-              return [  ];
-          };
-          if (v instanceof Data_Maybe.Just) {
-              return Data_Array.cons(React_DOM["h4'"]([ React_DOM.text(rep(v.value0.head)) ]))(Data_Functor.map(Data_Functor.functorArray)(function ($93) {
-                  return renderSyntax(rep($93));
-              })(v.value0.tail));
-          };
-          throw new Error("Failed pattern match at Component.App line 369, column 3 - line 372, column 75: " + [ v.constructor.name ]);
-      };
-  };
-  var renderDef = function (send) {
-      return function (rep) {
-          return function (def) {
-              return React_DOM["h4'"]([ React_DOM.div([ React_DOM_Props.className("glyphicon glyphicon-remove"), React_DOM_Props.onClick(function (v) {
-                  return send(new Remove(def.name));
-              }) ])([  ]), React_DOM.text(" " + rep(Data_Syntax.defToDoc(def))) ]);
+  var React_Basic = PS["React.Basic"];
+  var React_Basic_DOM = PS["React.Basic.DOM"];
+  var React_Basic_DOM_Generated = PS["React.Basic.DOM.Generated"];                 
+  var updateText = function (text) {
+      return function (v) {
+          return {
+              text: text,
+              expr: v.expr,
+              history: v.history,
+              defs: v.defs,
+              env: v.env,
+              rep: v.rep,
+              error: v.error
           };
       };
   };
-  var renderDefs = function (send) {
-      return function (rep) {
-          return function (definitions) {
-              return [ React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM["h3'"]([ React_DOM.text("Definitions") ]) ]), React_DOM.div([ React_DOM_Props.className("col-sm-12 monospace-font col-sm-12") ])(Data_Functor.map(Data_Functor.functorArray)(renderDef(send)(rep))(definitions)) ];
+  var toggleSugar = function (s) {
+      return {
+          text: s.text,
+          expr: s.expr,
+          history: s.history,
+          defs: s.defs,
+          env: s.env,
+          rep: Data_PrettyPrint.toggleRep(s.rep),
+          error: s.error
+      };
+  };
+  var split = function (lhs) {
+      return function (rhs) {
+          return React_Basic_DOM_Generated.div()({
+              className: "row",
+              children: [ React_Basic_DOM_Generated.div()({
+                  className: "col-sm-6",
+                  children: [ lhs ]
+              }), React_Basic_DOM_Generated.div()({
+                  className: "col-sm-6",
+                  children: [ rhs ]
+              }) ]
+          });
+      };
+  };
+  var setExpr = function (syntax) {
+      var history = Control_Applicative.pure(Control_Applicative.applicativeArray)(Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(syntax));
+      var expr = Control_Applicative.pure(Data_Maybe.applicativeMaybe)(Data_Expr.syntaxToExpr(syntax));
+      return function (v) {
+          return {
+              text: "",
+              expr: expr,
+              history: history,
+              defs: v.defs,
+              env: v.env,
+              rep: v.rep,
+              error: v.error
           };
       };
+  };
+  var setError = function (message) {
+      return function (v) {
+          return {
+              text: v.text,
+              expr: v.expr,
+              history: v.history,
+              defs: v.defs,
+              env: v.env,
+              rep: v.rep,
+              error: Control_Applicative.pure(Data_Maybe.applicativeMaybe)(Data_Level.danger(message))
+          };
+      };
+  };
+  var row = function (child) {
+      return React_Basic_DOM_Generated.div()({
+          className: "row",
+          children: [ React_Basic_DOM_Generated.div()({
+              className: "col-sm-12",
+              children: [ child ]
+          }) ]
+      });
   };
   var reduce = function (expr) {
       return function (s) {
-          var v = Data_Expr.step(s.env)(expr);
+          var v = Data_Functor.map(Data_Maybe.functorMaybe)(Data_Expr.alpha)(Data_Expr.step(s.env)(expr));
           if (v instanceof Data_Maybe.Nothing) {
               return s;
           };
           if (v instanceof Data_Maybe.Just) {
-              var expr$prime$prime = Data_Expr.alpha(v.value0);
-              var $37 = {};
-              for (var $38 in s) {
-                  if ({}.hasOwnProperty.call(s, $38)) {
-                      $37[$38] = s[$38];
-                  };
+              return {
+                  text: s.text,
+                  expr: Control_Applicative.pure(Data_Maybe.applicativeMaybe)(v.value0),
+                  history: Data_Array.cons(Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax(v.value0)))(s.history),
+                  defs: s.defs,
+                  env: s.env,
+                  rep: s.rep,
+                  error: s.error
               };
-              $37.history = Data_Array.cons(Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax(expr$prime$prime)))(s.history);
-              $37.expr = new Data_Maybe.Just(expr$prime$prime);
-              return $37;
           };
-          throw new Error("Failed pattern match at Component.App line 212, column 3 - line 216, column 96: " + [ v.constructor.name ]);
+          throw new Error("Failed pattern match at Components.App line 246, column 3 - line 251, column 8: " + [ v.constructor.name ]);
       };
   };
   var initialDefs = Data_Functor.map(Data_Functor.functorArray)(Data_Parse.unsafeParse(Data_Parse.parseDefinition))([ "fix f = (\u03bbx. f (x x)) (\u03bby. f (y y))", "true t _ = t", "false _ f = f", "and x y = x y false", "or x y = x true y", "foldr f z l = l f z", "any = foldr or false", "all = foldr and true", "add m n s z = m s (n s z)", "mul m n s z = m (n s) z" ]);
   var initialEnv = (function () {
       var fromDef = function (def) {
-          return new Data_Tuple.Tuple(def.name, Data_Expr.syntaxToExpr(Data_Syntax.defToSyntax(def)));
+          return Data_Tuple.Tuple.create(def.name)(Data_Expr.syntaxToExpr(Data_Syntax.defToSyntax(def)));
       };
-      return Data_Map.fromFoldable(Data_Name.ordName)(Data_Foldable.foldableArray)(Data_Functor.map(Data_Functor.functorArray)(fromDef)(initialDefs));
+      return Data_Map_Internal.fromFoldable(Data_Name.ordName)(Data_Foldable.foldableArray)(Data_Functor.map(Data_Functor.functorArray)(fromDef)(initialDefs));
   })();
   var initialState = {
-      text: "", 
-      expr: Data_Maybe.Nothing.value, 
-      history: [  ], 
-      defs: initialDefs, 
-      env: initialEnv, 
-      rep: Data_PrettyPrint.raw, 
+      text: "",
+      expr: Data_Maybe.Nothing.value,
+      history: [  ],
+      defs: initialDefs,
+      env: initialEnv,
+      rep: Data_PrettyPrint.Raw.value,
       error: Data_Maybe.Nothing.value
   };
-  var ifSugar = function (rep) {
-      return function (s) {
-          return function (r) {
-              return rep(Data_PrettyPrint.doc({
-                  sugar: s, 
-                  raw: r
-              }));
-          };
-      };
-  };
-  var renderExprs = function (send) {
-      return function (rep) {
-          return function (history) {
-              return function (v) {
-                  if (v instanceof Data_Maybe.Nothing) {
-                      return [  ];
-                  };
-                  if (v instanceof Data_Maybe.Just) {
-                      return [ React_DOM.div([ React_DOM_Props.className("col-sm-6") ])([ React_DOM["h3'"]([ React_DOM.text("Evaluation") ]) ]), React_DOM.div([ React_DOM_Props.className("col-sm-6") ])([ React_DOM.div([ React_DOM_Props.className("add-margin-medium btn-group pull-right") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (v1) {
-                          return send(new Reduce(v.value0));
-                      }) ])([ React_DOM.text("Step") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (v1) {
-                          return send(Clear.value);
-                      }) ])([ React_DOM.text("Clear") ]), React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (v1) {
-                          return send(Save.value);
-                      }) ])([ React_DOM.text("Save") ]), React_DOM.button([ React_DOM_Props.className("btn " + ifSugar(rep)("btn-danger")("btn-success")), React_DOM_Props.onClick(function (v1) {
-                          return send(ToggleSugar.value);
-                      }) ])([ React_DOM.text(ifSugar(rep)("Raw")("Sugar")) ]) ]) ]), React_DOM.div([ React_DOM_Props.className("col-sm-12 hide-overflow") ])([ React_DOM.div([ React_DOM_Props.className("scroll-overflow monospace-font") ])(renderHistory(rep)(history)) ]) ];
-                  };
-                  throw new Error("Failed pattern match at Component.App line 328, column 1 - line 328, column 42: " + [ send.constructor.name, rep.constructor.name, history.constructor.name, v.constructor.name ]);
-              };
-          };
-      };
-  };
-  var toggleSugar = function (s) {
-      return ifSugar(s.rep)((function () {
-          var $46 = {};
-          for (var $47 in s) {
-              if ({}.hasOwnProperty.call(s, $47)) {
-                  $46[$47] = s[$47];
-              };
-          };
-          $46.rep = Data_PrettyPrint.raw;
-          return $46;
-      })())((function () {
-          var $49 = {};
-          for (var $50 in s) {
-              if ({}.hasOwnProperty.call(s, $50)) {
-                  $49[$50] = s[$50];
-              };
-          };
-          $49.rep = Data_PrettyPrint.sugar;
-          return $49;
-      })());
-  };
-  var header = React_DOM.div([ React_DOM_Props.className("page-header") ])([ React_DOM["h2'"]([ React_DOM.text("Lambda Machine") ]) ]);
-  var handleKeyPress = function (e) {
-      var v = Component_Event.getKeyCode(e);
-      if (v === 13) {
-          return ParseText.value;
-      };
-      return DoNothing.value;
-  };
-  var handleChangeEvent = function ($94) {
-      return NewText.create(Component_Event.getValue($94));
-  };
-  var input = function (send) {
-      return function (value) {
-          return React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.div([ React_DOM_Props.className("input-group") ])([ React_DOM.input([ React_DOM_Props.className("form-control monospace-font"), React_DOM_Props.placeholder("<definition> or <expression>"), React_DOM_Props.value(value), React_DOM_Props.onKeyUp(function ($95) {
-              return send(handleKeyPress($95));
-          }), React_DOM_Props.onChange(function ($96) {
-              return send(handleChangeEvent($96));
-          }) ])([  ]), React_DOM.span([ React_DOM_Props.className("input-group-btn") ])([ React_DOM.button([ React_DOM_Props.className("btn btn-default"), React_DOM_Props.onClick(function (v) {
-              return send(ParseText.value);
-          }) ])([ React_DOM.text("Parse") ]) ]) ]) ]);
-      };
-  };
-  var footer = React_DOM["div'"]([ React_DOM["hr'"]([  ]), React_DOM.a([ React_DOM_Props.href("https://github.com/cdparks/lambda-machine"), React_DOM_Props.className("pull-right") ])([ React_DOM.text("Source on GitHub") ]) ]);
-  var fail = function (message) {
-      return function (s) {
-          var $53 = {};
-          for (var $54 in s) {
-              if ({}.hasOwnProperty.call(s, $54)) {
-                  $53[$54] = s[$54];
-              };
-          };
-          $53.error = new Data_Maybe.Just(new Data_Tuple.Tuple(Danger.value, message));
-          return $53;
+  var deleteError = function (v) {
+      return {
+          text: v.text,
+          expr: v.expr,
+          history: v.history,
+          defs: v.defs,
+          env: v.env,
+          rep: v.rep,
+          error: Data_Maybe.Nothing.value
       };
   };
   var deleteByName = function (name) {
-      return Data_Array.filter(function ($97) {
+      return Data_Array.filter(function ($28) {
           return (function (v) {
               return Data_Eq.notEq(Data_Name.eqName)(v)(name);
           })((function (v) {
               return v.name;
-          })($97));
+          })($28));
       });
   };
-  var remove = function (name) {
+  var deleteDef = function (name) {
       return function (s) {
-          var env$prime = Data_Map["delete"](Data_Name.ordName)(name)(s.env);
-          var names = Data_Expr.namesReferencing(name)(env$prime);
-          var error = (function () {
-              var $56 = Data_Set.size(names) === 0;
-              if ($56) {
-                  return Data_Maybe.Nothing.value;
-              };
-              return new Data_Maybe.Just(new Data_Tuple.Tuple(Warning.value, Data_Expr.formatUndefinedWarning(name)(names)));
-          })();
-          var $57 = {};
-          for (var $58 in s) {
-              if ({}.hasOwnProperty.call(s, $58)) {
-                  $57[$58] = s[$58];
-              };
+          var env = Data_Map_Internal["delete"](Data_Name.ordName)(name)(s.env);
+          var names = Data_Expr.namesReferencing(name)(env);
+          var error = Control_Bind.discard(Control_Bind.discardUnit)(Data_Maybe.bindMaybe)(Control_MonadZero.guard(Data_Maybe.monadZeroMaybe)(Data_Set.size(names) !== 0))(function () {
+              return Control_Applicative.pure(Data_Maybe.applicativeMaybe)(Data_Level.warn(Data_Expr.formatUndefinedWarning(name)(names)));
+          });
+          return {
+              text: s.text,
+              expr: s.expr,
+              history: s.history,
+              defs: deleteByName(name)(s.defs),
+              env: env,
+              rep: s.rep,
+              error: error
           };
-          $57.defs = deleteByName(name)(s.defs);
-          $57.env = env$prime;
-          $57.error = error;
-          return $57;
       };
   };
   var clear = function (s) {
-      var $60 = {};
-      for (var $61 in s) {
-          if ({}.hasOwnProperty.call(s, $61)) {
-              $60[$61] = s[$61];
-          };
+      var toHistory = function ($29) {
+          return Control_Applicative.pure(Control_Applicative.applicativeArray)(Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax($29)));
       };
-      $60.history = Data_Maybe.maybe([  ])(function ($98) {
-          return Data_Array.singleton(Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(Data_Expr.exprToSyntax($98)));
-      })(s.expr);
-      return $60;
-  };
-  var alert = function (send) {
-      return function (v) {
-          if (v instanceof Data_Maybe.Nothing) {
-              return [  ];
-          };
-          if (v instanceof Data_Maybe.Just) {
-              return [ React_DOM.div([ React_DOM_Props.className("col-sm-12") ])([ React_DOM.pre([ React_DOM_Props.className("alert alert-" + Data_Show.show(showLevel)(v.value0.value0)) ])([ React_DOM.span([ React_DOM_Props.className("glyphicon glyphicon-remove pull-right"), React_DOM_Props.onClick(function (v1) {
-                  return send(DismissAlert.value);
-              }) ])([  ]), React_DOM.text(v.value0.value1) ]) ]) ];
-          };
-          throw new Error("Failed pattern match at Component.App line 267, column 1 - line 267, column 24: " + [ send.constructor.name, v.constructor.name ]);
-      };
-  };
-  var render = function (send) {
-      return function (v) {
-          return function (state) {
-              return function (v1) {
-                  return [ React_DOM.div([ React_DOM_Props.className("container") ])([ React_DOM.div([ React_DOM_Props.className("row") ])([ header ]), React_DOM.div([ React_DOM_Props.className("row") ])(alert(send)(state.error)), React_DOM.div([ React_DOM_Props.className("row") ])([ input(send)(state.text) ]), React_DOM.div([ React_DOM_Props.className("row") ])(renderDefs(send)(state.rep)(state.defs)), React_DOM.div([ React_DOM_Props.className("row") ])(renderExprs(send)(state.rep)(state.history)(state.expr)), React_DOM.div([ React_DOM_Props.className("row") ])([ footer ]) ]) ];
-              };
-          };
-      };
-  };
-  var addExpr = function (syntax) {
-      return function (s) {
-          var history = [ Data_PrettyPrint.prettyPrint(Data_Syntax.prettyPrintSyntax)(syntax) ];
-          var expr = new Data_Maybe.Just(Data_Expr.syntaxToExpr(syntax));
-          var $68 = {};
-          for (var $69 in s) {
-              if ({}.hasOwnProperty.call(s, $69)) {
-                  $68[$69] = s[$69];
-              };
-          };
-          $68.text = "";
-          $68.history = history;
-          $68.expr = expr;
-          return $68;
+      return {
+          text: s.text,
+          expr: s.expr,
+          history: Data_Maybe.maybe([  ])(toHistory)(s.expr),
+          defs: s.defs,
+          env: s.env,
+          rep: s.rep,
+          error: s.error
       };
   };
   var addDef = function (def) {
       return function (s) {
           var expr = Data_Expr.syntaxToExpr(Data_Syntax.defToSyntax(def));
-          var missing = Data_Expr.undefinedNames(expr)(Data_Map["delete"](Data_Name.ordName)(def.name)(s.env));
-          var env = Data_Map.insert(Data_Name.ordName)(def.name)(expr)(s.env);
+          var missing = Data_Expr.undefinedNames(expr)(Data_Map_Internal["delete"](Data_Name.ordName)(def.name)(s.env));
+          var env = Data_Map_Internal.insert(Data_Name.ordName)(def.name)(expr)(s.env);
           var defs = Data_Array.snoc(deleteByName(def.name)(s.defs))(def);
-          var $71 = Data_Set.size(missing) === 0;
-          if ($71) {
-              var $72 = {};
-              for (var $73 in s) {
-                  if ({}.hasOwnProperty.call(s, $73)) {
-                      $72[$73] = s[$73];
-                  };
+          var $17 = Data_Set.isEmpty(missing);
+          if ($17) {
+              return {
+                  text: "",
+                  expr: s.expr,
+                  history: s.history,
+                  defs: defs,
+                  env: env,
+                  rep: s.rep,
+                  error: s.error
               };
-              $72.text = "";
-              $72.defs = defs;
-              $72.env = env;
-              return $72;
           };
-          return fail(Data_Expr.formatUndefinedError(s.text)(missing))(s);
+          return setError(Data_Expr.formatUndefinedError(s.text)(missing))(s);
       };
   };
-  var parse = function (s) {
+  var parseText = function (s) {
       if (s.text === "") {
           return s;
       };
       var v = Data_Parse.parseAll(Data_Parse.parseEither)(s.text);
       if (v instanceof Data_Either.Left) {
-          return fail(Data_Parse.formatParseError(s.text)(v.value0))(s);
+          return setError(Data_Parse.formatParseError(s.text)(v.value0))(s);
       };
       if (v instanceof Data_Either.Right && v.value0 instanceof Data_Either.Left) {
           return addDef(v.value0.value0)(s);
       };
       if (v instanceof Data_Either.Right && v.value0 instanceof Data_Either.Right) {
-          return addExpr(v.value0.value0)(s);
+          return setExpr(v.value0.value0)(s);
       };
-      throw new Error("Failed pattern match at Component.App line 169, column 3 - line 175, column 23: " + [ v.constructor.name ]);
+      throw new Error("Failed pattern match at Components.App line 202, column 3 - line 208, column 23: " + [ v.constructor.name ]);
   };
-  var update = function (action) {
-      return function (v) {
-          return function (v1) {
-              if (action instanceof DoNothing) {
-                  return Control_Applicative.pure(Control_Monad_Free_Trans.applicativeFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.monadAff))(Data_Unit.unit);
-              };
-              if (action instanceof NewText) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Thermite.modifyState(function (s) {
-                      var $83 = {};
-                      for (var $84 in s) {
-                          if ({}.hasOwnProperty.call(s, $84)) {
-                              $83[$84] = s[$84];
-                          };
-                      };
-                      $83.text = action.value0;
-                      $83.error = Data_Maybe.Nothing.value;
-                      return $83;
-                  }));
-              };
-              if (action instanceof DismissAlert) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Thermite.modifyState(function (s) {
-                      var $87 = {};
-                      for (var $88 in s) {
-                          if ({}.hasOwnProperty.call(s, $88)) {
-                              $87[$88] = s[$88];
-                          };
-                      };
-                      $87.error = Data_Maybe.Nothing.value;
-                      return $87;
-                  }));
-              };
-              if (action instanceof Remove) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Thermite.modifyState(remove(action.value0)));
-              };
-              if (action instanceof ParseText) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Thermite.modifyState(parse));
-              };
-              if (action instanceof Reduce) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Thermite.modifyState(reduce(action.value0)));
-              };
-              if (action instanceof Clear) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Thermite.modifyState(clear));
-              };
-              if (action instanceof Save) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Control_Bind.bind(Control_Monad_Free_Trans.bindFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.monadAff))(Thermite.modifyState(Control_Category.id(Control_Category.categoryFn)))(function (v2) {
-                      return Data_Traversable["for"](Control_Monad_Free_Trans.applicativeFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.monadAff))(Data_Traversable.traversableMaybe)(v2)(function (state) {
-                          return Data_Functor.voidRight(Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(state)(Control_Monad_Trans_Class.lift(Control_Monad_Free_Trans.monadTransFreeT(Control_Coroutine.functorCoTransform))(Control_Monad_Aff.monadAff)(save(state)));
-                      });
-                  }));
-              };
-              if (action instanceof ToggleSugar) {
-                  return Data_Functor["void"](Control_Monad_Free_Trans.functorFreeT(Control_Coroutine.functorCoTransform)(Control_Monad_Aff.functorAff))(Thermite.modifyState(toggleSugar));
-              };
-              throw new Error("Failed pattern match at Component.App line 131, column 3 - line 151, column 39: " + [ action.constructor.name ]);
-          };
+  var component = (function () {
+      var render = function (v) {
+          return React_Basic_DOM_Generated.div()({
+              className: "container",
+              children: [ row(React_Basic_DOM_Generated.h2()({
+                  className: "page-header",
+                  children: [ React_Basic_DOM.text("Lambda Machine") ]
+              })), row(React_Basic.element(Components_Alert.component)({
+                  error: v.state.error,
+                  dismiss: v.setState(deleteError)
+              })), row(React_Basic.element(Components_Input.component)({
+                  text: v.state.text,
+                  onChange: function ($30) {
+                      return v.setState(updateText($30));
+                  },
+                  onSubmit: v.setState(parseText)
+              })), row(React_Basic_DOM_Generated.h3_([ React_Basic_DOM.text("Definitions") ])), row(React_Basic.element(Components_Definitions.component)({
+                  defs: v.state.defs,
+                  rep: v.state.rep,
+                  onDelete: function ($31) {
+                      return v.setState(deleteDef($31));
+                  }
+              })), split(React_Basic_DOM_Generated.h3_([ React_Basic_DOM.text("Evaluation") ]))(React_Basic.element(Components_Controls.component)({
+                  expr: v.state.expr,
+                  onStep: function ($32) {
+                      return v.setState(reduce($32));
+                  },
+                  onClear: v.setState(clear),
+                  onSave: v.setState(function (s) {
+                      return s;
+                  }),
+                  onSugar: v.setState(toggleSugar),
+                  rep: v.state.rep
+              })), row(React_Basic.element(Components_Expressions.component)({
+                  history: v.state.history,
+                  rep: v.state.rep
+              })), row(React_Basic.element(Components_Footer.component)({})) ]
+          });
       };
-  };
-  var spec = Thermite.simpleSpec(update)(render);
-  exports["initialState"] = initialState;
-  exports["spec"] = spec;
-  exports["showLevel"] = showLevel;
-})(PS["Component.App"] = PS["Component.App"] || {});
+      var receiveProps = function (v) {
+          return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
+      };
+      return React_Basic.component({
+          displayName: "App",
+          initialState: initialState,
+          receiveProps: receiveProps,
+          render: render
+      });
+  })();
+  exports["component"] = component;
+})(PS["Components.App"] = PS["Components.App"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
+    'use strict';
+  var React =require("react");
+  var ReactDOM =require("react-dom"); 
+
+  exports.renderToId = function(id) {
+    return function(component) {
+      return function(props) {
+        return function() {
+          var element = document.getElementById(id);
+          if (!element) {
+            throw new Error("No such element: " + id);
+          }
+          ReactDOM.render(React.createElement(component, props), element);
+          return {};
+        }
+      }
+    }
+  }
+})(PS["React.Render"] = PS["React.Render"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
   "use strict";
-  var Component_App = PS["Component.App"];
-  var Control_Monad_Eff = PS["Control.Monad.Eff"];
-  var Control_Monad_Eff_Save = PS["Control.Monad.Eff.Save"];
-  var DOM = PS["DOM"];
-  var Data_Unit = PS["Data.Unit"];
+  var $foreign = PS["React.Render"];
+  var Effect = PS["Effect"];
   var Prelude = PS["Prelude"];
-  var Thermite = PS["Thermite"];        
-  var main = Thermite.defaultMain(Component_App.spec)(Component_App.initialState)(Data_Unit.unit);
+  var React_Basic = PS["React.Basic"];
+  exports["renderToId"] = $foreign.renderToId;
+})(PS["React.Render"] = PS["React.Render"] || {});
+(function(exports) {
+  // Generated by purs version 0.12.0
+  "use strict";
+  var Components_App = PS["Components.App"];
+  var Effect = PS["Effect"];
+  var Prelude = PS["Prelude"];
+  var React_Render = PS["React.Render"];                 
+  var main = React_Render.renderToId("root")(Components_App.component)({});
   exports["main"] = main;
 })(PS["Main"] = PS["Main"] || {});
 PS["Main"].main();
-
-},{"react":185,"react-dom":30,"react-dom/server":159}]},{},[186]);
+},{"react":183,"react-dom":31}]},{},[184]);
