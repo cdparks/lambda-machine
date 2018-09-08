@@ -18,19 +18,30 @@ type Props =
   { text :: String
   , onChange :: String -> Effect Unit
   , onSubmit :: Effect Unit
+  , onHelp :: Effect Unit
   }
 
 component :: React.Component Props
 component =
   React.stateless {displayName: "Input", render}
  where
-  render {text, onChange, onSubmit} =
+  render {text, onChange, onSubmit, onHelp} =
     R.div
       { className: "input-group"
       , children:
-        [ R.input $ hideOnKeyUp
+        [ R.span
+          { className: "input-group-btn"
+          , children:
+            [ R.button
+              { className: "btn btn-info"
+              , onClick: Events.handler_ onHelp
+              , children: [R.text "Help"]
+              }
+            ]
+          }
+        , R.input $ hideOnKeyUp
           { className: "form-control monospace-font"
-          , placeholder: "<definition> or <expression>"
+          , placeholder: "expression or definition"
           , onChange: Events.handler targetValue $ traverse_ onChange
           , onKeyUp: Events.handler key $ submitOnEnter onSubmit
           , value: text

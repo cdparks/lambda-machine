@@ -4,8 +4,6 @@ module Components.Alert
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import React.Basic as React
 import React.Basic.DOM as R
@@ -14,23 +12,29 @@ import React.Basic.Events as Events
 import Data.Level (Level)
 
 type Props =
-  { error :: Maybe (Tuple Level String)
+  { level :: Level
   , dismiss :: Effect Unit
+  , child :: React.JSX
   }
 
 component :: React.Component Props
 component =
-  React.stateless {displayName: "Header", render}
+  React.stateless {displayName: "Alert", render}
  where
-  render {error: Nothing} = React.empty
-  render {error: Just (Tuple level message), dismiss} =
-    R.pre
-      { className: "alert alert-" <> show level
+  render {level, child, dismiss} =
+    R.div
+      { className: "alert alert-dismissable alert-" <> show level
       , children:
-        [ R.span
-          { className: "cursor-pointer glyphicon glyphicon-remove pull-right"
+        [ R.button
+          { "type": "button"
           , onClick: Events.handler_ dismiss
+          , className: "close"
+          , children:
+            [ R.span
+              { className: "cursor-pointer glyphicon glyphicon-remove pull-right"
+              }
+            ]
           }
-        , R.text message
+        , child
         ]
       }

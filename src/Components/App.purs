@@ -14,14 +14,16 @@ import Data.Set as Set
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import React.Basic as React
+import React.Basic (JSX)
 import React.Basic.DOM as R
 
 import Components.Alert as Alert
-import Components.Input as Input
-import Components.Definitions as Definitions
 import Components.Controls as Controls
+import Components.Definitions as Definitions
 import Components.Expressions as Expressions
 import Components.Footer as Footer
+import Components.Help as Help
+import Components.Input as Input
 import Data.Expr
   ( Environment
   , Expr
@@ -34,7 +36,7 @@ import Data.Expr
   , syntaxToExpr
   , undefinedNames
   )
-import Data.Level (Level, warn, danger)
+import Data.Level (Level(..))
 import Data.Name (Name)
 import Data.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
 import Data.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
@@ -48,7 +50,7 @@ type State =
   , defs :: Array Definition
   , env :: Environment Expr
   , rep :: Rep
-  , error :: Maybe (Tuple Level String)
+  , alert :: Maybe (Tuple Level JSX)
   }
 
 component :: React.Component {}
@@ -66,14 +68,20 @@ component =
           { className: "page-header"
           , children: [R.text "Lambda Machine"]
           }
-        , row $ React.element Alert.component
-          { error: state.error
-          , dismiss: setState deleteError
-          }
+        , row $ case state.alert of
+            Nothing ->
+              React.empty
+            Just (Tuple level body) ->
+              React.element Alert.component
+                { level
+                , child: body
+                , dismiss: setState deleteAlert
+                }
         , row $ React.element Input.component
           { text: state.text
           , onChange: setState <<< updateText
           , onSubmit: setState parseText
+          , onHelp: setState showHelp
           }
         , row $ R.h3_ [R.text "Definitions"]
         , row $ React.element Definitions.component
@@ -100,14 +108,14 @@ component =
         ]
       }
 
-row :: React.JSX -> React.JSX
+row :: JSX -> JSX
 row child =
   R.div
     { className: "row"
     , children: [R.div {className: "col-sm-12", children: [child]}]
     }
 
-split :: React.JSX -> React.JSX -> React.JSX
+split :: JSX -> JSX -> JSX
 split lhs rhs =
   R.div
     { className: "row"
@@ -125,13 +133,15 @@ initialState =
   , defs: initialDefs
   , env: initialEnv
   , rep: Raw
-  , error: Nothing
+  , alert: Nothing
   }
 
 initialDefs :: Array Definition
 initialDefs =
   unsafeParse parseDefinition <$>
-    [ "fix f = (λx. f (x x)) (λy. f (y y))"
+    [ "identity x = x"
+    , "const x _ = x"
+    , "fix f = (λx. f (x x)) (λy. f (y y))"
     , "true t _ = t"
     , "false _ f = f"
     , "and x y = x y false"
@@ -149,17 +159,28 @@ initialEnv =
  where
   fromDef def = Tuple def.name $ syntaxToExpr $ defToSyntax def
 
-setError :: String -> State -> State
-setError message =
-  _ {error = pure $ danger message}
+mkAlert :: Level -> String -> Tuple Level JSX
+mkAlert level message =
+  Tuple level body
+ where
+  body = R.p
+    { className: "preformatted"
+    , children: [R.text message]
+    }
 
-deleteError :: State -> State
-deleteError =
-  _ {error = Nothing}
+showHelp :: State -> State
+showHelp =
+  _ {alert = pure $ Tuple Info body}
+ where
+  body = React.element Help.component {}
+
+deleteAlert :: State -> State
+deleteAlert =
+  _ {alert = Nothing}
 
 updateText :: String -> State -> State
 updateText text =
-  _ { error = Nothing, text = text }
+  _ {alert = Nothing, text = text}
 
 parseText :: State -> State
 parseText s
@@ -167,7 +188,7 @@ parseText s
 parseText s =
   case parseAll parseEither s.text of
     Left error ->
-      setError (formatParseError s.text error) s
+      s {alert = pure $ mkAlert Danger $ formatParseError s.text error}
     Right (Left def) ->
       addDef def s
     Right (Right syntax) ->
@@ -177,14 +198,14 @@ deleteDef :: Name -> State -> State
 deleteDef name s = s
   { defs = deleteByName name s.defs
   , env = env
-  , error = error
+  , alert = alert
   }
  where
   env = Map.delete name s.env
   names = namesReferencing name env
-  error = do
+  alert = do
     guard $ Set.size names /= 0
-    pure $ warn $ formatUndefinedWarning name names
+    pure $ mkAlert Warning $ formatUndefinedWarning name names
 
 deleteByName :: Name -> Array Definition -> Array Definition
 deleteByName name = filter $ (_ /= name) <<< _.name
@@ -193,7 +214,7 @@ addDef :: Definition -> State -> State
 addDef def s =
   if Set.isEmpty missing
     then s {text = "", defs = defs, env = env}
-    else setError (formatUndefinedError s.text missing) s
+    else s {alert = pure $ mkAlert Danger $ formatUndefinedError s.text missing}
  where
   defs = deleteByName def.name s.defs `snoc` def
   expr = syntaxToExpr (defToSyntax def)

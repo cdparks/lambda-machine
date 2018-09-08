@@ -2,13 +2,20 @@
   margin-top: 15px;
 }
 
-.monospace-font {
-  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+.cursor-pointer {
+  cursor: pointer;
 }
 
 .scroll-overflow {
   max-height: 600px;
   overflow-y: scroll;
+}
+
+.monospace-font,
+.preformatted,
+li.definition,
+li.expression {
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 ul.unstyled {
@@ -18,7 +25,6 @@ ul.unstyled {
 
 li.definition,
 li.expression {
-  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
   font-size: 18px;
   margin-top: 10px;
   margin-bottom: 10px;
@@ -32,6 +38,11 @@ li.expression:first-child {
   color: inherit;
 }
 
-.cursor-pointer {
-  cursor: pointer;
+.preformatted {
+  white-space: pre;
+  display: block;
+  line-height: 1.43;
+  page-break-inside: avoid;
+  word-break: break-all;
+  word-wrap: break-word;
 }
