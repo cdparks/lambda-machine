@@ -193,7 +193,7 @@ deleteError :: State -> State
 deleteError = _ {error = Nothing}
 
 updateText :: String -> State -> State
-updateText text = _ { text = text }
+updateText text = _ { error = Nothing, text = text }
 
 parseText :: State -> State
 parseText s

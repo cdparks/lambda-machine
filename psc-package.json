@@ -18,6 +18,7 @@
     "react-basic",
     "strings",
     "transformers",
+    "unsafe-coerce",
     "web-html"
   ]
 }

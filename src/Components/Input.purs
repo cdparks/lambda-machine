@@ -5,13 +5,14 @@ module Components.Input
 import Prelude
 
 import Effect (Effect)
-import Data.Maybe (Maybe(..))
-
+import Data.Foldable (traverse_)
+import Data.Maybe (Maybe)
 import React.Basic as React
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue, key)
 import React.Basic.Events as Events
-import React.Basic.Events (merge)
+import React.Basic.Events (EventHandler)
+import Unsafe.Coerce (unsafeCoerce)
 
 type Props =
   { text :: String
@@ -27,10 +28,11 @@ component =
     R.div
       { className: "input-group"
       , children:
-        [ R.input
+        [ R.input $ hideOnKeyUp
           { className: "form-control monospace-font"
           , placeholder: "<definition> or <expression>"
-          , onChange: Events.handler events $ dispatch onChange onSubmit
+          , onChange: Events.handler targetValue $ traverse_ onChange
+          , onKeyUp: Events.handler key $ submitOnEnter onSubmit
           , value: text
           }
         , R.span
@@ -46,19 +48,10 @@ component =
         ]
       }
 
-events :: Events.EventFn Events.SyntheticEvent {key :: Maybe String, targetValue :: Maybe String}
-events = merge {key, targetValue}
+submitOnEnter :: Effect Unit -> Maybe String -> Effect Unit
+submitOnEnter onSubmit = traverse_ \key ->
+  when (key == "Enter") onSubmit
 
-dispatch
-  :: (String -> Effect Unit)
-  -> Effect Unit
-  -> {key :: Maybe String, targetValue :: Maybe String}
-  -> Effect Unit
-dispatch onChange onSubmit {key, targetValue} =
-  case key, targetValue of
-    Just "Enter", _ ->
-      onSubmit
-    _, Just value ->
-      onChange value
-    _, _ ->
-      pure unit
+-- input props doesn't have an onKeyUp handler
+hideOnKeyUp :: forall props. { onKeyUp :: EventHandler | props } -> { | props }
+hideOnKeyUp = unsafeCoerce
