@@ -1,31 +1,34 @@
-![Lambda Machine Screenshot](https://raw.githubusercontent.com/cdparks/lambda-machine/master/static/images/lambda-machine.png)
+![Lambda Machine Screenshot][screenshot]
 
 ## What?
 
-It's a machine for evaluating expressions in the untyped lambda calculus. You get lambdas, variables, applications, and top-level definitions. You can try it [here](http://cdparks.github.io/lambda-machine).
+[Try it here][lambda-machine]! It's a machine for evaluating
+expressions in the untyped lambda calculus. You get lambdas, variables,
+applications, and non-recursive top-level definitions.
 
 ## Really?
 
-Yep. Here's a grammar:
+Yarp. Here's a grammar, if you like that kind of thing:
 
 ```plaintext
 <definition>
-    ::= <name> [<name> ...] = <expression>       -- Definition
+  ::= <name> [<name> ...] = <expression>       -- Definition
 
 <expression>
-    ::= \ <name> . <expression>                  -- Lambda
-    |   <name>                                   -- Variable
-    |   <expression> <expression>                -- Application
-    |   ( <expression> )                         -- Parenthesization
+  ::= \ <name> [<name> ...] . <expression>     -- Lambda
+  |   <name>                                   -- Variable
+  |   <expression> <expression>                -- Application
+  |   ( <expression> )                         -- Parenthesization
 
 <name>
-    ::= [<lower> <underscore>]
-        [<lower> <digit> <hyphen>]*
-        [<question-mark>]?
-        ([<prime>]* | [<subscript>]*)
+  ::= [<lower> <underscore>]
+      [<lower> <digit> <hyphen>]*
+      [<question-mark>]?
+      ([<prime>]* | [<subscript>]*)
 ```
 
-There is also optional syntax for natural numbers and lists, but these are desugared to plain lambda calculus at parse time:
+There is also optional syntax for natural numbers and lists, but these
+are desugared to plain lambda calculus at parse time:
 
 ```plaintext
 [a, b, c]
@@ -38,21 +41,35 @@ There is also optional syntax for natural numbers and lists, but these are desug
 
 ## Why?
 
-I've been working through the exercises in [Introduction to Functional Programming Through Lambda Calculus](http://www.amazon.com/Introduction-Functional-Programming-Calculus-Mathematics/dp/0486478831) by [Greg Michaelson](http://www.macs.hw.ac.uk/~greg/), and some of these expressions have become rather tedious to reduce by hand. It'd be nice to have something that would do it for me step-by-step, ya know?
+I've been working through the exercises in
+[Introduction to Functional Programming Through Lambda Calculus][book]
+by [Greg Michaelson][greg], and some of these expressions are tedious
+to reduce by hand. It's nice to have something that does it for me!
 
 ## How?
 
-It's written in [PureScript](http://www.purescript.org/) and [React](https://facebook.github.io/react/) using the [Thermite](https://github.com/paf31/purescript-thermite) library. Expressions are converted to a locally nameless representation before being evaluated in normal order.
+Lambda Machine is written in [PureScript][purescript] and [React][react]
+using the [purescript-react-basic][react-basic] bindings. Expressions
+are converted to a locally nameless representation before being
+evaluated in normal order.
 
 You can run it like this:
 
 ```bash
-npm install
-bower install
-pulp browserify --optimise --to static/js/main.js
-open index.html
+yarn setup
+yarn build
+[xdg-]open index.html
 ```
 
 ## Who?
 
-Me, [Chris Parks](mailto:christopher.daniel.parks@gmail.com). Feel free to say hi!
+Me, [Chris Parks][me]. Feel free to say hi!
+
+[screenshot]: https://raw.githubusercontent.com/cdparks/lambda-machine/master/static/images/lambda-machine.png
+[lambda-machine]: http://cdparks.github.io/lambda-machine
+[book]: http://www.amazon.com/Introduction-Functional-Programming-Calculus-Mathematics/dp/0486478831
+[greg]: http://www.macs.hw.ac.uk/~greg/
+[purescript]: http://www.purescript.org/
+[react]: https://facebook.github.io/react/
+[react-basic]: https://github.com/lumihq/purescript-react-basic
+[me]: mailto:christopher.daniel.parks@gmail.com
