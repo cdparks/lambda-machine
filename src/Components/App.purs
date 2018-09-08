@@ -130,7 +130,7 @@ initialState =
 
 initialDefs :: Array Definition
 initialDefs =
-  map (unsafeParse parseDefinition)
+  unsafeParse parseDefinition <$>
     [ "fix f = (λx. f (x x)) (λy. f (y y))"
     , "true t _ = t"
     , "false _ f = f"
@@ -145,7 +145,7 @@ initialDefs =
 
 initialEnv :: Environment Expr
 initialEnv =
-  Map.fromFoldable (map fromDef initialDefs)
+  Map.fromFoldable $ fromDef <$> initialDefs
  where
   fromDef def = Tuple def.name $ syntaxToExpr $ defToSyntax def
 

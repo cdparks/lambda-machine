@@ -4,10 +4,10 @@ module Components.Expressions
 
 import Prelude
 
-import Data.PrettyPrint (Rep, Doc, selectRep)
-
 import React.Basic as React
 import React.Basic.DOM as R
+
+import Data.PrettyPrint (Rep, Doc, selectRep)
 
 type Props =
   { history :: Array (Doc String)

@@ -7,32 +7,13 @@ module Data.Parse
   , formatParseError
   ) where
 
-import Prelude
-  ( bind
-  , discard
-  , otherwise
-  , pure
-  , show
-  , void
-  , (&&)
-  , (*>)
-  , (-)
-  , (<$>)
-  , (<*)
-  , (<*>)
-  , (<<<)
-  , (<=)
-  , (<>)
-  , (==)
-  , (||)
-  , ($)
-  )
+import Prelude hiding (between)
 
 import Control.Alt ((<|>))
 import Control.Lazy (fix)
 import Data.Array (some, many, replicate, length)
 import Data.Either (Either(..), fromRight)
-import Data.Foldable (foldl, foldr)
+import Data.Foldable (fold, foldl, foldr)
 import Data.Int (fromString)
 import Data.List (List(..))
 import Data.Maybe (fromJust)
@@ -57,10 +38,19 @@ unsafeParse p s = unsafePartial (fromRight (parseAll p s))
 
 formatParseError :: String -> ParseError -> String
 formatParseError text err =
-  "Parse error: " <> message <> " at column " <> show column <> "\n" <> text <> "\n" <> caretLine
+  fold
+    [ "Parse error: "
+    , message
+    , " at column "
+    , show column
+    , "\n"
+    , text
+    , "\n"
+    , caretLine
+    ]
  where
   message = parseErrorMessage err
-  column = positionColumn (parseErrorPosition err)
+  column = positionColumn $ parseErrorPosition err
   caretLine = fromCharArray (replicate (column - 1) ' ') <> "^"
 
 positionColumn :: Position -> Int
@@ -76,7 +66,8 @@ parseDefinition = {name:_, args:_, syntax:_}
   <*> (token (string "=") *> parseSyntax)
 
 parseSyntax :: Parser String Syntax
-parseSyntax = fix parseApply
+parseSyntax =
+  fix parseApply
  where
   parseApply p = do
     first <- parseAtom
@@ -100,13 +91,15 @@ parens :: forall a. Parser String a -> Parser String a
 parens = between (token (string "(")) (token (string ")"))
 
 toList :: List Syntax -> Syntax
-toList xs = Lambda (name_ "cons") (Lambda (name_ "nil") (loop xs))
+toList xs =
+  Lambda (name_ "cons") (Lambda (name_ "nil") (loop xs))
  where
   loop Nil = Var (name_ "nil")
   loop (Cons y ys) = Apply (Apply (Var (name_ "cons")) y) (loop ys)
 
 toChurch :: Int -> Syntax
-toChurch n = Lambda (name_ "s") (Lambda (name_ "z") (loop n))
+toChurch n =
+  Lambda (name_ "s") (Lambda (name_ "z") (loop n))
  where
   loop k
     | k <= 0 = Var (name_ "z")
@@ -114,16 +107,16 @@ toChurch n = Lambda (name_ "s") (Lambda (name_ "z") (loop n))
 
 parseNat :: Parser String Syntax
 parseNat = token do
-  digits <- some (satisfy isDigit)
-  let n = unsafePartial (fromJust (fromString (fromCharArray digits)))
-  pure (toChurch n)
+  digits <- some $ satisfy isDigit
+  let n = unsafePartial $ fromJust $ fromString $ fromCharArray digits
+  pure $ toChurch n
 
 parseList :: Parser String Syntax -> Parser String Syntax
 parseList p = token do
   void $ char '['
   elements <- p `sepBy` token (char ',')
   void $ char ']'
-  pure (toList elements)
+  pure $ toList elements
 
 parseVar :: Parser String Syntax
 parseVar = Var <$> parseName
@@ -131,10 +124,10 @@ parseVar = Var <$> parseName
 parseName :: Parser String Name
 parseName = token do
   first <- satisfy firstChar
-  body <- many (satisfy bodyChar)
+  body <- many $ satisfy bodyChar
   question <- string "?" <|> pure ""
   subscript <- parsePrimes <|> parseSubscript
-  pure (name (fromCharArray ([first] <> body) <> question) subscript)
+  pure $ name (fromCharArray ([first] <> body) <> question) subscript
 
 parsePrimes :: Parser String Int
 parsePrimes = length <$> some (satisfy (_ == '\''))

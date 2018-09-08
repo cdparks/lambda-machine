@@ -10,8 +10,8 @@ import React.Basic as React
 import React.Basic.DOM as R
 import React.Basic.Events as Events
 
-import Data.PrettyPrint (Rep, ifSugar)
 import Data.Expr (Expr)
+import Data.PrettyPrint (Rep, ifSugar)
 
 type Props =
   { expr :: Maybe Expr

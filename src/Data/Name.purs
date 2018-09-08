@@ -9,31 +9,15 @@ module Data.Name
   ) where
 
 import Prelude
-  ( class Eq
-  , class Ord
-  , class Show
-  , div
-  , map
-  , mod
-  , otherwise
-  , (&&)
-  , (*)
-  , (+)
-  , (-)
-  , (<)
-  , (<=)
-  , (<>)
-  , (==)
-  , (>>>)
-  )
+
 import Data.Array (unsafeIndex)
-import Data.Foldable (foldl)
-import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Char (toCharCode)
+import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Set as Set
+import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Partial.Unsafe (unsafePartial)
 
 data Name = Name String Int
@@ -51,7 +35,7 @@ derive instance genericName :: Generic Name _
 
 instance showName :: Show Name where
   show (Name n s)
-    | s == 0    = n
+    | s == 0 = n
     | otherwise = n <> intToSubscript s
 
 instance eqName :: Eq Name where
@@ -61,10 +45,11 @@ instance ordName :: Ord Name where
   compare = genericCompare
 
 intToSubscript :: Int -> String
-intToSubscript = digits >>> map (unsafePartial (subscriptTable `unsafeIndex` _)) >>> fromCharArray
+intToSubscript = fromCharArray <<< map (unsafePartial (subscriptTable `unsafeIndex` _)) <<< digits
 
 subscriptToInt :: String -> Int
-subscriptToInt = toCharArray >>> foldl step 0
+subscriptToInt =
+  foldl step 0 <<< toCharArray
  where
   step n c = 10 * n + toDigit c
   toDigit c
@@ -86,6 +71,5 @@ subscriptTable = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈',
 
 digits :: Int -> Array Int
 digits n
-  | n < 10    = [n]
+  | n < 10 = [n]
   | otherwise = digits (n `div` 10) <> [n `mod` 10]
-

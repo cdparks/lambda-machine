@@ -4,9 +4,9 @@ module Components.Input
 
 import Prelude
 
-import Effect (Effect)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe)
+import Effect (Effect)
 import React.Basic as React
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue, key)

@@ -13,19 +13,6 @@ module Data.PrettyPrint
   ) where
 
 import Prelude
-  ( class Applicative
-  , class Apply
-  , class Functor
-  , class Semigroup
-  , append
-  , otherwise
-  , pure
-  , (<$>)
-  , (<*>)
-  , (<>)
-  )
-
-import Data.Monoid (class Monoid, mempty)
 
 data Rep
   = Sugar

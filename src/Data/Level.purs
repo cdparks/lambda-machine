@@ -4,7 +4,7 @@ module Data.Level
   , danger
   ) where
 
-import Prelude (class Show)
+import Prelude
 
 import Data.Tuple (Tuple(..))
 

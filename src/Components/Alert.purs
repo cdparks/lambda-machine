@@ -4,14 +4,12 @@ module Components.Alert
 
 import Prelude
 
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
-
 import React.Basic as React
 import React.Basic.DOM as R
 import React.Basic.Events as Events
-
-import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 
 import Data.Level (Level)
 
