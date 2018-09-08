@@ -2,15 +2,17 @@ module Components.App
   ( component
   ) where
 
-import Prelude (discard, map, pure, unit, ($), (/=), (<$>), (<<<), (==))
+import Prelude
+
 import Control.MonadZero (guard)
-import Data.Array (cons, snoc, filter)
+import Data.Array (concat, cons, filter, reverse, snoc)
 import Data.Either (Either(..))
--- import Data.Foldable (intercalate)
+import Data.Foldable (intercalate)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Set as Set
 import Data.Tuple (Tuple(..))
+import Effect (Effect)
 import React.Basic as React
 import React.Basic.DOM as R
 
@@ -35,14 +37,9 @@ import Data.Expr
 import Data.Level (Level, warn, danger)
 import Data.Name (Name)
 import Data.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
-import Data.PrettyPrint (Rep(..), Doc, prettyPrint, toggleRep)
-import Data.Syntax (Definition, Syntax, defToSyntax)
--- import Data.Syntax (Definition, Syntax, defToDoc, defToSyntax)
-
--- import Control.Monad.Eff.Save (SAVE, saveTextAs)
--- import Control.Monad.Trans.Class (lift)
--- import Control.Monad.Eff.Class (liftEff)
--- import Control.Monad.Aff (Aff, Canceler, forkAff)
+import Data.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
+import Data.Syntax (Definition, Syntax, defToDoc, defToSyntax)
+import Effect.Save (saveTextAs)
 
 type State =
   { text :: String
@@ -90,7 +87,7 @@ component =
             { expr: state.expr
             , onStep: setState <<< reduce
             , onClear: setState clear
-            , onSave: setState \s -> s
+            , onSave: save state
             , onSugar: setState toggleSugar
             , rep: state.rep
             }
@@ -152,48 +149,17 @@ initialEnv =
  where
   fromDef def = Tuple def.name $ syntaxToExpr $ defToSyntax def
 
-{-
-update :: T.PerformAction _ State _ AppAction
-update action _ _ =
-  case action of
-    DoNothing ->
-      pure unit
-    NewText text ->
-      void (T.modifyState (\s -> s { text = text, error = Nothing }))
-    DismissAlert ->
-      void (T.modifyState (\s -> s { error = Nothing }))
-    Remove name ->
-      void (T.modifyState (remove name))
-    ParseText ->
-      void (T.modifyState parse)
-    Reduce expr ->
-      void (T.modifyState (reduce expr))
-    Clear ->
-      void (T.modifyState clear)
-    Save -> void do
-      mState <- T.modifyState id
-      for mState $ \state ->
-        state <$ lift (save state)
-    ToggleSugar ->
-      void (T.modifyState toggleSugar)
-
-
-save :: forall eff. State -> Aff (save :: SAVE | eff) (Canceler (save :: SAVE | eff))
-save s = do
-  let
-    allDefs = map defToDoc s.defs <> reverse s.history
-    text = intercalate "\n" (map s.rep allDefs)
-  forkAff (liftEff (saveTextAs text "evaluation.txt"))
--}
-
 setError :: String -> State -> State
-setError message = _ {error = pure $ danger message}
+setError message =
+  _ {error = pure $ danger message}
 
 deleteError :: State -> State
-deleteError = _ {error = Nothing}
+deleteError =
+  _ {error = Nothing}
 
 updateText :: String -> State -> State
-updateText text = _ { error = Nothing, text = text }
+updateText text =
+  _ { error = Nothing, text = text }
 
 parseText :: State -> State
 parseText s
@@ -255,6 +221,18 @@ clear s =
   s {history = maybe [] toHistory s.expr}
  where
   toHistory = pure <<< prettyPrint <<< exprToSyntax
+
+save :: State -> Effect Unit
+save {rep, defs, history} =
+  saveTextAs text "evaluation.txt"
+ where
+  allDefs = concat
+    [ pure <$> ["Definitions:", ""]
+    , map defToDoc defs
+    , pure <$> ["", "Evaluation:", ""]
+    , reverse history
+    ]
+  text = intercalate "\n" $ map (\def -> selectRep def rep) allDefs
 
 toggleSugar :: State -> State
 toggleSugar s = s {rep = toggleRep s.rep}

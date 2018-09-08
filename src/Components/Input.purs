@@ -52,6 +52,6 @@ submitOnEnter :: Effect Unit -> Maybe String -> Effect Unit
 submitOnEnter onSubmit = traverse_ \key ->
   when (key == "Enter") onSubmit
 
--- input props doesn't have an onKeyUp handler
+-- input props don't allow an onKeyUp handler
 hideOnKeyUp :: forall props. { onKeyUp :: EventHandler | props } -> { | props }
 hideOnKeyUp = unsafeCoerce
