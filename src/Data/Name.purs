@@ -28,9 +28,11 @@ import Prelude
   )
 import Data.Array (unsafeIndex)
 import Data.Foldable (foldl)
-import Data.String (fromCharArray, toCharArray)
+import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Char (toCharCode)
-import Data.Generic (class Generic, gCompare, gEq)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
+import Data.Generic.Rep.Ord (genericCompare)
 import Data.Set as Set
 import Partial.Unsafe (unsafePartial)
 
@@ -45,7 +47,7 @@ name_ n = Name n 0
 next :: Name -> Name
 next (Name n s) = Name n (s + 1)
 
-derive instance genericName :: Generic Name
+derive instance genericName :: Generic Name _
 
 instance showName :: Show Name where
   show (Name n s)
@@ -53,10 +55,10 @@ instance showName :: Show Name where
     | otherwise = n <> intToSubscript s
 
 instance eqName :: Eq Name where
-  eq = gEq
+  eq = genericEq
 
 instance ordName :: Ord Name where
-  compare = gCompare
+  compare = genericCompare
 
 intToSubscript :: Int -> String
 intToSubscript = digits >>> map (unsafePartial (subscriptTable `unsafeIndex` _)) >>> fromCharArray

@@ -1,13 +1,12 @@
-module Main where
+module Main
+  ( main
+  ) where
 
-import Prelude (Unit, unit)
+import Prelude
 
-import DOM (DOM)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Save (SAVE)
+import Effect (Effect)
+import React.Render (renderToId)
+import Components.App as App
 
-import Component.App (spec, initialState)
-import Thermite as T
-
-main :: forall eff. Eff (dom :: DOM, save :: SAVE | eff) Unit
-main = T.defaultMain spec initialState unit
+main :: Effect Unit
+main = renderToId "root" App.component {}

@@ -9,9 +9,11 @@ module Data.Parse
 
 import Prelude
   ( bind
+  , discard
   , otherwise
   , pure
   , show
+  , void
   , (&&)
   , (*>)
   , (-)
@@ -23,24 +25,23 @@ import Prelude
   , (<>)
   , (==)
   , (||)
+  , ($)
   )
 
-import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
-import Text.Parsing.Parser.Combinators (between, sepBy, try)
-import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
-import Text.Parsing.Parser.Pos (Position(..))
-
-import Control.Lazy (fix)
 import Control.Alt ((<|>))
-
+import Control.Lazy (fix)
 import Data.Array (some, many, replicate, length)
-import Data.Foldable (foldl)
-import Data.String (fromCharArray)
 import Data.Either (Either(..), fromRight)
-import Data.Maybe (fromJust)
+import Data.Foldable (foldl, foldr)
 import Data.Int (fromString)
 import Data.List (List(..))
+import Data.Maybe (fromJust)
+import Data.String.CodeUnits (fromCharArray)
 import Partial.Unsafe (unsafePartial)
+import Text.Parsing.Parser.Combinators (between, sepBy, try)
+import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
+import Text.Parsing.Parser.Pos (Position(..))
+import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
 
 import Data.Syntax (Definition, Syntax(..))
 import Data.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
@@ -88,9 +89,12 @@ parseSyntax = fix parseApply
     parseAtom = parseLambda <|> parseNat <|> parseList p <|> parens p <|> parseVar
 
     parseLambda :: Parser String Syntax
-    parseLambda = Lambda
-      <$> (token (string "\\" <|> string "λ") *> parseName)
-      <*> (token (string ".") *> p)
+    parseLambda = do
+      void $ token $ string "\\" <|> string "λ"
+      names <- some parseName
+      void $ token $ string "."
+      body <- p
+      pure $ foldr Lambda body names
 
 parens :: forall a. Parser String a -> Parser String a
 parens = between (token (string "(")) (token (string ")"))
@@ -116,9 +120,9 @@ parseNat = token do
 
 parseList :: Parser String Syntax -> Parser String Syntax
 parseList p = token do
-  _ <- char '['
+  void $ char '['
   elements <- p `sepBy` token (char ',')
-  _ <- char ']'
+  void $ char ']'
   pure (toList elements)
 
 parseVar :: Parser String Syntax
@@ -149,4 +153,3 @@ isDigit c = '0' <= c && c <= '9'
 
 isLower :: Char -> Boolean
 isLower c = 'a' <= c && c <= 'z'
-

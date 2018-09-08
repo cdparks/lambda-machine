@@ -6,17 +6,19 @@ module Data.Syntax
   ) where
 
 import Prelude (class Show, map, otherwise, pure, show, (+), (<$>), (<>), (==))
-import Control.Alt ((<|>))
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Generic (class Generic, gShow)
-import Data.List (List(..), foldr, intercalate)
 
-import Data.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, raw, sugar)
+import Control.Alt ((<|>))
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.List (List(..), foldr, intercalate)
+import Data.Maybe (Maybe(..), fromMaybe)
+
 import Data.Name (Name)
+import Data.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
 
 type Definition =
-  { name   :: Name
-  , args   :: Array Name
+  { name :: Name
+  , args :: Array Name
   , syntax :: Syntax
   }
 
@@ -34,9 +36,10 @@ data Syntax
   | Lambda Name Syntax
   | Apply Syntax Syntax
 
-derive instance genericSyntax :: Generic Syntax
+derive instance genericSyntax :: Generic Syntax _
+
 instance showSyntax :: Show Syntax where
-  show = gShow
+  show x = genericShow x
 
 isComposite :: Syntax -> Boolean
 isComposite (Var _) = false

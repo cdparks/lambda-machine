@@ -1,4 +1,4 @@
-// module Control.Monad.Eff.Save
+// module Effect.Save
 
 exports.saveTextAs = function(text) {
   return function(filename) {

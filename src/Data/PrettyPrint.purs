@@ -1,6 +1,9 @@
 module Data.PrettyPrint
-  ( Doc
-  , runDoc
+  ( Rep(..)
+  , ifSugar
+  , selectRep
+  , toggleRep
+  , Doc
   , doc
   , sugar
   , raw
@@ -23,6 +26,20 @@ import Prelude
   )
 
 import Data.Monoid (class Monoid, mempty)
+
+data Rep
+  = Sugar
+  | Raw
+
+selectRep :: forall a. Doc a -> Rep -> a
+selectRep (Doc s r) = ifSugar s r
+
+toggleRep :: Rep -> Rep
+toggleRep = ifSugar Raw Sugar
+
+ifSugar :: forall a. a -> a -> Rep -> a
+ifSugar s _ Sugar = s
+ifSugar _ r Raw = r
 
 data Doc a = Doc a a
 

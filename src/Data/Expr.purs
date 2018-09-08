@@ -18,7 +18,8 @@ import Prelude (class Show, map, otherwise, pure, show, (+), (<$>), (<*>), (<>),
 import Data.Maybe (Maybe(..), maybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Control.Alt ((<|>))
-import Data.Generic (class Generic, gShow)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 
 import Data.Map as Map
 import Data.Set as Set
@@ -39,9 +40,9 @@ data Expr
 
 type Environment a = Map.Map Name a
 
-derive instance genericExpr :: Generic Expr
+derive instance genericExpr :: Generic Expr _
 instance showExpr :: Show Expr where
-  show = gShow
+  show x = genericShow x
 
 syntaxToExpr :: Syntax -> Expr
 syntaxToExpr = loop Map.empty >>> alpha

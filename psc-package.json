@@ -1,0 +1,23 @@
+{
+  "name": "lambda-machine",
+  "set": "psc-0.12.0-20180901",
+  "source": "https://github.com/purescript/package-sets.git",
+  "version": "0.2.0",
+  "depends": [
+    "prelude",
+    "arrays",
+    "console",
+    "control",
+    "effect",
+    "foldable-traversable",
+    "generics-rep",
+    "integers",
+    "maybe",
+    "ordered-collections",
+    "parsing",
+    "profunctor-lenses",
+    "react-basic",
+    "strings",
+    "transformers"
+  ]
+}

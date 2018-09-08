@@ -1,13 +1,5 @@
-.add-margin-small {
-  margin-top: 10px;
-}
-
 .add-margin-medium {
   margin-top: 15px;
-}
-
-.add-margin-large {
-  margin-top: 30px;
 }
 
 .monospace-font {
@@ -25,3 +17,27 @@
   overflow-y: scroll;
 }
 
+ul.unstyled {
+  list-style: none;
+  padding: 0;
+}
+
+li.definition,
+li.expression {
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 18px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+li.expression {
+  color: #777;
+}
+
+li.expression:first-child {
+  color: inherit;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
