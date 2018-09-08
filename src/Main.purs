@@ -5,8 +5,8 @@ module Main
 import Prelude
 
 import Effect (Effect)
-import React.Render (renderToId)
+import React.Render (renderTo)
 import Components.App as App
 
 main :: Effect Unit
-main = renderToId "root" App.component {}
+main = renderTo "root" App.component {}

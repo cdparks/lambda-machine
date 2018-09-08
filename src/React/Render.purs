@@ -1,15 +1,29 @@
 module React.Render
-  ( renderToId
+  ( renderTo
   ) where
 
 import Prelude
 
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
-import React.Basic as React
+import Effect.Exception (throw)
+import React.Basic (Component, element)
+import React.Basic.DOM (render)
+import Web.DOM.NonElementParentNode (getElementById)
+import Web.HTML (window)
+import Web.HTML.HTMLDocument (toNonElementParentNode)
+import Web.HTML.Window (document)
 
-foreign import renderToId
+renderTo
   :: forall props
    . String
-  -> React.Component props
-  -> props
+  -> Component { | props }
+  -> { | props }
   -> Effect Unit
+renderTo id component props = do
+  mContainer <- getElementById id =<< (map toNonElementParentNode $ document =<< window)
+  case mContainer of
+    Nothing ->
+      throw "Container element not found"
+    Just container ->
+      render (element component props) container
