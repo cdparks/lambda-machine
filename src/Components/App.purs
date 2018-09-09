@@ -9,7 +9,7 @@ import Data.Array (concat, cons, filter, reverse, snoc)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Set as Set
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -238,10 +238,7 @@ reduce expr s =
       }
 
 clear :: State -> State
-clear s =
-  s {history = maybe [] toHistory s.expr}
- where
-  toHistory = pure <<< prettyPrint <<< exprToSyntax
+clear = _ {expr = Nothing, history = []}
 
 save :: State -> Effect Unit
 save {rep, defs, history} =

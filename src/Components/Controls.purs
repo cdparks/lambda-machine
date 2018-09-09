@@ -4,11 +4,11 @@ module Components.Controls
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe, maybe)
 import Effect (Effect)
 import React.Basic as React
 import React.Basic.DOM as R
-import React.Basic.Events as Events
+import React.Basic.Events (EventHandler, handler_)
 
 import Data.Expr (Expr)
 import Data.PrettyPrint (Rep, ifSugar)
@@ -26,30 +26,55 @@ component :: React.Component Props
 component =
   React.stateless {displayName: "Controls", render}
  where
-  render {expr: Nothing} = React.empty
-  render {expr: Just expr, onStep, onClear, onSave, onSugar, rep} =
+  render {expr, onStep, onClear, onSave, onSugar, rep} =
     R.div
       { className: "add-margin-medium btn-group pull-right"
       , children:
-        [ R.button
+        [ button expr
           { className: "btn btn-default"
-          , onClick: Events.handler_ $ onStep expr
-          , children: [R.text "Step"]
+          , onClick: onStep
+          , label: "Step"
           }
-        , R.button
+        , button expr
           { className: "btn btn-default"
-          , onClick: Events.handler_ onClear
-          , children: [R.text "Clear"]
+          , onClick: const onClear
+          , label: "Clear"
           }
-        , R.button
+        , button expr
           { className: "btn btn-default"
-          , onClick: Events.handler_ onSave
-          , children: [R.text "Save"]
+          , onClick: const onSave
+          , label: "Save"
           }
-        , R.button
+        , button expr
           { className: "btn " <> ifSugar "btn-danger" "btn-success" rep
-          , onClick: Events.handler_ onSugar
-          , children: [R.text $ ifSugar "Raw" "Sugar" rep]
+          , onClick: const onSugar
+          , label: ifSugar "Raw" "Sugar" rep
           }
         ]
       }
+
+button
+  :: forall a
+   . Maybe a
+  ->
+    { className :: String
+    , onClick :: a -> Effect Unit
+    , label :: String
+    }
+  -> React.JSX
+button m {className, onClick, label} =
+  R.button
+    { className: maybeEnable className m
+    , onClick: maybeHandle onClick m
+    , children: [R.text label]
+    }
+
+maybeHandle :: forall a. (a -> Effect Unit) -> Maybe a -> EventHandler
+maybeHandle handle =
+  handler_ <<< maybe (pure unit) handle
+
+maybeEnable :: forall a. String -> Maybe a -> String
+maybeEnable className =
+  maybe
+    (className <> " disabled")
+    (const className)
