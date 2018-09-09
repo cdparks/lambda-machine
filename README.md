@@ -66,10 +66,10 @@ yarn build
 Me, [Chris Parks][me]. Feel free to say hi!
 
 [screenshot]: https://raw.githubusercontent.com/cdparks/lambda-machine/master/static/images/lambda-machine.png
-[lambda-machine]: http://cdparks.github.io/lambda-machine
-[book]: http://www.amazon.com/Introduction-Functional-Programming-Calculus-Mathematics/dp/0486478831
-[greg]: http://www.macs.hw.ac.uk/~greg/
-[purescript]: http://www.purescript.org/
-[react]: https://facebook.github.io/react/
+[lambda-machine]: https://cdparks.github.io/lambda-machine
+[book]: https://www.amazon.com/dp/0486478831
+[greg]: https://www.macs.hw.ac.uk/~greg
+[purescript]: https://www.purescript.org
+[react]: https://reactjs.org/
 [react-basic]: https://github.com/lumihq/purescript-react-basic
 [me]: mailto:christopher.daniel.parks@gmail.com
