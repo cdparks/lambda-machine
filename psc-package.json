@@ -9,16 +9,12 @@
     "effect",
     "foldable-traversable",
     "generics-rep",
-    "integers",
     "maybe",
     "ordered-collections",
     "parsing",
     "prelude",
-    "profunctor-lenses",
     "react-basic",
     "strings",
-    "transformers",
-    "unsafe-coerce",
     "web-html"
   ]
 }

@@ -5,14 +5,11 @@ module Components.Input
 import Prelude
 
 import Data.Foldable (traverse_)
-import Data.Maybe (Maybe)
 import Effect (Effect)
 import React.Basic as React
 import React.Basic.DOM as R
-import React.Basic.DOM.Events (targetValue, key)
+import React.Basic.DOM.Events (targetValue, preventDefault)
 import React.Basic.Events as Events
-import React.Basic.Events (EventHandler)
-import Unsafe.Coerce (unsafeCoerce)
 
 type Props =
   { text :: String
@@ -26,43 +23,43 @@ component =
   React.stateless {displayName: "Input", render}
  where
   render {text, onChange, onSubmit, onHelp} =
-    R.div
-      { className: "input-group"
+    R.form
+      { onSubmit: Events.handler preventDefault $ const onSubmit
       , children:
-        [ R.span
-          { className: "input-group-btn"
-          , children:
-            [ R.button
-              { className: "btn btn-info"
-              , onClick: Events.handler_ onHelp
-              , children: [R.text "Help"]
-              }
-            ]
-          }
-        , R.input $ hideOnKeyUp
-          { className: "form-control monospace-font"
-          , placeholder: "expression or definition"
-          , onChange: Events.handler targetValue $ traverse_ onChange
-          , onKeyUp: Events.handler key $ submitOnEnter onSubmit
-          , value: text
-          }
-        , R.span
-          { className: "input-group-btn"
-          , children:
-            [ R.button
-              { className: "btn btn-default"
-              , onClick: Events.handler_ onSubmit
-              , children: [R.text "Parse"]
-              }
-            ]
-          }
+        [ inputGroup
+          [ inputGroupBtn $ R.button
+            { className: "btn btn-info"
+            , "type": "button"
+            , onClick: Events.handler_ onHelp
+            , children: [R.text "Help"]
+            }
+          , R.input
+            { className: "form-control monospace-font"
+            , placeholder: "expression or definition"
+            , onChange: Events.handler targetValue $ traverse_ onChange
+            , value: text
+            }
+          , inputGroupBtn $ R.button
+            { className: "btn btn-default"
+            , "type": "submit"
+            , onClick: Events.handler_ onSubmit
+            , children: [R.text "Parse"]
+            }
+          ]
         ]
       }
 
-submitOnEnter :: Effect Unit -> Maybe String -> Effect Unit
-submitOnEnter onSubmit = traverse_ \key ->
-  when (key == "Enter") onSubmit
 
--- input props don't allow an onKeyUp handler
-hideOnKeyUp :: forall props. { onKeyUp :: EventHandler | props } -> { | props }
-hideOnKeyUp = unsafeCoerce
+inputGroup :: Array React.JSX -> React.JSX
+inputGroup children =
+  R.div
+    { className: "input-group"
+    , children
+    }
+
+inputGroupBtn :: React.JSX -> React.JSX
+inputGroupBtn child =
+  R.div
+    { className: "input-group-btn"
+    , children: [child]
+    }
