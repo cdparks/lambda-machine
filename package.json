@@ -1,15 +1,15 @@
 {
   "name": "lambda-machine",
-  "version": "0.2.0",
+  "version": "0.2.4",
   "author": "Chris Parks",
   "repository": "https://github.com/cdparks/lambda-machine",
   "license": "MIT",
   "scripts": {
     "setup": "yarn install && psc-package install",
-    "build": "yarn pulp browserify -O --to static/js/main.js",
+    "build": "yarn setup && yarn pulp browserify -O --to static/js/main.js",
     "test": "yarn pulp test",
     "clean": "rm -rf output",
-    "reset": "yarn clean && rm -rf node_modules .psc-package .psci_modules .pulp-cache",
+    "reset": "yarn clean && rm -rf node_modules .psc-package .psci_modules .pulp-cache yarn-error.log",
     "add:ps": "psc-package install",
     "pulp": "PATH=./node_modules/.bin:$PATH pulp"
   },
@@ -19,7 +19,6 @@
     "react-dom": "^15.5.4"
   },
   "devDependencies": {
-    "bower": "^1.8.4",
     "psc-package-bin-simple": "^1.0.1",
     "pulp": "^12.3.0",
     "purescript": "^0.12.0"
