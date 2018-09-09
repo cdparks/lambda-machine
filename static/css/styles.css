@@ -46,3 +46,8 @@ li.expression:first-child {
   word-break: break-all;
   word-wrap: break-word;
 }
+
+.comment {
+  font-style: italic;
+  padding-left: 30px;
+}

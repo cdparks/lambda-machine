@@ -14,16 +14,24 @@ component =
   render _ = React.fragment $ toJSX <$> tutorial
 
 data Markup
-  = Para (Array Leaf)
+  = Header String
+  | Para (Array Leaf)
   | Code (Array String)
+  | Comments (Array Comment)
 
 data Leaf
   = Text String
   | Bold String
-  | MailTo String
+  | Mono String
+  | Link String String
+
+data Comment
+  = Comment String (Array Leaf)
 
 toJSX :: Markup -> React.JSX
 toJSX = case _ of
+  Header t ->
+    R.h3_ [R.text t]
   Para ls ->
     R.p
       { children: formatLeaf <$> ls
@@ -33,6 +41,8 @@ toJSX = case _ of
       { className: "preformatted"
       , children: formatCode <$> cs
       }
+  Comments as ->
+    R.table_ [R.tbody_ $ formatComment <$> as]
  where
   formatLeaf :: Leaf -> React.JSX
   formatLeaf = case _ of
@@ -40,18 +50,43 @@ toJSX = case _ of
       R.text t
     Bold t ->
       R.b_ [R.text t]
-    MailTo t ->
+    Link t url ->
       R.a
-        { href: "mailto:christopher.daniel.parks@gmail.com"
+        { href: "https://" <> url
+        , children: [R.text t]
+        }
+    Mono t ->
+      R.span
+        { className: "monospace-font"
         , children: [R.text t]
         }
 
   formatCode :: String -> React.JSX
   formatCode code = R.text $ "  " <> code <> "\n"
 
+  formatComment :: Comment -> React.JSX
+  formatComment (Comment t cs) =
+    R.tr_
+      [ R.td_
+        [ R.span
+          { className: "preformatted"
+          , children: [formatCode t]
+          }
+        ]
+      , R.td
+        { className: "comment"
+        , children: formatLeaf <$> cs
+        }
+      ]
+
 tutorial :: Array Markup
 tutorial =
-  [ Para
+  [ Header "Hello!"
+  , Para
+    [ Text "Welcome to Lambda Machine, a tool for stepping through expressions in the untyped lambda calculus."
+    ]
+  , Header "Expressions"
+  , Para
     [ Text "Lambda Machine accepts "
     , Bold "expressions"
     , Text " and "
@@ -62,7 +97,7 @@ tutorial =
     , Bold "\\"
     , Text " or the Greek letter "
     , Bold "λ"
-    , Text ", but we'll use "
+    , Text ". We'll use "
     , Bold "\\"
     , Text " since it's easier to type. Here's an expression that represents a function that accepts one argument and returns it immediately."
     ]
@@ -72,7 +107,10 @@ tutorial =
   , Para
     [ Text "We call this function "
     , Bold "identity"
-    , Text ". Here's a function that returns its first argument after throwing away its second argument."
+    , Text "."
+    ]
+  , Para
+    [ Text "Here's a function that returns its first argument after throwing away its second argument."
     ]
   , Code
     [ "\\x. \\y. x"
@@ -80,14 +118,20 @@ tutorial =
   , Para
     [ Text "We usually call this function "
     , Bold "const"
-    , Text ". Note that the function above is really a function that returns another function."
-    , Text " For convenience we can write it as a single lambda with two arguments, but it means the same thing."
+    , Text "."
+    ]
+  , Para
+    [ Text "Note that the expression above is a function that returns another function."
+    , Text " For convenience we can write it as a single lambda with two arguments."
     ]
   , Code
     [ "\\x y. x"
     ]
   , Para
-    [ Text "Going forward, we'll use the multi-argument form instead of manually nesting lambdas. We can apply "
+    [ Text "We'll use the multi-argument form instead of manually nesting lambdas from now on."
+    ]
+  , Para
+    [ Text "We can apply "
     , Bold "const"
     , Text " to "
     , Bold "identity"
@@ -107,13 +151,30 @@ tutorial =
     [ "(\\x y. x) (\\a. a) (\\b. b)"
     ]
   , Para
-    [ Text "Specifically, this expression would reduce as follows"
+    [ Text "Specifically, this expression reduces as follows."
     ]
-  , Code
-    [ "(\\x y. x) (\\a. a) (\\b. b)"
-    , "(\\y. \\a. a) (\\b. b)"
-    , "\\a. a"
+  , Comments
+    [ Comment
+      "(\\x y. x) (\\a. a) (\\b. b)"
+      [ Text "Replace "
+      , Mono "x"
+      , Text " with "
+      , Mono "(\\a. a)"
+      , Text " in "
+      , Mono "(\\x y. x)"
+      ]
+    , Comment
+      "(\\y. \\a. a) (\\b. b)"
+      [ Text "Replace "
+      , Mono "y"
+      , Text " with "
+      , Mono "(\\b. b)"
+      , Text " in "
+      , Mono "(\\y. \\a. a)"
+      ]
+    , Comment "\\a. a" []
     ]
+  , Header "Definitions"
   , Para
     [ Text "To avoid repeating ourselves, we can enter a "
     , Bold "definition"
@@ -139,24 +200,94 @@ tutorial =
     , "const x y = x"
     ]
   , Para
-    [ Text "Once we've defined them, we can refer to them by name."
+    [ Text "Now we can refer to them by name."
     ]
   , Code
     [ "const identity identity"
     ]
   , Para
-    [ Text "We reduce names by replacing them with their definition."
+    [ Text "A name is reduced by replacing it with the expression on the right-hand-side of its definition."
+    ]
+  , Comments
+    [ Comment
+      "const identity identity"
+      [ Text "Replace "
+      , Mono "const"
+      , Text " with "
+      , Mono "\\x. \\y. x"
+      ]
+    , Comment
+      "(\\x. \\y. x) identity identity"
+      [ Text "Replace "
+      , Mono "x"
+      , Text " with "
+      , Mono "identity"
+      , Text " in "
+      , Mono "(\\x. \\y. x)"
+      ]
+    , Comment
+      "(\\y. identity) identity"
+      [ Text "Replace "
+      , Mono "y"
+      , Text " with "
+      , Mono "identity"
+      , Text " in "
+      , Mono "(\\y. identity)"
+      ]
+    , Comment
+      "identity"
+      [ Text "Replace "
+      , Mono "identity"
+      , Text " with "
+      , Mono "\\x. x"
+      ]
+    , Comment "\\x. x" []
+    ]
+  , Header "Syntactic Sugar"
+  , Para
+    [ Text "Lambda Machine can parse natural numbers. A natural number "
+    , Bold "n"
+    , Text " is parsed as a function that applies "
+    , Bold "s"
+    , Text " to "
+    , Bold "z n"
+    , Text " times."
     ]
   , Code
-    [ "const identity identity"
-    , "(\\x. \\y. x) identity identity"
-    , "(\\y. identity) identity"
-    , "identity"
-    , "\\x. x"
+    [ "0 -> \\s. \\z. z"
+    , "1 -> \\s. \\z. s z"
+    , "2 -> \\s. \\z. s (s z)"
+    , "3 -> \\s. \\z. s (s (s z))"
+    , "4 -> \\s. \\z. s (s (s (s z)))"
+    ]
+  , Para
+    [ Text "You can read more about this encoding "
+    , Link "here" "en.wikipedia.org/wiki/Church_encoding"
+    , Text "."
+    ]
+  , Para
+    [ Text "Lambda Machine can also parse lists."
+    , Text " A list is parsed as a right fold over the elements using "
+    , Bold "cons"
+    , Text " and "
+    , Bold "nil"
+    , Text "."
+    ]
+  , Code
+    [ "[a] -> \\cons. \\nil. cons a nil"
+    , "[a, b] -> \\cons. \\nil. cons a (cons b nil)"
+    , "[a, b, c] -> \\cons. \\nil. cons a (cons b (cons c nil))"
+    ]
+  , Para
+    [ Text "This works with natural numbers as well."
+    ]
+  , Code
+    [ "[1] -> \\cons. \\nil. cons (\\s. \\z. s z) nil"
+    , "[1, 2] -> \\cons. \\nil. cons (\\s. \\z. s z) (cons (\\s. \\z. s (s z)) nil)"
     ]
   , Para
     [ Text "Have fun and "
-    , MailTo "let me know if you find this useful"
+    , Link "let me know if you find this useful" "github.com/cdparks/lambda-machine"
     , Text "!"
     ]
   ]

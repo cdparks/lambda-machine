@@ -22664,6 +22664,38 @@ var PS = {};
   var ul = function (dictUnion) {
       return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("ul"));
   };
+  var tr = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("tr"));
+  };
+  var tr_ = function (children) {
+      return tr()({
+          children: children
+      });
+  };
+  var td = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("td"));
+  };
+  var td_ = function (children) {
+      return td()({
+          children: children
+      });
+  };
+  var tbody = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("tbody"));
+  };
+  var tbody_ = function (children) {
+      return tbody()({
+          children: children
+      });
+  };
+  var table = function (dictUnion) {
+      return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("table"));
+  };
+  var table_ = function (children) {
+      return table()({
+          children: children
+      });
+  };
   var span = function (dictUnion) {
       return React_Basic.element(React_Basic_DOM_Internal.unsafeCreateDOMComponent("span"));
   };
@@ -22720,6 +22752,14 @@ var PS = {};
   exports["li"] = li;
   exports["p"] = p;
   exports["span"] = span;
+  exports["table"] = table;
+  exports["table_"] = table_;
+  exports["tbody"] = tbody;
+  exports["tbody_"] = tbody_;
+  exports["td"] = td;
+  exports["td_"] = td_;
+  exports["tr"] = tr;
+  exports["tr_"] = tr_;
   exports["ul"] = ul;
 })(PS["React.Basic.DOM.Generated"] = PS["React.Basic.DOM.Generated"] || {});
 (function(exports) {
@@ -22794,17 +22834,6 @@ var PS = {};
       }
       var result = new Array(count);
       return result.fill(value);
-    };
-  };
-
-  var replicatePolyfill = function (count) {
-    return function (value) {
-      var result = [];
-      var n = 0;
-      for (var i = 0; i < count; i++) {
-        result[n++] = value;
-      }
-      return result;
     };
   };
 
@@ -25612,14 +25641,47 @@ var PS = {};
       };
       return Bold;
   })();
-  var MailTo = (function () {
-      function MailTo(value0) {
+  var Mono = (function () {
+      function Mono(value0) {
           this.value0 = value0;
       };
-      MailTo.create = function (value0) {
-          return new MailTo(value0);
+      Mono.create = function (value0) {
+          return new Mono(value0);
       };
-      return MailTo;
+      return Mono;
+  })();
+  var Link = (function () {
+      function Link(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      Link.create = function (value0) {
+          return function (value1) {
+              return new Link(value0, value1);
+          };
+      };
+      return Link;
+  })();
+  var Comment = (function () {
+      function Comment(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      Comment.create = function (value0) {
+          return function (value1) {
+              return new Comment(value0, value1);
+          };
+      };
+      return Comment;
+  })();
+  var Header = (function () {
+      function Header(value0) {
+          this.value0 = value0;
+      };
+      Header.create = function (value0) {
+          return new Header(value0);
+      };
+      return Header;
   })();
   var Para = (function () {
       function Para(value0) {
@@ -25639,7 +25701,16 @@ var PS = {};
       };
       return Code;
   })();
-  var tutorial = [ new Para([ new Text("Lambda Machine accepts "), new Bold("expressions"), new Text(" and "), new Bold("definitions"), new Text(". An "), new Bold("expression"), new Text(" consists of variables, applications, and lambdas. Lambdas can be written with a backslash "), new Bold("\\"), new Text(" or the Greek letter "), new Bold("\u03bb"), new Text(", but we'll use "), new Bold("\\"), new Text(" since it's easier to type. Here's an expression that represents a function that accepts one argument and returns it immediately.") ]), new Code([ "\\x. x" ]), new Para([ new Text("We call this function "), new Bold("identity"), new Text(". Here's a function that returns its first argument after throwing away its second argument.") ]), new Code([ "\\x. \\y. x" ]), new Para([ new Text("We usually call this function "), new Bold("const"), new Text(". Note that the function above is really a function that returns another function."), new Text(" For convenience we can write it as a single lambda with two arguments, but it means the same thing.") ]), new Code([ "\\x y. x" ]), new Para([ new Text("Going forward, we'll use the multi-argument form instead of manually nesting lambdas. We can apply "), new Bold("const"), new Text(" to "), new Bold("identity"), new Text(" twice using "), new Bold("juxtaposition"), new Text(", which is a fancy word for \"putting things next to one another\".") ]), new Code([ "(\\x y. x) (\\x. x) (\\x. x)" ]), new Para([ new Text("Even if we rename the arguments to our "), new Bold("identity"), new Text(" functions, they still do the same thing.") ]), new Code([ "(\\x y. x) (\\a. a) (\\b. b)" ]), new Para([ new Text("Specifically, this expression would reduce as follows") ]), new Code([ "(\\x y. x) (\\a. a) (\\b. b)", "(\\y. \\a. a) (\\b. b)", "\\a. a" ]), new Para([ new Text("To avoid repeating ourselves, we can enter a "), new Bold("definition"), new Text(". A "), new Bold("definition"), new Text(" consists of a name, zero or more arguments, an equals sign, and an "), new Bold("expression"), new Text(". Let's make definitions for "), new Bold("identity"), new Text(" and "), new Bold("const"), new Text(".") ]), new Code([ "identity = \\x. x", "const = \\x y. x" ]), new Para([ new Text("We can also write these like so.") ]), new Code([ "identity x = x", "const x y = x" ]), new Para([ new Text("Once we've defined them, we can refer to them by name.") ]), new Code([ "const identity identity" ]), new Para([ new Text("We reduce names by replacing them with their definition.") ]), new Code([ "const identity identity", "(\\x. \\y. x) identity identity", "(\\y. identity) identity", "identity", "\\x. x" ]), new Para([ new Text("Have fun and "), new MailTo("let me know if you find this useful"), new Text("!") ]) ];
+  var Comments = (function () {
+      function Comments(value0) {
+          this.value0 = value0;
+      };
+      Comments.create = function (value0) {
+          return new Comments(value0);
+      };
+      return Comments;
+  })();
+  var tutorial = [ new Header("Hello!"), new Para([ new Text("Welcome to Lambda Machine, a tool for stepping through expressions in the untyped lambda calculus.") ]), new Header("Expressions"), new Para([ new Text("Lambda Machine accepts "), new Bold("expressions"), new Text(" and "), new Bold("definitions"), new Text(". An "), new Bold("expression"), new Text(" consists of variables, applications, and lambdas. Lambdas can be written with a backslash "), new Bold("\\"), new Text(" or the Greek letter "), new Bold("\u03bb"), new Text(". We'll use "), new Bold("\\"), new Text(" since it's easier to type. Here's an expression that represents a function that accepts one argument and returns it immediately.") ]), new Code([ "\\x. x" ]), new Para([ new Text("We call this function "), new Bold("identity"), new Text(".") ]), new Para([ new Text("Here's a function that returns its first argument after throwing away its second argument.") ]), new Code([ "\\x. \\y. x" ]), new Para([ new Text("We usually call this function "), new Bold("const"), new Text(".") ]), new Para([ new Text("Note that the expression above is a function that returns another function."), new Text(" For convenience we can write it as a single lambda with two arguments.") ]), new Code([ "\\x y. x" ]), new Para([ new Text("We'll use the multi-argument form instead of manually nesting lambdas from now on.") ]), new Para([ new Text("We can apply "), new Bold("const"), new Text(" to "), new Bold("identity"), new Text(" twice using "), new Bold("juxtaposition"), new Text(", which is a fancy word for \"putting things next to one another\".") ]), new Code([ "(\\x y. x) (\\x. x) (\\x. x)" ]), new Para([ new Text("Even if we rename the arguments to our "), new Bold("identity"), new Text(" functions, they still do the same thing.") ]), new Code([ "(\\x y. x) (\\a. a) (\\b. b)" ]), new Para([ new Text("Specifically, this expression reduces as follows.") ]), new Comments([ new Comment("(\\x y. x) (\\a. a) (\\b. b)", [ new Text("Replace "), new Mono("x"), new Text(" with "), new Mono("(\\a. a)"), new Text(" in "), new Mono("(\\x y. x)") ]), new Comment("(\\y. \\a. a) (\\b. b)", [ new Text("Replace "), new Mono("y"), new Text(" with "), new Mono("(\\b. b)"), new Text(" in "), new Mono("(\\y. \\a. a)") ]), new Comment("\\a. a", [  ]) ]), new Header("Definitions"), new Para([ new Text("To avoid repeating ourselves, we can enter a "), new Bold("definition"), new Text(". A "), new Bold("definition"), new Text(" consists of a name, zero or more arguments, an equals sign, and an "), new Bold("expression"), new Text(". Let's make definitions for "), new Bold("identity"), new Text(" and "), new Bold("const"), new Text(".") ]), new Code([ "identity = \\x. x", "const = \\x y. x" ]), new Para([ new Text("We can also write these like so.") ]), new Code([ "identity x = x", "const x y = x" ]), new Para([ new Text("Now we can refer to them by name.") ]), new Code([ "const identity identity" ]), new Para([ new Text("A name is reduced by replacing it with the expression on the right-hand-side of its definition.") ]), new Comments([ new Comment("const identity identity", [ new Text("Replace "), new Mono("const"), new Text(" with "), new Mono("\\x. \\y. x") ]), new Comment("(\\x. \\y. x) identity identity", [ new Text("Replace "), new Mono("x"), new Text(" with "), new Mono("identity"), new Text(" in "), new Mono("(\\x. \\y. x)") ]), new Comment("(\\y. identity) identity", [ new Text("Replace "), new Mono("y"), new Text(" with "), new Mono("identity"), new Text(" in "), new Mono("(\\y. identity)") ]), new Comment("identity", [ new Text("Replace "), new Mono("identity"), new Text(" with "), new Mono("\\x. x") ]), new Comment("\\x. x", [  ]) ]), new Header("Syntactic Sugar"), new Para([ new Text("Lambda Machine can parse natural numbers. A natural number "), new Bold("n"), new Text(" is parsed as a function that applies "), new Bold("s"), new Text(" to "), new Bold("z n"), new Text(" times.") ]), new Code([ "0 -> \\s. \\z. z", "1 -> \\s. \\z. s z", "2 -> \\s. \\z. s (s z)", "3 -> \\s. \\z. s (s (s z))", "4 -> \\s. \\z. s (s (s (s z)))" ]), new Para([ new Text("You can read more about this encoding "), new Link("here", "en.wikipedia.org/wiki/Church_encoding"), new Text(".") ]), new Para([ new Text("Lambda Machine can also parse lists."), new Text(" A list is parsed as a right fold over the elements using "), new Bold("cons"), new Text(" and "), new Bold("nil"), new Text(".") ]), new Code([ "[a] -> \\cons. \\nil. cons a nil", "[a, b] -> \\cons. \\nil. cons a (cons b nil)", "[a, b, c] -> \\cons. \\nil. cons a (cons b (cons c nil))" ]), new Para([ new Text("This works with natural numbers as well.") ]), new Code([ "[1] -> \\cons. \\nil. cons (\\s. \\z. s z) nil", "[1, 2] -> \\cons. \\nil. cons (\\s. \\z. s z) (cons (\\s. \\z. s (s z)) nil)" ]), new Para([ new Text("Have fun and "), new Link("let me know if you find this useful", "github.com/cdparks/lambda-machine"), new Text("!") ]) ];
   var toJSX = (function () {
       var formatLeaf = function (v) {
           if (v instanceof Text) {
@@ -25648,18 +25719,36 @@ var PS = {};
           if (v instanceof Bold) {
               return React_Basic_DOM_Generated.b_([ React_Basic_DOM.text(v.value0) ]);
           };
-          if (v instanceof MailTo) {
+          if (v instanceof Link) {
               return React_Basic_DOM_Generated.a()({
-                  href: "mailto:christopher.daniel.parks@gmail.com",
+                  href: "https://" + v.value1,
                   children: [ React_Basic_DOM.text(v.value0) ]
               });
           };
-          throw new Error("Failed pattern match at Components.Help line 38, column 16 - line 47, column 10: " + [ v.constructor.name ]);
+          if (v instanceof Mono) {
+              return React_Basic_DOM_Generated.span()({
+                  className: "monospace-font",
+                  children: [ React_Basic_DOM.text(v.value0) ]
+              });
+          };
+          throw new Error("Failed pattern match at Components.Help line 48, column 16 - line 62, column 10: " + [ v.constructor.name ]);
       };
       var formatCode = function (code) {
           return React_Basic_DOM.text("  " + (code + "\x0a"));
       };
+      var formatComment = function (v) {
+          return React_Basic_DOM_Generated.tr_([ React_Basic_DOM_Generated.td_([ React_Basic_DOM_Generated.span()({
+              className: "preformatted",
+              children: [ formatCode(v.value0) ]
+          }) ]), React_Basic_DOM_Generated.td()({
+              className: "comment",
+              children: Data_Functor.map(Data_Functor.functorArray)(formatLeaf)(v.value1)
+          }) ]);
+      };
       return function (v) {
+          if (v instanceof Header) {
+              return React_Basic_DOM_Generated.h3_([ React_Basic_DOM.text(v.value0) ]);
+          };
           if (v instanceof Para) {
               return React_Basic_DOM_Generated.p()({
                   children: Data_Functor.map(Data_Functor.functorArray)(formatLeaf)(v.value0)
@@ -25671,7 +25760,10 @@ var PS = {};
                   children: Data_Functor.map(Data_Functor.functorArray)(formatCode)(v.value0)
               });
           };
-          throw new Error("Failed pattern match at Components.Help line 26, column 9 - line 35, column 8: " + [ v.constructor.name ]);
+          if (v instanceof Comments) {
+              return React_Basic_DOM_Generated.table_([ React_Basic_DOM_Generated.tbody_(Data_Functor.map(Data_Functor.functorArray)(formatComment)(v.value0)) ]);
+          };
+          throw new Error("Failed pattern match at Components.Help line 32, column 9 - line 45, column 47: " + [ v.constructor.name ]);
       };
   })();
   var component = (function () {
