@@ -248,9 +248,8 @@ save {rep, defs, history} =
   saveTextAs text "evaluation.txt"
  where
   allDefs = concat
-    [ pure <$> ["Definitions:", ""]
-    , map defToDoc defs
-    , pure <$> ["", "Evaluation:", ""]
+    [ map defToDoc defs
+    , [pure ""]
     , reverse history
     ]
   text = intercalate "\n" $ map (\def -> selectRep def rep) allDefs
