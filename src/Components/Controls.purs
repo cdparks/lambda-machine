@@ -45,7 +45,7 @@ component =
           , onClick: const onSave
           , label: "Save"
           }
-        , button expr
+        , button (pure unit)
           { className: "btn " <> ifSugar "btn-danger" "btn-success" rep
           , onClick: const onSugar
           , label: ifSugar "Raw" "Sugar" rep
