@@ -10,33 +10,33 @@ module Data.Name
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Data.Array (unsafeIndex)
 import Data.Char (toCharCode)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Set as Set
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Partial.Unsafe (unsafePartial)
 
-data Name = Name String Int
+data Name = Name String (Maybe Int)
 
-name :: String -> Int -> Name
-name = Name
+name :: String -> Maybe Int -> Name
+name n ms = Name n ms
 
 name_ :: String -> Name
-name_ n = Name n 0
+name_ n = Name n Nothing
 
 next :: Name -> Name
-next (Name n s) = Name n (s + 1)
+next (Name n ms) = Name n $ (_ + 1) <$> ms <|> pure 0
 
 derive instance genericName :: Generic Name _
 
 instance showName :: Show Name where
-  show (Name n s)
-    | s == 0 = n
-    | otherwise = n <> intToSubscript s
+  show (Name n ms) = n <> maybe "" intToSubscript ms
 
 instance eqName :: Eq Name where
   eq = genericEq

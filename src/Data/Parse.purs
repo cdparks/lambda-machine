@@ -16,7 +16,7 @@ import Data.Either (Either(..), fromRight)
 import Data.Foldable (fold, foldl, foldr)
 import Data.Int (fromString)
 import Data.List (List(..))
-import Data.Maybe (fromJust)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.String.CodeUnits (fromCharArray)
 import Partial.Unsafe (unsafePartial)
 import Text.Parsing.Parser.Combinators (between, sepBy, try)
@@ -128,10 +128,12 @@ parseName = token do
   first <- satisfy firstChar
   body <- many $ satisfy bodyChar
   question <- string "?" <|> pure ""
-  name (fromCharArray ([first] <> body) <> question) <$> parseSubscript
+  subscript <- Just <$> parseSubscript <|> pure Nothing
+  let var = fromCharArray ([first] <> body) <> question
+  pure $ name var subscript
 
 parseSubscript :: Parser String Int
-parseSubscript = subscriptToInt <<< fromCharArray <$> many (satisfy isSubscriptChar)
+parseSubscript = subscriptToInt <<< fromCharArray <$> some (satisfy isSubscriptChar)
 
 firstChar :: Char -> Boolean
 firstChar c = isLower c || c == '_'
