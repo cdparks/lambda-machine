@@ -1,4 +1,5 @@
 .psc-package
+.psci_modules
 node_modules
 output
 yarn-error.log

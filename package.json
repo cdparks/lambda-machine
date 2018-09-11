@@ -7,6 +7,7 @@
   "scripts": {
     "setup": "yarn install && psc-package install",
     "build": "yarn setup && yarn pulp browserify -O --to static/js/main.js",
+    "repl": "yarn pulp repl",
     "test": "yarn pulp test",
     "clean": "rm -rf output",
     "reset": "yarn clean && rm -rf node_modules .psc-package .psci_modules .pulp-cache yarn-error.log",
