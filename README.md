@@ -10,33 +10,68 @@ applications, and non-recursive top-level definitions.
 
 Yarp. Here's a grammar, if you like that kind of thing:
 
-```plaintext
-<definition>
-  ::= <name> [<name> ...] = <expression>       -- Definition
+```ebnf
+definition
+  = name, {name}, "=", expression ;          (* Definition *)
 
-<expression>
-  ::= \ <name> [<name> ...] . <expression>     -- Lambda
-  |   <name>                                   -- Variable
-  |   <expression> <expression>                -- Application
-  |   ( <expression> )                         -- Parenthesization
+expression
+  = lambda, name, {name}, ".", expression    (* Lambda abstraction *)
+  | name                                     (* Variable *)
+  | expression, expression                   (* Application *)
+  | "(", expression, ")"                     (* Parentheses *)
+  | {digit}                                  (* Natural number *)
+  | "[", [expressions], "]"                  (* List *)
+  ;
 
-<name>
-  ::= [<lower> <underscore>]
-      [<lower> <digit> <hyphen>]*
-      [<question-mark>]?
-      ([<prime>]* | [<subscript>]*)
+expressions
+  = expression, [",", expressions]           (* One or more comma-separated expressions *)
+
+lambda
+  = "\"                                      (* Backslash *)
+  | "λ"                                      (* Greek letter lambda *)
+  ;
+
+name
+  = (letter | "_")                           (* Initial letter or underscore *)
+  , {letter | "-"}                           (* Zero or more letters or hyphens *)
+  , ["?"]                                    (* Optional question mark *)
+  , {subscript | digit}                      (* Zero or more subscripts or digits *)
+  ;
+
+letter                                       (* Lowercase latin letters *)
+  = "a" | "b" | "c" | "d" | "e" | "f" | "g"
+  | "h" | "i" | "j" | "k" | "l" | "m" | "n"
+  | "o" | "p" | "q" | "r" | "s" | "t" | "u"
+  | "v" | "w" | "x" | "y" | "z" ;
+
+subscript                                    (* Subscripts *)
+  = "₀" | "₁" | "₂" | "₃" | "₄" | "₅" | "₆"
+  | "₇" | "₈" | "₉" ;
+
+digit                                        (* Decimal digits *)
+  = "0" | "1" | "2" | "3" | "4" | "5" | "6"
+  | "7" | "8" | "9" ;
 ```
 
-There is also optional syntax for natural numbers and lists, but these
-are desugared to plain lambda calculus at parse time:
+Natural numbers and lists are desugared to plain lambda calculus during
+parsing. A natural number **n** is parsed as a function that applies
+**s** to **z** **n** times.
+
+```plaingtext
+0 -> \s. \z. z
+1 -> \s. \z. s z
+2 -> \s. \z. s (s z)
+3 -> \s. \z. s (s (s z))
+4 -> \s. \z. s (s (s (s z)))
+```
+
+A list is parsed as a right fold over its elements using **cons** and
+**nil**.
 
 ```plaintext
-[a, b, c]
-    -> λcons. λnil. cons a (cons b (cons c nil))
-3
-    -> λs. λz. s (s (s z))
-[1]
-    -> λcons. λnil. cons (λs. λz. s z) nil
+[a]       -> \cons. \nil. cons a nil
+[a, b]    -> \cons. \nil. cons a (cons b nil)
+[a, b, c] -> \cons. \nil. cons a (cons b (cons c nil))
 ```
 
 ## Why?

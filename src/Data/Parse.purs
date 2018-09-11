@@ -11,7 +11,7 @@ import Prelude hiding (between)
 
 import Control.Alt ((<|>))
 import Control.Lazy (fix)
-import Data.Array (some, many, replicate, length)
+import Data.Array (some, many, replicate)
 import Data.Either (Either(..), fromRight)
 import Data.Foldable (fold, foldl, foldr)
 import Data.Int (fromString)
@@ -87,8 +87,14 @@ parseSyntax =
       body <- p
       pure $ foldr Lambda body names
 
+balance :: forall a. Char -> Char -> Parser String a -> Parser String a
+balance lhs rhs = between (token (char lhs)) (token (char rhs))
+
 parens :: forall a. Parser String a -> Parser String a
-parens = between (token (string "(")) (token (string ")"))
+parens = balance '(' ')'
+
+brackets :: forall a. Parser String a -> Parser String a
+brackets = balance '[' ']'
 
 toList :: List Syntax -> Syntax
 toList xs =
@@ -112,11 +118,7 @@ parseNat = token do
   pure $ toChurch n
 
 parseList :: Parser String Syntax -> Parser String Syntax
-parseList p = token do
-  void $ char '['
-  elements <- p `sepBy` token (char ',')
-  void $ char ']'
-  pure $ toList elements
+parseList p = toList <$> brackets (p `sepBy` token (char ','))
 
 parseVar :: Parser String Syntax
 parseVar = Var <$> parseName
@@ -126,11 +128,7 @@ parseName = token do
   first <- satisfy firstChar
   body <- many $ satisfy bodyChar
   question <- string "?" <|> pure ""
-  subscript <- parsePrimes <|> parseSubscript
-  pure $ name (fromCharArray ([first] <> body) <> question) subscript
-
-parsePrimes :: Parser String Int
-parsePrimes = length <$> some (satisfy (_ == '\''))
+  name (fromCharArray ([first] <> body) <> question) <$> parseSubscript
 
 parseSubscript :: Parser String Int
 parseSubscript = subscriptToInt <<< fromCharArray <$> many (satisfy isSubscriptChar)
@@ -139,7 +137,7 @@ firstChar :: Char -> Boolean
 firstChar c = isLower c || c == '_'
 
 bodyChar :: Char -> Boolean
-bodyChar c = isLower c || isDigit c || c == '-'
+bodyChar c = isLower c || c == '-'
 
 isDigit :: Char -> Boolean
 isDigit c = '0' <= c && c <= '9'
