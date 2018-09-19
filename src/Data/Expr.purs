@@ -29,13 +29,14 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Partial.Unsafe (unsafePartial)
 
 import Data.Name (Name, next)
+import Data.Param (Param, isStrict, rename, unwrap)
 import Data.PrettyPrint (class PrettyPrint, parensIf)
 import Data.Syntax (Syntax(..))
 
 data Expr
   = Bound Int
   | Free Name
-  | Bind Name Expr
+  | Bind Param Expr
   | App Expr Expr
 
 type Environment a = Map.Map Name a
@@ -53,7 +54,7 @@ syntaxToExpr =
     Var n ->
       maybe (Free n) Bound (Map.lookup n env)
     Lambda n b ->
-      let env' = Map.insert n 0 (map (_ + 1) env)
+      let env' = Map.insert (unwrap n) 0 (map (_ + 1) env)
       in Bind n (loop env' b)
     Apply f a ->
       App (loop env f) (loop env a)
@@ -68,8 +69,8 @@ alpha e =
     Free n ->
       Free n
     Bind n b ->
-      let pair = fresh env n
-      in Bind (snd pair) (loop (fst pair) b)
+      let pair = fresh env $ unwrap n
+      in Bind (rename n (snd pair)) (loop (fst pair) b)
     App f a ->
       App (loop env f) (loop env a)
 
@@ -88,7 +89,7 @@ exprToSyntax =
     Free n ->
       Var n
     Bind n b ->
-      Lambda n $ loop (n `cons` env) b
+      Lambda n $ loop (unwrap n `cons` env) b
     App f a ->
       Apply (loop env f) (loop env a)
 
@@ -164,8 +165,9 @@ instance prettyPrintExpr :: PrettyPrint Expr where
 
 step :: Environment Expr -> Expr -> Maybe Expr
 step env = case _ of
-  App (Bind n b) m ->
-    pure $ substitute m b
+  App (Bind n b) m
+    | isStrict n -> (App (Bind n b) <$> step env m) <|> pure (substitute m b)
+    | otherwise -> pure $ substitute m b
   App f a ->
     (App <$> step env f <*> pure a) <|> (App <$> pure f <*> step env a)
   Bind n b ->

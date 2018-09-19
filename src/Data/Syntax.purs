@@ -15,11 +15,12 @@ import Data.List (List(..), foldr, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
 
 import Data.Name (Name)
+import Data.Param (Param, unwrap)
 import Data.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
 
 type Definition =
   { name :: Name
-  , args :: Array Name
+  , args :: Array Param
   , syntax :: Syntax
   }
 
@@ -36,11 +37,11 @@ defToDoc def =
     ]
  where
   prettyArgs [] = pure ""
-  prettyArgs as = pure " " <> pure (intercalate " " (map show as))
+  prettyArgs as = pure " " <> intercalate (pure " ") (map prettyPrint as)
 
 data Syntax
   = Var Name
-  | Lambda Name Syntax
+  | Lambda Param Syntax
   | Apply Syntax Syntax
 
 derive instance genericSyntax :: Generic Syntax _
@@ -61,10 +62,10 @@ tryFromChurch (Lambda s (Lambda z body)) =
   show <$> walk body
  where
   walk (Apply (Var s') arg)
-    | s' == s = (_ + 1) <$> walk arg
+    | s' == unwrap s = (_ + 1) <$> walk arg
     | otherwise = Nothing
   walk (Var z')
-    | z' == z = pure 0
+    | z' == unwrap z = pure 0
     | otherwise = Nothing
   walk _ = Nothing
 tryFromChurch _ = Nothing
@@ -74,10 +75,10 @@ tryFromList (Lambda c (Lambda n body)) =
   listToString <$> walk body
  where
   walk (Apply (Apply (Var c') x) xs)
-    | c' == c = Cons (sugar (prettySyntax x)) <$> walk xs
+    | c' == unwrap c = Cons (sugar (prettySyntax x)) <$> walk xs
     | otherwise = Nothing
   walk (Var n')
-    | n' == n = pure Nil
+    | n' == unwrap n = pure Nil
     | otherwise = Nothing
   walk _ = Nothing
 tryFromList _ = Nothing
@@ -91,10 +92,10 @@ prettySyntax =
  where
   walk inApp = case _ of
     Var v ->
-      pure (show v)
+      pure $ show v
     l@(Lambda n b) ->
       let
-        simple = parensIf inApp (pure "λ" <> pure (show n) <> pure ". " <> walk false b)
+        simple = parensIf inApp (pure "λ" <> prettyPrint n <> pure ". " <> walk false b)
         literal = tryFromChurch l <|> tryFromList l
       in
         doc {raw: raw simple, sugar: fromMaybe (sugar simple) literal}

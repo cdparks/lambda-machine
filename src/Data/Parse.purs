@@ -25,6 +25,7 @@ import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
 
 import Data.Syntax (Definition, Syntax(..))
+import Data.Param (Param, lazy, strict)
 import Data.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
 
 token :: forall a. Parser String a -> Parser String a
@@ -62,7 +63,7 @@ parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
 parseDefinition :: Parser String Definition
 parseDefinition = {name:_, args:_, syntax:_}
   <$> parseName
-  <*> many parseName
+  <*> many parseParam
   <*> (token (string "=") *> parseSyntax)
 
 parseSyntax :: Parser String Syntax
@@ -82,7 +83,7 @@ parseSyntax =
     parseLambda :: Parser String Syntax
     parseLambda = do
       void $ token $ string "\\" <|> string "λ"
-      names <- some parseName
+      names <- some parseParam
       void $ token $ string "."
       body <- p
       pure $ foldr Lambda body names
@@ -98,18 +99,22 @@ brackets = balance '[' ']'
 
 toList :: List Syntax -> Syntax
 toList xs =
-  Lambda (name_ "cons") (Lambda (name_ "nil") (loop xs))
+  Lambda (lazy cons) (Lambda (lazy nil) (loop xs))
  where
-  loop Nil = Var (name_ "nil")
-  loop (Cons y ys) = Apply (Apply (Var (name_ "cons")) y) (loop ys)
+  cons = name_ "cons"
+  nil = name_ "nil"
+  loop Nil = Var nil
+  loop (Cons y ys) = Apply (Apply (Var cons) y) (loop ys)
 
 toChurch :: Int -> Syntax
 toChurch n =
-  Lambda (name_ "s") (Lambda (name_ "z") (loop n))
+  Lambda (lazy s) (Lambda (lazy z) (loop n))
  where
+  s = name_ "s"
+  z = name_ "z"
   loop k
-    | k <= 0 = Var (name_ "z")
-    | otherwise = Apply (Var (name_ "s")) (loop (k - 1))
+    | k <= 0 = Var z
+    | otherwise = Apply (Var s) (loop (k - 1))
 
 parseNat :: Parser String Syntax
 parseNat = token do
@@ -122,6 +127,9 @@ parseList p = toList <$> brackets (p `sepBy` token (char ','))
 
 parseVar :: Parser String Syntax
 parseVar = Var <$> parseName
+
+parseParam :: Parser String Param
+parseParam = token $ strict <$> (string "!" *> parseName) <|> lazy <$> parseName
 
 parseName :: Parser String Name
 parseName = token do
