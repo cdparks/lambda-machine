@@ -25576,7 +25576,35 @@ var PS = {};
               if (v1 instanceof App) {
                   return new App(walk(index)(v1.value0), walk(index)(v1.value1));
               };
-              throw new Error("Failed pattern match at Data.Expr line 183, column 16 - line 192, column 39: " + [ v1.constructor.name ]);
+              throw new Error("Failed pattern match at Data.Expr line 188, column 16 - line 197, column 40: " + [ v1.constructor.name ]);
+          };
+      };
+      return walk(0);
+  };
+  var unbind = function ($104) {
+      return substitute(Free.create($104));
+  };
+  var rebind = function (m) {
+      var walk = function (index) {
+          return function (v) {
+              if (v instanceof Bound) {
+                  return new Bound(v.value0);
+              };
+              if (v instanceof Free) {
+                  if (Data_Eq.eq(Data_Name.eqName)(v.value0)(m)) {
+                      return new Bound(index);
+                  };
+                  if (Data_Boolean.otherwise) {
+                      return new Free(v.value0);
+                  };
+              };
+              if (v instanceof Bind) {
+                  return Bind.create(v.value0)(walk(index + 1 | 0)(v.value1));
+              };
+              if (v instanceof App) {
+                  return new App(walk(index)(v.value0), walk(index)(v.value1));
+              };
+              throw new Error("Failed pattern match at Data.Expr line 205, column 16 - line 214, column 39: " + [ v.constructor.name ]);
           };
       };
       return walk(0);
@@ -25595,7 +25623,9 @@ var PS = {};
               return Control_Alt.alt(Data_Maybe.altMaybe)(Control_Apply.apply(Data_Maybe.applyMaybe)(Data_Functor.map(Data_Maybe.functorMaybe)(App.create)(step(env)(v.value0)))(Control_Applicative.pure(Data_Maybe.applicativeMaybe)(v.value1)))(Control_Apply.apply(Data_Maybe.applyMaybe)(Data_Functor.map(Data_Maybe.functorMaybe)(App.create)(Control_Applicative.pure(Data_Maybe.applicativeMaybe)(v.value0)))(step(env)(v.value1)));
           };
           if (v instanceof Bind) {
-              return Data_Functor.map(Data_Maybe.functorMaybe)(Bind.create(v.value0))(step(env)(v.value1));
+              var n = Data_Param.unwrap(v.value0);
+              var env$prime = Data_Map_Internal["delete"](Data_Name.ordName)(n)(env);
+              return Data_Functor.map(Data_Maybe.functorMaybe)(Bind.create(v.value0))(Data_Functor.map(Data_Maybe.functorMaybe)(rebind(n))(step(env$prime)(unbind(n)(v.value1))));
           };
           if (v instanceof Free) {
               return Data_Map_Internal.lookup(Data_Name.ordName)(v.value0)(env);
@@ -25603,11 +25633,11 @@ var PS = {};
           if (v instanceof Bound) {
               return Data_Maybe.Nothing.value;
           };
-          throw new Error("Failed pattern match at Data.Expr line 167, column 12 - line 178, column 12: " + [ v.constructor.name ]);
+          throw new Error("Failed pattern match at Data.Expr line 167, column 12 - line 183, column 12: " + [ v.constructor.name ]);
       };
   };    
-  var globalNames = function ($96) {
-      return Data_Set.fromFoldable(Data_Set.foldableSet)(Data_Name.ordName)(Data_Map.keys($96));
+  var globalNames = function ($105) {
+      return Data_Set.fromFoldable(Data_Set.foldableSet)(Data_Name.ordName)(Data_Map.keys($105));
   }; 
   var fresh = function ($copy_env) {
       return function ($copy_n) {
@@ -25665,8 +25695,8 @@ var PS = {};
               throw new Error("Failed pattern match at Data.Expr line 123, column 3 - line 125, column 23: " + [ keys.constructor.name, v.constructor.name ]);
           };
       };
-      return function ($97) {
-          return Data_Foldable.foldl(Data_List_Types.foldableList)(go)(Data_Set.empty)(toList($97));
+      return function ($106) {
+          return Data_Foldable.foldl(Data_List_Types.foldableList)(go)(Data_Set.empty)(toList($106));
       };
   };
   var undefinedNames = function (expr) {
@@ -25676,8 +25706,8 @@ var PS = {};
   };
   var formatNames = (function () {
       var toList = Data_Set.toUnfoldable(Data_List_Types.unfoldableList);
-      return function ($98) {
-          return Data_Foldable.intercalate(Data_List_Types.foldableList)(Data_Monoid.monoidString)(", ")(Data_Functor.map(Data_List_Types.functorList)(Data_Show.show(Data_Name.showName))(toList($98)));
+      return function ($107) {
+          return Data_Foldable.intercalate(Data_List_Types.foldableList)(Data_Monoid.monoidString)(", ")(Data_Functor.map(Data_List_Types.functorList)(Data_Show.show(Data_Name.showName))(toList($107)));
       };
   })();
   var formatUndefinedError = function (text) {
@@ -25749,8 +25779,8 @@ var PS = {};
               throw new Error("Failed pattern match at Data.Expr line 53, column 14 - line 60, column 36: " + [ v.constructor.name ]);
           };
       };
-      return function ($99) {
-          return alpha(loop(Data_Map_Internal.empty)($99));
+      return function ($108) {
+          return alpha(loop(Data_Map_Internal.empty)($108));
       };
   })();
   exports["Bound"] = Bound;

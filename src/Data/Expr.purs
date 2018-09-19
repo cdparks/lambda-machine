@@ -170,8 +170,13 @@ step env = case _ of
     | otherwise -> pure $ substitute m b
   App f a ->
     (App <$> step env f <*> pure a) <|> (App <$> pure f <*> step env a)
-  Bind n b ->
-    Bind n <$> step env b
+  Bind p b ->
+    -- When walking under a lambda, make the bound var free, then
+    -- rebind it since it may have moved
+    let
+      n = unwrap p
+      env' = Map.delete n env
+    in Bind p <$> (rebind n <$> step env' (unbind n b))
   Free n ->
     Map.lookup n env
   Bound i ->
@@ -186,6 +191,23 @@ substitute v = walk 0
       | otherwise -> Bound i
     Free n ->
       Free n
+    Bind n b ->
+      Bind n $ walk (index + 1) b
+    App f a ->
+      App (walk index f) (walk index a)
+
+unbind :: Name -> Expr -> Expr
+unbind = substitute <<< Free
+
+rebind :: Name -> Expr -> Expr
+rebind m = walk 0
+ where
+  walk index = case _ of
+    Bound i ->
+      Bound i
+    Free n
+      | n == m -> Bound index
+      | otherwise -> Free n
     Bind n b ->
       Bind n $ walk (index + 1) b
     App f a ->
