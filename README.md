@@ -106,7 +106,7 @@ yarn build
 Me, [Chris Parks][me]. Feel free to say hi!
 
 [screenshot]: https://raw.githubusercontent.com/cdparks/lambda-machine/master/static/images/lambda-machine.png
-[lambda-machine]: https://cdparks.github.io/lambda-machine
+[lambda-machine]: https://lambda-machine.com
 [book]: https://www.amazon.com/dp/0486478831
 [greg]: https://www.macs.hw.ac.uk/~greg
 [purescript]: https://www.purescript.org
