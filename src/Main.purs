@@ -7,7 +7,9 @@ import Prelude
 import Effect (Effect)
 import React.Render (renderTo)
 
-import Components.App as App
+import Components.App (mkApp)
 
 main :: Effect Unit
-main = renderTo "root" App.component {}
+main = do
+  app <- mkApp
+  renderTo "root" $ app {}

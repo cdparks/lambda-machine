@@ -4,14 +4,11 @@ module Components.Help
 
 import Prelude
 
-import React.Basic as React
+import React.Basic (JSX, fragment)
 import React.Basic.DOM as R
 
-component :: React.Component {}
-component =
-  React.stateless {displayName: "Help", render}
- where
-  render _ = React.fragment $ toJSX <$> tutorial
+component :: {} -> JSX
+component _ = fragment $ toJSX <$> tutorial
 
 data Markup
   = Header String
@@ -28,7 +25,7 @@ data Leaf
 data Comment
   = Comment String (Array Leaf)
 
-toJSX :: Markup -> React.JSX
+toJSX :: Markup -> JSX
 toJSX = case _ of
   Header t ->
     R.h3_ [R.text t]
@@ -44,7 +41,7 @@ toJSX = case _ of
   Comments as ->
     R.table_ [R.tbody_ $ formatComment <$> as]
  where
-  formatLeaf :: Leaf -> React.JSX
+  formatLeaf :: Leaf -> JSX
   formatLeaf = case _ of
     Text t ->
       R.text t
@@ -61,10 +58,10 @@ toJSX = case _ of
         , children: [R.text t]
         }
 
-  formatCode :: String -> React.JSX
+  formatCode :: String -> JSX
   formatCode code = R.text $ "  " <> code <> "\n"
 
-  formatComment :: Comment -> React.JSX
+  formatComment :: Comment -> JSX
   formatComment (Comment t cs) =
     R.tr_
       [ R.td_

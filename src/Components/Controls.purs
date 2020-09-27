@@ -6,7 +6,7 @@ import Prelude
 
 import Data.Maybe (Maybe, maybe)
 import Effect (Effect)
-import React.Basic as React
+import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (EventHandler, handler_)
 
@@ -22,36 +22,33 @@ type Props =
   , rep :: Rep
   }
 
-component :: React.Component Props
-component =
-  React.stateless {displayName: "Controls", render}
- where
-  render {expr, onStep, onClear, onSave, onSugar, rep} =
-    R.div
-      { className: "add-margin-medium btn-group pull-right"
-      , children:
-        [ button expr
-          { className: "btn btn-default"
-          , onClick: onStep
-          , label: "Step"
-          }
-        , button expr
-          { className: "btn btn-default"
-          , onClick: const onClear
-          , label: "Clear"
-          }
-        , button expr
-          { className: "btn btn-default"
-          , onClick: const onSave
-          , label: "Save"
-          }
-        , button (pure unit)
-          { className: "btn " <> ifSugar "btn-danger" "btn-success" rep
-          , onClick: const onSugar
-          , label: ifSugar "Raw" "Sugar" rep
-          }
-        ]
-      }
+component :: Props -> JSX
+component {expr, onStep, onClear, onSave, onSugar, rep} =
+  R.div
+    { className: "add-margin-medium btn-group pull-right"
+    , children:
+      [ button expr
+        { className: "btn btn-default"
+        , onClick: onStep
+        , label: "Step"
+        }
+      , button expr
+        { className: "btn btn-default"
+        , onClick: const onClear
+        , label: "Clear"
+        }
+      , button expr
+        { className: "btn btn-default"
+        , onClick: const onSave
+        , label: "Save"
+        }
+      , button (pure unit)
+        { className: "btn " <> ifSugar "btn-danger" "btn-success" rep
+        , onClick: const onSugar
+        , label: ifSugar "Raw" "Sugar" rep
+        }
+      ]
+    }
 
 button
   :: forall a
@@ -61,7 +58,7 @@ button
     , onClick :: a -> Effect Unit
     , label :: String
     }
-  -> React.JSX
+  -> JSX
 button m {className, onClick, label} =
   R.button
     { className: maybeEnable className m

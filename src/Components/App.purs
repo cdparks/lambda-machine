@@ -1,5 +1,5 @@
 module Components.App
-  ( component
+  ( mkApp
   ) where
 
 import Prelude
@@ -12,10 +12,13 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Set as Set
 import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import React.Basic as React
 import React.Basic (JSX)
 import React.Basic.DOM as R
+import React.Basic.Hooks (Component, component, mkReducer, useReducer)
+import React.Basic.Hooks as Hooks
 
 import Components.Alert as Alert
 import Components.Controls as Controls
@@ -53,15 +56,12 @@ type State =
   , alert :: Maybe (Tuple Level JSX)
   }
 
-component :: React.Component {}
-component =
-  React.component {displayName: "App", initialState, receiveProps, render}
- where
-  receiveProps _ =
-    pure unit
-
-  render {state, setState} =
-    R.div
+mkApp :: Component {}
+mkApp = do
+  reducer <- mkReducer update
+  component "App" \_ -> Hooks.do
+    state /\ dispatch <- useReducer initialState reducer
+    pure $ R.div
       { className: "container"
       , children:
         [ row $ R.h2
@@ -72,39 +72,39 @@ component =
             Nothing ->
               React.empty
             Just (Tuple level body) ->
-              React.element Alert.component
+              Alert.component
                 { level
                 , child: body
-                , dismiss: setState deleteAlert
+                , dismiss: dispatch DismissAlert
                 }
-        , row $ React.element Input.component
+        , row $ Input.component
           { text: state.text
-          , onChange: setState <<< updateText
-          , onSubmit: setState parseText
-          , onHelp: setState showHelp
+          , onChange: dispatch <<< UpdateText
+          , onSubmit: dispatch ParseText
+          , onHelp: dispatch ShowHelp
           }
         , row $ R.h3_ [R.text "Definitions"]
-        , row $ React.element Definitions.component
+        , row $ Definitions.component
           { defs: state.defs
           , rep: state.rep
-          , onDelete: setState <<< deleteDef
+          , onDelete: dispatch <<< DeleteDef
           }
         , split
           (R.h3_ [R.text "Evaluation"])
-          (React.element Controls.component
+          (Controls.component
             { expr: state.expr
-            , onStep: setState <<< reduce
-            , onClear: setState clear
+            , onStep: dispatch <<< Reduce
+            , onClear: dispatch Clear
             , onSave: save state
-            , onSugar: setState toggleSugar
+            , onSugar: dispatch ToggleSugar
             , rep: state.rep
             }
           )
-        , row $ React.element Expressions.component
+        , row $ Expressions.component
           { history: state.history
           , rep: state.rep
           }
-        , row $ React.element Footer.component {}
+        , row $ Footer.component {}
         ]
       }
 
@@ -124,17 +124,6 @@ split lhs rhs =
       , R.div {className: "col-sm-6", children: [rhs]}
       ]
     }
-
-initialState :: State
-initialState =
-  { text: ""
-  , expr: Nothing
-  , history: []
-  , defs: initialDefs
-  , env: initialEnv
-  , rep: Raw
-  , alert: Nothing
-  }
 
 initialDefs :: Array Definition
 initialDefs =
@@ -159,23 +148,48 @@ initialEnv =
  where
   fromDef def = Tuple def.name $ syntaxToExpr $ defToSyntax def
 
-mkAlert :: Level -> String -> Tuple Level JSX
-mkAlert level message =
-  Tuple level body
- where
-  body = R.p
-    { className: "preformatted"
-    , children: [R.text message]
-    }
+data Action
+  = ShowHelp
+  | DismissAlert
+  | UpdateText String
+  | ParseText
+  | DeleteDef Name
+  | AddDef Definition
+  | SetExpr Syntax
+  | Reduce Expr
+  | Clear
+  | ToggleSugar
+
+initialState :: State
+initialState =
+  { text: ""
+  , expr: Nothing
+  , history: []
+  , defs: initialDefs
+  , env: initialEnv
+  , rep: Raw
+  , alert: Nothing
+  }
+
+update :: State -> Action -> State
+update s = case _ of
+  ShowHelp -> showHelp s
+  DismissAlert -> dismissAlert s
+  UpdateText text -> updateText text s
+  ParseText -> parseText s
+  DeleteDef name -> deleteDef name s
+  AddDef def -> addDef def s
+  SetExpr expr -> setExpr expr s
+  Reduce expr -> reduce expr s
+  Clear -> clear s
+  ToggleSugar -> toggleSugar s
 
 showHelp :: State -> State
 showHelp =
-  _ {alert = pure $ Tuple Info body}
- where
-  body = React.element Help.component {}
+  _ {alert = pure $ Tuple Info $ Help.component {} }
 
-deleteAlert :: State -> State
-deleteAlert =
+dismissAlert :: State -> State
+dismissAlert =
   _ {alert = Nothing}
 
 updateText :: String -> State -> State
@@ -188,7 +202,7 @@ parseText s
 parseText s =
   case parseAll parseEither s.text of
     Left error ->
-      s {alert = pure $ mkAlert Danger $ formatParseError s.text error}
+      s {alert = pure $ alert Danger $ formatParseError s.text error}
     Right (Left def) ->
       addDef def s
     Right (Right syntax) ->
@@ -198,14 +212,13 @@ deleteDef :: Name -> State -> State
 deleteDef name s = s
   { defs = deleteByName name s.defs
   , env = env
-  , alert = alert
+  , alert = do
+      guard $ Set.size names /= 0
+      pure $ alert Warning $ formatUndefinedWarning name names
   }
  where
   env = Map.delete name s.env
   names = namesReferencing name env
-  alert = do
-    guard $ Set.size names /= 0
-    pure $ mkAlert Warning $ formatUndefinedWarning name names
 
 deleteByName :: Name -> Array Definition -> Array Definition
 deleteByName name = filter $ (_ /= name) <<< _.name
@@ -214,7 +227,7 @@ addDef :: Definition -> State -> State
 addDef def s =
   if Set.isEmpty missing
     then s {text = "", defs = defs, env = env}
-    else s {alert = pure $ mkAlert Danger $ formatUndefinedError s.text missing}
+    else s {alert = pure $ alert Danger $ formatUndefinedError s.text missing}
  where
   defs = deleteByName def.name s.defs `snoc` def
   expr = syntaxToExpr (defToSyntax def)
@@ -240,6 +253,9 @@ reduce expr s =
 clear :: State -> State
 clear = _ {expr = Nothing, history = []}
 
+toggleSugar :: State -> State
+toggleSugar s = s {rep = toggleRep s.rep}
+
 save :: State -> Effect Unit
 save {rep, defs, history} =
   saveTextAs text "evaluation.txt"
@@ -251,5 +267,11 @@ save {rep, defs, history} =
     ]
   text = intercalate "\n" $ map (\def -> selectRep def rep) allDefs
 
-toggleSugar :: State -> State
-toggleSugar s = s {rep = toggleRep s.rep}
+alert :: Level -> String -> Tuple Level JSX
+alert level message =
+  Tuple level body
+ where
+  body = R.p
+    { className: "preformatted"
+    , children: [R.text message]
+    }

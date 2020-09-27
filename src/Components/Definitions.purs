@@ -5,9 +5,9 @@ module Components.Definitions
 import Prelude
 
 import Effect (Effect)
-import React.Basic as React
+import React.Basic (JSX)
 import React.Basic.DOM as R
-import React.Basic.Events as Events
+import React.Basic.Events (handler_)
 
 import Data.Name (Name)
 import Data.PrettyPrint (Rep, selectRep)
@@ -19,23 +19,20 @@ type Props =
   , rep :: Rep
   }
 
-component :: React.Component Props
-component =
-  React.stateless {displayName: "Definitions", render}
+component :: Props -> JSX
+component {defs, rep, onDelete} =
+  R.ul
+    { className: "unstyled"
+    , children: map renderDef defs
+    }
  where
-  render {defs, rep, onDelete} =
-    R.ul
-      { className: "unstyled"
-      , children: map (renderDef rep onDelete) defs
-      }
-
-  renderDef rep onDelete def =
+  renderDef def =
     R.li
       { className: "definition"
       , children:
         [ R.span
           { className: "cursor-pointer glyphicon glyphicon-remove"
-          , onClick: Events.handler_ $ onDelete def.name
+          , onClick: handler_ $ onDelete def.name
           , children: []
           }
         , R.text $ " " <> selectRep (defToDoc def) rep

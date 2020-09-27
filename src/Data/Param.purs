@@ -12,7 +12,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
-import Data.Name (Name, name_)
+import Data.Name (Name)
 import Data.PrettyPrint (class PrettyPrint)
 
 data Param
