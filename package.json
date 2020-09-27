@@ -1,27 +1,26 @@
 {
   "name": "lambda-machine",
-  "version": "0.2.6",
+  "version": "1.0.0",
   "author": "Chris Parks",
   "repository": "https://github.com/cdparks/lambda-machine",
   "license": "MIT",
-  "scripts": {
-    "setup": "yarn install && psc-package install",
-    "build": "yarn setup && yarn pulp browserify -O --to static/js/main.js",
-    "repl": "yarn pulp repl",
-    "test": "yarn pulp test",
-    "clean": "rm -rf output",
-    "reset": "yarn clean && rm -rf node_modules .psc-package .psci_modules .pulp-cache yarn-error.log",
-    "add:ps": "psc-package install",
-    "pulp": "PATH=./node_modules/.bin:$PATH pulp"
-  },
   "dependencies": {
-    "file-saver": "^1.3.8",
-    "react": "^15.5.4",
-    "react-dom": "^15.5.4"
+    "file-saver": "^2.0.2",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1"
   },
   "devDependencies": {
-    "psc-package-bin-simple": "^1.0.1",
-    "pulp": "^12.3.0",
-    "purescript": "^0.12.0"
+    "parcel": "^1.12.4",
+    "purescript": "^0.13.8",
+    "spago": "^0.16.0"
+  },
+  "scripts": {
+    "setup": "yarn install && spago install",
+    "start": "yarn build && parcel index.html",
+    "bundle": "yarn build && parcel build --public-url='./' index.html",
+    "build": "spago build",
+    "repl": "spago repl",
+    "clean": "rm -rf .cache .spago .psci_modules output dist",
+    "reset": "yarn clean && rm -rf node_modules"
   }
 }

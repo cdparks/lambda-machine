@@ -1,6 +1,9 @@
+.cache
 .psc-package
 .psci_modules
+.purs-repl
+.spago
+dist
 node_modules
 output
 yarn-error.log
-static/js
