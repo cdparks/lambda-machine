@@ -21,6 +21,7 @@
     "build": "spago build",
     "repl": "spago repl",
     "clean": "rm -rf .cache .spago .psci_modules output dist",
-    "reset": "yarn clean && rm -rf node_modules"
+    "reset": "yarn clean && rm -rf node_modules",
+    "deploy": "yarn bundle && ./deploy.sh"
   }
 }
