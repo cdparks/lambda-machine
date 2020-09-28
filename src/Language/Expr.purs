@@ -1,4 +1,4 @@
-module Data.Expr
+module Language.Expr
   ( Expr(..)
   , Environment(..)
   , syntaxToExpr
@@ -26,12 +26,11 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst, snd)
+import Language.Name (Name, next)
+import Language.Param (Param, isStrict, rename, unwrap)
+import Language.PrettyPrint (class PrettyPrint, parensIf)
+import Language.Syntax (Syntax(..))
 import Partial.Unsafe (unsafePartial)
-
-import Data.Name (Name, next)
-import Data.Param (Param, isStrict, rename, unwrap)
-import Data.PrettyPrint (class PrettyPrint, parensIf)
-import Data.Syntax (Syntax(..))
 
 data Expr
   = Bound Int

@@ -1,4 +1,4 @@
-module Data.Name
+module Language.Name
   ( isSubscriptChar
   , intToSubscript
   , subscriptToInt

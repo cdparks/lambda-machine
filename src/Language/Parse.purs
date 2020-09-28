@@ -1,4 +1,4 @@
-module Data.Parse
+module Language.Parse
   ( parseAll
   , parseDefinition
   , parseSyntax
@@ -18,15 +18,14 @@ import Data.Int (fromString)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.String.CodeUnits (fromCharArray)
+import Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
+import Language.Param (Param, lazy, strict)
+import Language.Syntax (Definition, Syntax(..))
 import Partial.Unsafe (unsafePartial)
-import Text.Parsing.Parser.Combinators (between, sepBy, try)
 import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
+import Text.Parsing.Parser.Combinators (between, sepBy, try)
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
-
-import Data.Syntax (Definition, Syntax(..))
-import Data.Param (Param, lazy, strict)
-import Data.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
 
 token :: forall a. Parser String a -> Parser String a
 token p = p <* skipSpaces

@@ -1,4 +1,4 @@
-module Data.Syntax
+module Language.Syntax
   ( Definition(..)
   , defToSyntax
   , defToDoc
@@ -13,10 +13,9 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List(..), foldr, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
-
-import Data.Name (Name)
-import Data.Param (Param, unwrap)
-import Data.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
+import Language.Name (Name)
+import Language.Param (Param, unwrap)
+import Language.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
 
 type Definition =
   { name :: Name

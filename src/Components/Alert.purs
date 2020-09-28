@@ -1,5 +1,6 @@
 module Components.Alert
-  ( component
+  ( Level(..)
+  , component
   ) where
 
 import Prelude
@@ -9,7 +10,13 @@ import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)
 
-import Data.Level (Level)
+data Level = Info | Success | Warning | Danger
+
+instance showLevel :: Show Level where
+  show Info = "info"
+  show Success = "success"
+  show Warning = "warning"
+  show Danger  = "danger"
 
 type Props =
   { level :: Level

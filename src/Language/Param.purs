@@ -1,4 +1,4 @@
-module Data.Param
+module Language.Param
   ( Param
   , lazy
   , strict
@@ -11,9 +11,8 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-
-import Data.Name (Name)
-import Data.PrettyPrint (class PrettyPrint)
+import Language.Name (Name)
+import Language.PrettyPrint (class PrettyPrint)
 
 data Param
   = Lazy Name

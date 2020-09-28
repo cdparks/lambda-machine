@@ -4,6 +4,14 @@ module Components.App
 
 import Prelude
 
+import Components.Alert as Alert
+import Components.Alert (Level(..))
+import Components.Controls as Controls
+import Components.Definitions as Definitions
+import Components.Expressions as Expressions
+import Components.Footer as Footer
+import Components.Help as Help
+import Components.Input as Input
 import Control.MonadZero (guard)
 import Data.Array (concat, cons, filter, reverse, snoc)
 import Data.Either (Either(..))
@@ -14,20 +22,8 @@ import Data.Set as Set
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
-import React.Basic as React
-import React.Basic (JSX)
-import React.Basic.DOM as R
-import React.Basic.Hooks (Component, component, mkReducer, useReducer)
-import React.Basic.Hooks as Hooks
-
-import Components.Alert as Alert
-import Components.Controls as Controls
-import Components.Definitions as Definitions
-import Components.Expressions as Expressions
-import Components.Footer as Footer
-import Components.Help as Help
-import Components.Input as Input
-import Data.Expr
+import Effect.Save (saveTextAs)
+import Language.Expr
   ( Environment
   , Expr
   , alpha
@@ -39,12 +35,15 @@ import Data.Expr
   , syntaxToExpr
   , undefinedNames
   )
-import Data.Level (Level(..))
-import Data.Name (Name)
-import Data.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
-import Data.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
-import Data.Syntax (Definition, Syntax, defToDoc, defToSyntax)
-import Effect.Save (saveTextAs)
+import Language.Name (Name)
+import Language.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
+import Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
+import Language.Syntax (Definition, Syntax, defToDoc, defToSyntax)
+import React.Basic (JSX)
+import React.Basic as React
+import React.Basic.DOM as R
+import React.Basic.Hooks (Component, component, mkReducer, useReducer)
+import React.Basic.Hooks as Hooks
 
 type State =
   { text :: String

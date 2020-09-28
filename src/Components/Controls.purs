@@ -6,12 +6,11 @@ import Prelude
 
 import Data.Maybe (Maybe, maybe)
 import Effect (Effect)
+import Language.Expr (Expr)
+import Language.PrettyPrint (Rep, ifSugar)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (EventHandler, handler_)
-
-import Data.Expr (Expr)
-import Data.PrettyPrint (Rep, ifSugar)
 
 type Props =
   { expr :: Maybe Expr

@@ -5,13 +5,12 @@ module Components.Definitions
 import Prelude
 
 import Effect (Effect)
+import Language.Name (Name)
+import Language.PrettyPrint (Rep, selectRep)
+import Language.Syntax (Definition, defToDoc)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)
-
-import Data.Name (Name)
-import Data.PrettyPrint (Rep, selectRep)
-import Data.Syntax (Definition, defToDoc)
 
 type Props =
   { defs :: Array Definition

@@ -1,4 +1,4 @@
-module Data.PrettyPrint
+module Language.PrettyPrint
   ( Rep(..)
   , ifSugar
   , selectRep
