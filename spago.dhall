@@ -10,6 +10,7 @@ You can edit this file as you like.
   , "effect"
   , "foldable-traversable"
   , "generics-rep"
+  , "unordered-collections"
   , "maybe"
   , "ordered-collections"
   , "parsing"
@@ -19,6 +20,7 @@ You can edit this file as you like.
   , "react-basic-hooks"
   , "react-basic-dom"
   , "strings"
+  , "transformers"
   , "web-html"
   ]
 , packages = ./packages.dhall

@@ -19,7 +19,6 @@ import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.String.CodeUnits (fromCharArray)
 import Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
-import Language.Param (Param, lazy, strict)
 import Language.Syntax (Definition, Syntax(..))
 import Partial.Unsafe (unsafePartial)
 import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
@@ -62,7 +61,7 @@ parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
 parseDefinition :: Parser String Definition
 parseDefinition = {name:_, args:_, syntax:_}
   <$> parseName
-  <*> many parseParam
+  <*> many parseName
   <*> (token (string "=") *> parseSyntax)
 
 parseSyntax :: Parser String Syntax
@@ -82,7 +81,7 @@ parseSyntax =
     parseLambda :: Parser String Syntax
     parseLambda = do
       void $ token $ string "\\" <|> string "λ"
-      names <- some parseParam
+      names <- some parseName
       void $ token $ string "."
       body <- p
       pure $ foldr Lambda body names
@@ -98,7 +97,7 @@ brackets = balance '[' ']'
 
 toList :: List Syntax -> Syntax
 toList xs =
-  Lambda (lazy cons) (Lambda (lazy nil) (loop xs))
+  Lambda cons (Lambda nil (loop xs))
  where
   cons = name_ "cons"
   nil = name_ "nil"
@@ -107,7 +106,7 @@ toList xs =
 
 toChurch :: Int -> Syntax
 toChurch n =
-  Lambda (lazy s) (Lambda (lazy z) (loop n))
+  Lambda s (Lambda z (loop n))
  where
   s = name_ "s"
   z = name_ "z"
@@ -126,9 +125,6 @@ parseList p = toList <$> brackets (p `sepBy` token (char ','))
 
 parseVar :: Parser String Syntax
 parseVar = Var <$> parseName
-
-parseParam :: Parser String Param
-parseParam = token $ strict <$> (string "!" *> parseName) <|> lazy <$> parseName
 
 parseName :: Parser String Name
 parseName = token do

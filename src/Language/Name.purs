@@ -17,9 +17,12 @@ import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
+import Data.Hashable (class Hashable, hash)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Set as Set
 import Data.String.CodeUnits (fromCharArray, toCharArray)
+import Data.Tuple (Tuple(..))
+import Language.PrettyPrint (class PrettyPrint)
 import Partial.Unsafe (unsafePartial)
 
 data Name = Name String (Maybe Int)
@@ -38,8 +41,14 @@ derive instance genericName :: Generic Name _
 instance showName :: Show Name where
   show (Name n ms) = n <> maybe "" intToSubscript ms
 
+instance prettyPrintName :: PrettyPrint Name where
+  prettyPrint = pure <<< show
+
 instance eqName :: Eq Name where
   eq = genericEq
+
+instance hashableName :: Hashable Name where
+  hash (Name n ms) = hash $ Tuple n ms
 
 instance ordName :: Ord Name where
   compare = genericCompare

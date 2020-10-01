@@ -14,12 +14,11 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.List (List(..), foldr, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Language.Name (Name)
-import Language.Param (Param, unwrap)
 import Language.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
 
 type Definition =
   { name :: Name
-  , args :: Array Param
+  , args :: Array Name
   , syntax :: Syntax
   }
 
@@ -40,7 +39,7 @@ defToDoc def =
 
 data Syntax
   = Var Name
-  | Lambda Param Syntax
+  | Lambda Name Syntax
   | Apply Syntax Syntax
 
 derive instance genericSyntax :: Generic Syntax _
@@ -61,10 +60,10 @@ tryFromChurch (Lambda s (Lambda z body)) =
   show <$> walk body
  where
   walk (Apply (Var s') arg)
-    | s' == unwrap s = (_ + 1) <$> walk arg
+    | s' == s = (_ + 1) <$> walk arg
     | otherwise = Nothing
   walk (Var z')
-    | z' == unwrap z = pure 0
+    | z' == z = pure 0
     | otherwise = Nothing
   walk _ = Nothing
 tryFromChurch _ = Nothing
@@ -74,10 +73,10 @@ tryFromList (Lambda c (Lambda n body)) =
   listToString <$> walk body
  where
   walk (Apply (Apply (Var c') x) xs)
-    | c' == unwrap c = Cons (sugar (prettySyntax x)) <$> walk xs
+    | c' == c = Cons (sugar (prettySyntax x)) <$> walk xs
     | otherwise = Nothing
   walk (Var n')
-    | n' == unwrap n = pure Nil
+    | n' == n = pure Nil
     | otherwise = Nothing
   walk _ = Nothing
 tryFromList _ = Nothing

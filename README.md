@@ -12,10 +12,10 @@ Yarp. Here's a grammar, if you like that kind of thing:
 
 ```ebnf
 definition
-  = name, {param}, "=", expression ;         (* Definition *)
+  = name, {name}, "=", expression ;          (* Definition *)
 
 expression
-  = lambda, param, {param}, ".", expression  (* Lambda abstraction *)
+  = lambda, name, {name}, ".", expression    (* Lambda abstraction *)
   | name                                     (* Variable *)
   | expression, expression                   (* Application *)
   | "(", expression, ")"                     (* Parentheses *)
@@ -30,9 +30,6 @@ lambda
   = "\"                                      (* Backslash *)
   | "λ"                                      (* Greek letter lambda *)
   ;
-
-param
-  = ["!"] name ;                             (* Strict params can be marked with a bang *)
 
 name
   = (letter | "_")                           (* Initial letter or underscore *)
@@ -89,9 +86,7 @@ to reduce by hand. It's nice to have something that does it for me!
 Lambda Machine is written in [PureScript][purescript] and [React][react]
 using the [purescript-react-basic][react-basic] bindings. Expressions
 are converted to a locally nameless representation before being
-evaluated in normal order _by default_. You can mark individual
-parameters as being eagerly evaluated by prefixing them with a
-bang (`!`). (Note: this is sneaky and new and I'm not sure it works yet.)
+evaluated in normal order.
 
 Build and run it like this:
 

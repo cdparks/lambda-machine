@@ -27,7 +27,6 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst, snd)
 import Language.Name (Name, next)
-import Language.Param (Param, isStrict, rename, unwrap)
 import Language.PrettyPrint (class PrettyPrint, parensIf)
 import Language.Syntax (Syntax(..))
 import Partial.Unsafe (unsafePartial)
@@ -35,7 +34,7 @@ import Partial.Unsafe (unsafePartial)
 data Expr
   = Bound Int
   | Free Name
-  | Bind Param Expr
+  | Bind Name Expr
   | App Expr Expr
 
 type Environment a = Map.Map Name a
@@ -53,7 +52,7 @@ syntaxToExpr =
     Var n ->
       maybe (Free n) Bound (Map.lookup n env)
     Lambda n b ->
-      let env' = Map.insert (unwrap n) 0 (map (_ + 1) env)
+      let env' = Map.insert n 0 (map (_ + 1) env)
       in Bind n (loop env' b)
     Apply f a ->
       App (loop env f) (loop env a)
@@ -68,15 +67,15 @@ alpha e =
     Free n ->
       Free n
     Bind n b ->
-      let pair = fresh env $ unwrap n
-      in Bind (rename n (snd pair)) (loop (fst pair) b)
+      let {used, new} = fresh env n
+      in Bind new (loop used b)
     App f a ->
       App (loop env f) (loop env a)
 
-fresh :: Set.Set Name -> Name -> Tuple (Set.Set Name) Name
+fresh :: Set.Set Name -> Name -> {used :: Set.Set Name, new :: Name}
 fresh env n
   | n `Set.member` env = fresh env (next n)
-  | otherwise = Tuple (Set.insert n env) n
+  | otherwise = {used:  Set.insert n env, new: n}
 
 exprToSyntax :: Expr -> Syntax
 exprToSyntax =
@@ -88,7 +87,7 @@ exprToSyntax =
     Free n ->
       Var n
     Bind n b ->
-      Lambda n $ loop (unwrap n `cons` env) b
+      Lambda n $ loop (n `cons` env) b
     App f a ->
       Apply (loop env f) (loop env a)
 
@@ -164,18 +163,15 @@ instance prettyPrintExpr :: PrettyPrint Expr where
 
 step :: Environment Expr -> Expr -> Maybe Expr
 step env = case _ of
-  App (Bind n b) m
-    | isStrict n -> (App (Bind n b) <$> step env m) <|> pure (substitute m b)
-    | otherwise -> pure $ substitute m b
+  App (Bind n b) m ->
+    pure $ substitute m b
   App f a ->
     (App <$> step env f <*> pure a) <|> (App <$> pure f <*> step env a)
-  Bind p b ->
+  Bind n b ->
     -- When walking under a lambda, make the bound var free, then
     -- rebind it since it may have moved
-    let
-      n = unwrap p
-      env' = Map.delete n env
-    in Bind p <$> (rebind n <$> step env' (unbind n b))
+    let env' = Map.delete n env
+    in Bind n <$> (rebind n <$> step env' (unbind n b))
   Free n ->
     Map.lookup n env
   Bound i ->

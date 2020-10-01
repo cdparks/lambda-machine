@@ -282,28 +282,6 @@ tutorial =
     [ "[1] -> \\cons. \\nil. cons (\\s. \\z. s z) nil"
     , "[1, 2] -> \\cons. \\nil. cons (\\s. \\z. s z) (cons (\\s. \\z. s (s z)) nil)"
     ]
-  , Header "Experimental"
-  , Para
-    [ Text "Lambda Machine evaluates expressions using "
-    , Link "en.wikipedia.org/wiki/Evaluation_strategy#Normal_order" "normal order evaluation"
-    , Text ". However, you can specify that an individual parameter to a lambda should be"
-    , Text " evaluated before the body of the lambda by prefixing it with an exclamation point."
-    , Text " This can be useful if you want to avoid duplicating work. For example, compare the behavor of "
-    , Mono "iterate₁"
-    , Text " and "
-    , Mono "iterate₂"
-    , Text " by applying them to "
-    , Mono "(add 1)"
-    , Text " and "
-    , Mono "0."
-    ]
-  , Code
-    [ "add m n s z = m s (n s z)"
-    , "cons x xs f z = f x (xs f z)"
-    , "fix f = (λx. f (x x)) (λy. f (y y))"
-    , "iterate₁ = fix (\\next f x. cons x (next f (f x)))"
-    , "iterate₂ = fix (\\next f !x. cons x (next f (f x)))"
-    ]
   , Header "Bye!"
   , Para
     [ Text "Have fun and "
