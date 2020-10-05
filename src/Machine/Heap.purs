@@ -2,6 +2,7 @@ module Machine.Heap
   ( Heap
   , empty
   , alloc
+  , reserve
   , fetch
   , update
   , free
@@ -29,6 +30,12 @@ empty = { memory: HashMap.empty, next: wrap 1 }
 alloc :: forall a s m. MonadState { heap :: Heap a | s } m => a -> m Address
 alloc node = modifyHeap \{ memory, next } -> Tuple next
   { memory: HashMap.insert next node memory
+  , next: next + wrap 1
+  }
+
+reserve :: forall a s m. MonadState { heap :: Heap a | s } m => m Address
+reserve = modifyHeap \{ memory, next } -> Tuple next
+  { memory
   , next: next + wrap 1
   }
 

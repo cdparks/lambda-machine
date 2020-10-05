@@ -2,16 +2,28 @@ module Machine.Node
   ( Node(..)
   , Stuck(..)
   , Env
+  , define
+  , compile
+  , instantiate
   ) where
 
 import Prelude
 
+import Control.Monad.State (class MonadState)
+import Data.Foldable (fold)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.List (List)
-import Language.Expr (Expr)
+import Data.List (List(..))
+import Data.List as List
+import Data.Maybe (Maybe(..))
+import Language.Expr (Expr(..))
 import Language.Name (Name)
 import Machine.Address (Address)
+import Machine.Globals (Globals)
+import Machine.Globals as Globals
+import Machine.Heap (Heap)
+import Machine.Heap as Heap
+import Partial.Unsafe (unsafeCrashWith)
 
 data Node
   = Node Address Address
@@ -36,3 +48,52 @@ instance showStuck :: Show Stuck where
   show x = genericShow x
 
 type Env = List Address
+
+deref :: Int -> Env -> Address
+deref i env = case List.index env i of
+  Just a -> a
+  Nothing -> unsafeCrashWith $ fold
+    [ "Invalid De Bruijn index "
+    , show i
+    , " in environment "
+    , show env
+    ]
+
+define
+  :: forall s m
+   . MonadState { heap :: Heap Node, globals :: Globals | s } m
+  => Name
+  -> Expr
+  -> m Unit
+define name expr = Globals.add name \_ ->
+  Global name <$> compile expr
+
+compile
+  :: forall s m
+   . MonadState { heap :: Heap Node, globals :: Globals | s } m
+  => Expr
+  -> m Address
+compile = instantiate Nil
+
+instantiate
+  :: forall s m
+   . MonadState { heap :: Heap Node, globals :: Globals | s } m
+  => Env
+  -> Expr
+  -> m Address
+instantiate env0 = case _ of
+  Bind name body ->
+    Heap.alloc $ Closure env0 name body
+  App f0 a0 -> do
+    a <- instantiate env0 a0
+    f <- instantiate env0 f0
+    Heap.alloc $ Node f a
+  Bound i -> do
+    pure $ deref i env0
+  Free name ->
+    Globals.get name >>= case _ of
+      Nothing -> do
+        stuck <- Heap.alloc $ Stuck $ StuckVar name
+        Globals.add name \_ -> pure $ Global name stuck
+        pure stuck
+      Just addr -> pure addr
