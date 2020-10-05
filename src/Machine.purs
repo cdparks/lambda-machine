@@ -1,22 +1,24 @@
 module Machine
   ( Machine(..)
-  , start
-  , smallStep
-  , bigStep
+  , new
+  , step
+  , add
+  , remove
   ) where
 
-import Prelude
+import Prelude hiding (add)
 
-import Control.Monad.State (class MonadState, evalState, gets, modify_)
+import Control.Monad.Rec.Class (tailRecM, Step(..))
+import Control.Monad.State (class MonadState, evalState, execState, gets, modify_)
+import Data.Foldable (class Foldable, fold)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
-import Data.List as List
 import Data.List (List(..))
+import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap)
-import Data.Traversable (for)
-import Data.TraversableWithIndex (forWithIndex)
-import Data.Foldable (fold)
+import Data.Traversable (traverse_)
+import Data.Tuple(Tuple, uncurry)
 import Language.Expr (Expr(..))
 import Language.Name (Name)
 import Machine.Address (Address)
@@ -39,31 +41,47 @@ type Machine =
   , trace :: Trace
   }
 
-initialize
-  :: HashMap Name Expr
-  -> Expr
-  -> {root :: Address, globals :: HashMap Name Address, heap :: Heap Node }
-initialize rawGlobals expr =
-  flip evalState {heap: Heap.empty} do
-    globals <- initializeGlobals rawGlobals
+new :: forall f. Foldable f => f (Tuple Name Expr) -> Expr -> Machine
+new rawGlobals expr =
+  { root
+  , heap
+  , globals
+  , stack: Stack.singleton root
+  , stash: Stash.empty
+  , trace: Start
+  }
+ where
+  empty = { heap: Heap.empty, globals: HashMap.empty }
+  {root, globals, heap} = flip evalState empty $ do
+    traverse_ (uncurry add) rawGlobals
+    globals <- gets _.globals
     root <- compile globals expr
     heap <- gets _.heap
-    pure { root, globals, heap}
+    pure {root, globals, heap}
 
-initializeGlobals
-  :: forall s m
-   . MonadState { heap :: Heap Node | s } m
-  => HashMap Name Expr
-  -> m (HashMap Name Address)
-initializeGlobals globals = do
-  env <- for globals \expr -> do
-    addr <- Heap.alloc $ Pointer $ wrap 0
-    pure { addr, expr }
-  let addrs = _.addr <$> env
-  forWithIndex env \name { addr, expr } -> do
-    compiled <- compile addrs expr
-    Heap.update addr $ Global name compiled
-    pure addr
+add
+  :: forall s m. MonadState { heap :: Heap Node, globals :: HashMap Name Address | s} m
+  => Name
+  -> Expr
+  -> m Unit
+add name expr = do
+  addr <- Heap.alloc $ Pointer $ wrap 0
+  globals <- gets _.globals
+  compiled <- compile globals expr
+  Heap.update addr $ Global name compiled
+  modify_ _ { globals = HashMap.insert name addr globals }
+
+remove
+  :: forall s m. MonadState { heap :: Heap Node, globals :: HashMap Name Address | s} m
+  => Name
+  -> m Unit
+remove name = do
+  globals <- gets _.globals
+  case HashMap.lookup name globals of
+    Nothing -> pure unit
+    Just addr -> do
+      Heap.free addr
+      modify_ _ { globals = HashMap.delete name globals }
 
 compile
   :: forall s m
@@ -96,37 +114,22 @@ deref i env = case List.index env i of
     , show env
     ]
 
-start :: HashMap Name Expr -> Expr -> Machine
-start rawGlobals expr =
-  { root
-  , heap
-  , globals
-  , stack: Stack.singleton root
-  , stash: Stash.empty
-  , trace: Start
-  }
- where
-   {root, globals, heap} = initialize rawGlobals expr
-
 emit :: forall s m. MonadState { trace :: Trace | s } m => Trace -> m Unit
 emit message = modify_ _ { trace = message }
 
-smallStep :: forall m. MonadState Machine m => m Unit
-smallStep = do
-  { top } <- gets _.stack
-  eval top =<< Heap.fetch top
-
-bigStep :: forall m. MonadState Machine m => m Unit
-bigStep = do
-  smallStep
-  trace <- gets _.trace
-  unless (interesting trace) bigStep
+step :: Machine -> Machine
+step = execState $ tailRecM go unit
  where
-  interesting = case _ of
-    Fetched _ -> true
-    Substituted _ _ -> true
-    Halted _ -> true
-    _ -> false
+  go _ = do
+    { top } <- gets _.stack
+    eval top =<< Heap.fetch top
+    trace <- gets _.trace
+    pure $ next trace unit
+  next = case _ of
+    Fetched _ -> Done
+    Substituted _ _ -> Done
+    Halted _ -> Done
+    _ -> Loop
 
 eval :: forall m. MonadState Machine m => Address -> Node -> m Unit
 eval top = case _ of

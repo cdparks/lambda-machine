@@ -4,6 +4,7 @@ module Machine.Heap
   , alloc
   , fetch
   , update
+  , free
   ) where
 
 import Prelude
@@ -40,6 +41,11 @@ fetch address = withHeap \{ memory } ->
 update :: forall a s m. MonadState { heap :: Heap a | s } m => Address -> a -> m Unit
 update address node = modifyHeap \heap -> Tuple unit $ heap
   { memory = HashMap.insert address node heap.memory
+  }
+
+free :: forall a s m. MonadState { heap :: Heap a | s } m => Address -> m Unit
+free address = modifyHeap \heap -> Tuple unit $ heap
+  { memory = HashMap.delete address heap.memory
   }
 
 modifyHeap :: forall a s m r. MonadState { heap :: Heap a | s } m => (Heap a -> Tuple r (Heap a)) -> m r
