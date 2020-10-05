@@ -17,6 +17,7 @@ import Machine.Stack (Stack, fromList)
 newtype Stash = Stash (List Stack)
 
 derive instance newtypeStash :: Newtype Stash _
+derive newtype instance showStash :: Show Stash
 
 empty :: Stash
 empty = Stash Nil

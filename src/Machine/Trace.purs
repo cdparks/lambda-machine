@@ -13,10 +13,8 @@ data Trace
   = Start
   | Unwound Address
   | Followed Address
-  | Unfolded Name
   | Fetched Name
   | Instantiated Address
-  | Tied Name
   | Substituted Name Address
   | WentUnder Address
   | Discarded Address Address

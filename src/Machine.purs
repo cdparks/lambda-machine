@@ -4,19 +4,26 @@ module Machine
   , step
   , add
   , remove
+  , testBig
+  , testSmall
   ) where
 
 import Prelude hiding (add)
 
+import Effect (Effect)
 import Control.Monad.Rec.Class (tailRecM, Step(..))
 import Control.Monad.State (class MonadState, evalState, execState, gets, modify_)
 import Data.Foldable (class Foldable, fold)
-import Data.List (List(..))
+import Data.List (List(..), (:))
+import Language.Parse (unsafeParse, parseSyntax)
+import Effect.Console (log)
 import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse_)
-import Data.Tuple (Tuple, uncurry)
-import Language.Expr (Expr)
-import Language.Name (Name)
+import Data.Traversable (traverse, traverse_)
+import Data.Tuple (Tuple(..), uncurry)
+import Language.Expr (Expr(..), syntaxToExpr)
+import Language.Syntax (Syntax(..))
+import Language.PrettyPrint (prettyPrint, sugar)
+import Language.Name (Name, name_)
 import Machine.Address (Address)
 import Machine.Globals (Globals)
 import Machine.Globals as Globals
@@ -68,18 +75,25 @@ emit :: forall s m. MonadState { trace :: Trace | s } m => Trace -> m Unit
 emit message = modify_ _ { trace = message }
 
 step :: Machine -> Machine
-step = execState $ tailRecM go unit
+step = stepWith interesting
+
+stepWith :: (Trace -> Boolean) -> Machine -> Machine
+stepWith stop m = execState (tailRecM go unit) m
  where
   go _ = do
     { top } <- gets _.stack
     eval top =<< Heap.fetch top
     trace <- gets _.trace
-    pure $ next trace unit
-  next = case _ of
-    Fetched _ -> Done
-    Substituted _ _ -> Done
-    Halted _ -> Done
-    _ -> Loop
+    pure if stop trace
+      then Done unit
+      else Loop unit
+
+interesting :: Trace -> Boolean
+interesting = case _ of
+  Fetched _ -> true
+  Substituted _ _ -> true
+  Halted _ -> true
+  _ -> false
 
 eval :: forall m. MonadState Machine m => Address -> Node -> m Unit
 eval top = case _ of
@@ -109,25 +123,25 @@ eval top = case _ of
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        x <- Node.instantiate (Cons arg env) e
-        Heap.update app $ Pointer x
+        node <- Node.instantiate (Cons arg env) e
+        Heap.update app $ Pointer node
         Stack.discard
-        Stack.replace x
+        Stack.replace node
         emit $ Substituted name arg
       Nothing -> do
         arg <- Heap.alloc $ Stuck $ StuckVar name
-        x <- Node.instantiate (Cons arg env) e
-        p <- Heap.alloc $ Stuck $ StuckBind name x
-        Heap.update top $ Pointer p
-        Stack.replace x
+        node <- Node.instantiate (Cons arg env) e
+        stuck <- Heap.alloc $ Stuck $ StuckBind name node
+        Heap.update top $ Pointer stuck
+        Stack.replace node
         emit $ WentUnder top
 
   Stuck _ ->
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        p <- Heap.alloc $ Stuck $ StuckApp top arg
-        Heap.update app $ Pointer p
+        stuck <- Heap.alloc $ Stuck $ StuckApp top arg
+        Heap.update app $ Pointer stuck
         Stack.discard
         Stack.replace arg
         Stash.suspend
@@ -146,3 +160,156 @@ fetchArg address = do
       [ "Non-application below top of stack: "
       , show node
       ]
+
+formatNode :: forall s m. MonadState { heap :: Heap Node | s } m => Address -> m Syntax
+formatNode address = do
+  node <- Heap.fetch address
+  case node of
+    Node f a -> Apply <$> formatNode f <*> formatNode a
+    Closure env0 name e -> do
+      env <- traverse formatNode env0
+      pure $ Lambda name $ toSyntax (Var name : env) e
+    Stuck term -> formatStuck term
+    Pointer a -> formatNode a
+    Global name _ -> pure $ Var name
+
+toSyntax :: List Syntax -> Expr -> Syntax
+toSyntax env = case _ of
+  Bind n e -> Lambda n $ toSyntax (Var n : env) e
+  App f a -> Apply (toSyntax env f) (toSyntax env a)
+  Bound i -> Node.deref i env
+  Free n -> Var n
+
+formatStuck :: forall s m. MonadState { heap :: Heap Node | s } m => Stuck -> m Syntax
+formatStuck = case _ of
+  StuckVar name -> pure $ Var name
+  StuckBind name e  -> Lambda name <$> formatNode e
+  StuckApp f a -> Apply <$> formatNode f <*> formatNode a
+
+formatSyntax :: Syntax -> String
+formatSyntax = sugar <<< prettyPrint
+
+formatTrace :: forall s m. MonadState { heap :: Heap Node | s } m => Trace -> m String
+formatTrace = map fold <<< case _ of
+  Start -> pure ["Start"]
+  Unwound address -> do
+    node <- formatNode address
+    pure
+      [ "Unwound "
+      , formatSyntax node
+      ]
+  Followed address -> do
+    node <- formatNode address
+    pure
+      [ "Followed #"
+      , show address
+      , " to "
+      , formatSyntax node
+      ]
+  Fetched name -> pure
+    [ "Fetched "
+    , show name
+    ]
+  Instantiated address -> do
+    node <- formatNode address
+    pure
+      [ "Instantiated new copy of "
+      , formatSyntax node
+      ]
+  Substituted name address -> do
+    stuck <- isStuck <$> Heap.fetch address
+    node <- formatNode address
+    pure
+      [ "Substituted "
+      , if stuck then "stuck term " else ""
+      , formatSyntax node
+      , " in for "
+      , show name
+      ]
+  WentUnder address -> do
+    node <- formatNode address
+    pure
+      [ "Went under stuck lambda "
+      , formatSyntax node
+      ]
+  Discarded discarded next -> do
+    stuck <- formatNode discarded
+    node <- formatNode next
+    pure
+      [ "Discarded stuck term "
+      , formatSyntax stuck
+      , "; evaluating "
+      , formatSyntax node
+      ]
+  Halted address -> do
+    node <- formatNode address
+    pure
+      [ "Halted with "
+      , formatSyntax node
+      , " on top of stack"
+      ]
+ where
+  isStuck = case _ of
+    Stuck _ -> true
+    _ -> false
+
+format :: Machine -> { root :: String, trace :: String }
+format = evalState do
+  root <- map formatSyntax <<< formatNode =<< gets _.root
+  trace <- formatTrace =<< gets _.trace
+  pure { root, trace }
+
+testBig :: Int -> String -> Effect Unit
+testBig = testWith (stepWith interesting)
+
+testSmall :: Int -> String -> Effect Unit
+testSmall = testWith (stepWith $ const true)
+
+testWith :: (Machine -> Machine) -> Int -> String -> Effect Unit
+testWith next n = go 0 <<< new prelude <<< parse
+ where
+  go i m
+    | i >= n = log $ "Did not halt in " <> show n <> " steps"
+    | otherwise = do
+        let { root, trace } = format m
+        log $ "Step " <> show i
+        log $ "  trace: " <> trace
+        log $ "  root:  " <> root
+        case m.trace of
+          Halted _ -> pure unit
+          _ -> go (i + 1) $ next m
+
+parse :: String -> Expr
+parse = syntaxToExpr <<< unsafeParse parseSyntax
+
+def :: String -> String -> Tuple Name Expr
+def n = Tuple (name_ n) <<< parse
+
+infix 1 def as =.
+
+prelude :: Array (Tuple Name Expr)
+prelude =
+  [ "identity" =. "λx. x"
+  , "const" =. "λx y. x"
+  , "true" =. "λt f. t"
+  , "false" =. "λt f. f"
+  , "fix" =. "λf. (λx. f (x x)) (λy. f (y y))"
+  , "and" =. "λx y. x y false"
+  , "or" =. "λx y. x true y"
+  , "not" =. "λx. x false true"
+  , "foldr" =. "λf z l. l f z"
+  , "all" =. "foldr and true"
+  , "any" =. "foldr or false"
+  , "cons" =. "λx xs cons nil. cons x (xs cons nil)"
+  , "nil" =. "λx xs cons nil. nil"
+  , "iterate" =. "fix (λnext. λf x. cons x (next f (f x)))"
+  , "repeat" =. "fix (λnext. λx. cons x (next x))"
+  , "pair" =. "λa b f. f a b"
+  , "fst" =. "λp. p (λa b. a)"
+  , "snd" =. "λp. p (λa b. b)"
+  , "succ" =. "λn s z. s (n s z)"
+  , "add" =. "λm n s z. m s (n s z)"
+  , "mul" =. "λm n s z. m (n s) z"
+  , "pred" =. "λn f x. n (λg. λh. h (g f)) (λu. x) (λu. u)"
+  , "is-zero?" =. "λn. n (λx. false) true"
+  ]

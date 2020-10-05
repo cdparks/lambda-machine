@@ -2,6 +2,7 @@ module Machine.Node
   ( Node(..)
   , Stuck(..)
   , Env
+  , deref
   , define
   , compile
   , instantiate
@@ -27,7 +28,7 @@ import Partial.Unsafe (unsafeCrashWith)
 
 data Node
   = Node Address Address
-  | Closure Env Name Expr
+  | Closure (Env Address) Name Expr
   | Global Name Address
   | Stuck Stuck
   | Pointer Address
@@ -47,9 +48,9 @@ derive instance genericStuck :: Generic Stuck _
 instance showStuck :: Show Stuck where
   show x = genericShow x
 
-type Env = List Address
+type Env = List
 
-deref :: Int -> Env -> Address
+deref :: forall a. Show a => Int -> Env a -> a
 deref i env = case List.index env i of
   Just a -> a
   Nothing -> unsafeCrashWith $ fold
@@ -78,7 +79,7 @@ compile = instantiate Nil
 instantiate
   :: forall s m
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
-  => Env
+  => Env Address
   -> Expr
   -> m Address
 instantiate env0 = case _ of
