@@ -4,6 +4,8 @@ module Machine
   , step
   , add
   , remove
+  , halted
+  , snapshot
   , testBig
   , testSmall
   ) where
@@ -64,6 +66,11 @@ new rawGlobals expr =
     heap <- gets _.heap
     globals <- gets _.globals
     pure {root, globals, heap}
+
+halted :: Machine -> Boolean
+halted m = case m.trace of
+  Halted _ -> true
+  _ -> false
 
 add :: Name -> Expr -> Machine -> Machine
 add name expr = execState $ Node.define name expr
@@ -253,9 +260,9 @@ formatTrace = map fold <<< case _ of
     Stuck _ -> true
     _ -> false
 
-format :: Machine -> { root :: String, trace :: String }
-format = evalState do
-  root <- map formatSyntax <<< formatNode =<< gets _.root
+snapshot :: Machine -> { root :: Syntax, trace :: String }
+snapshot = evalState do
+  root <- formatNode =<< gets _.root
   trace <- formatTrace =<< gets _.trace
   pure { root, trace }
 
@@ -271,10 +278,10 @@ testWith next n = go 0 <<< new prelude <<< parse
   go i m
     | i >= n = log $ "Did not halt in " <> show n <> " steps"
     | otherwise = do
-        let { root, trace } = format m
+        let { root, trace } = snapshot m
         log $ "Step " <> show i
         log $ "  trace: " <> trace
-        log $ "  root:  " <> root
+        log $ "  root:  " <> formatSyntax root
         case m.trace of
           Halted _ -> pure unit
           _ -> go (i + 1) $ next m
