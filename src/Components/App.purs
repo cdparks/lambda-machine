@@ -12,33 +12,26 @@ import Components.Expressions as Expressions
 import Components.Footer as Footer
 import Components.Help as Help
 import Components.Input as Input
-import Control.MonadZero (guard)
 import Data.Array (concat, cons, filter, reverse, snoc)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
-import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.Set as Set
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Save (saveTextAs)
 import Language.Expr
-  ( Environment
-  , Expr
-  , alpha
-  , exprToSyntax
-  , formatUndefinedError
-  , formatUndefinedWarning
-  , namesReferencing
-  , step
+  ( Expr
   , syntaxToExpr
-  , undefinedNames
   )
 import Language.Name (Name)
+import Language.World (World)
+import Language.World as World
 import Language.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
 import Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
 import Language.Syntax (Definition, Syntax, defToDoc, defToSyntax)
+import Machine (Machine)
+import Machine as Machine
 import React.Basic (JSX)
 import React.Basic as React
 import React.Basic.DOM as R
@@ -47,10 +40,10 @@ import React.Basic.Hooks as Hooks
 
 type State =
   { text :: String
-  , expr :: Maybe Expr
-  , history :: Array (Doc String)
   , defs :: Array Definition
-  , env :: Environment Expr
+  , world :: World
+  , machine :: Maybe Machine
+  , history :: Array (Doc String)
   , rep :: Rep
   , alert :: Maybe (Tuple Level JSX)
   }
@@ -91,8 +84,8 @@ mkApp = do
         , split
           (R.h3_ [R.text "Evaluation"])
           (Controls.component
-            { expr: state.expr
-            , onStep: dispatch <<< Reduce
+            { machine: state.machine
+            , onStep: dispatch <<< Step
             , onClear: dispatch Clear
             , onSave: save state
             , onSugar: dispatch ToggleSugar
@@ -124,28 +117,25 @@ split lhs rhs =
       ]
     }
 
-initialDefs :: Array Definition
-initialDefs =
+prelude :: Array Definition
+prelude =
   unsafeParse parseDefinition <$>
     [ "identity x = x"
-    , "const x _ = x"
+    , "const x y = x"
     , "fix f = (λx. f (x x)) (λy. f (y y))"
-    , "true t _ = t"
-    , "false _ f = f"
+    , "true t f = t"
+    , "false t f = f"
     , "and x y = x y false"
     , "or x y = x true y"
+    , "succ n s z = s (n s z)"
+    , "pred n f x = n (λg. λh. h (g f)) (λu. x) (λu. u)"
+    , "add m n s z = m s (n s z)"
+    , "mul m n s z = m (n s) z"
+    , "is-zero? n = n (λx. false) true"
     , "foldr f z l = l f z"
     , "any = foldr or false"
     , "all = foldr and true"
-    , "add m n s z = m s (n s z)"
-    , "mul m n s z = m (n s) z"
     ]
-
-initialEnv :: Environment Expr
-initialEnv =
-  Map.fromFoldable $ fromDef <$> initialDefs
- where
-  fromDef def = Tuple def.name $ syntaxToExpr $ defToSyntax def
 
 data Action
   = ShowHelp
@@ -155,17 +145,17 @@ data Action
   | DeleteDef Name
   | AddDef Definition
   | SetExpr Syntax
-  | Reduce Expr
+  | Step Machine
   | Clear
   | ToggleSugar
 
 initialState :: State
 initialState =
   { text: ""
-  , expr: Nothing
+  , defs: prelude
+  , world: World.new $ defsToGlobals prelude
+  , machine: Nothing
   , history: []
-  , defs: initialDefs
-  , env: initialEnv
   , rep: Raw
   , alert: Nothing
   }
@@ -179,7 +169,7 @@ update s = case _ of
   DeleteDef name -> deleteDef name s
   AddDef def -> addDef def s
   SetExpr expr -> setExpr expr s
-  Reduce expr -> reduce expr s
+  Step machine -> step machine s
   Clear -> clear s
   ToggleSugar -> toggleSugar s
 
@@ -208,49 +198,72 @@ parseText s =
       setExpr syntax s
 
 deleteDef :: Name -> State -> State
-deleteDef name s = s
-  { defs = deleteByName name s.defs
-  , env = env
-  , alert = do
-      guard $ Set.size names /= 0
-      pure $ alert Warning $ formatUndefinedWarning name names
-  }
- where
-  env = Map.delete name s.env
-  names = namesReferencing name env
+deleteDef name s = case World.undefine name s.world of
+  Left err ->
+    s {alert = pure $ alert Danger err}
+  Right world -> s
+    { defs = deleteByName name s.defs
+    , world = world
+    , machine = Machine.remove name <$> s.machine
+    , alert = Nothing
+    }
 
 deleteByName :: Name -> Array Definition -> Array Definition
 deleteByName name = filter $ (_ /= name) <<< _.name
 
 addDef :: Definition -> State -> State
-addDef def s =
-  if Set.isEmpty missing
-    then s {text = "", defs = defs, env = env}
-    else s {alert = pure $ alert Danger $ formatUndefinedError s.text missing}
+addDef def s = case World.define def.name expr s.world of
+  Left err ->
+    s {alert = pure $ alert Danger err}
+  Right world -> s
+    { text = ""
+    , defs = deleteByName def.name s.defs `snoc` def
+    , world = world
+    , machine = Machine.add def.name expr <$> s.machine
+    , alert = Nothing
+    }
  where
-  defs = deleteByName def.name s.defs `snoc` def
-  expr = syntaxToExpr (defToSyntax def)
-  env = Map.insert def.name expr s.env
-  missing = undefinedNames expr (Map.delete def.name s.env)
+  expr = syntaxToExpr $ defToSyntax def
 
 setExpr :: Syntax -> State -> State
-setExpr syntax =
-  _ {text = "", history = history, expr = expr}
- where
-  history = pure $ prettyPrint syntax
-  expr = pure $ syntaxToExpr syntax
-
-reduce :: Expr -> State -> State
-reduce expr s =
-  case alpha <$> step s.env expr of
-    Nothing -> s
-    Just reduced -> s
-      { history = prettyPrint (exprToSyntax reduced) `cons` s.history
-      , expr = pure reduced
+setExpr syntax s =
+  case World.focus expr s.world of
+    Left err ->
+      s {alert = pure $ alert Danger err}
+    Right world -> s
+      { text = ""
+      , world = world
+      , machine = machine
+      , history = history
+      , alert = Nothing
       }
+ where
+  expr = syntaxToExpr syntax
+  globals = defsToGlobals s.defs
+  history = pure $ prettyPrint syntax
+  machine = pure $ Machine.new globals expr
+
+defsToGlobals :: Array Definition -> Array (Tuple Name Expr)
+defsToGlobals = map \def -> Tuple def.name $ syntaxToExpr $ defToSyntax def
+
+step :: Machine -> State -> State
+step m0 s =  s
+  { machine = pure m
+  , history = history
+  }
+ where
+  m = Machine.step m0
+  { root } = Machine.snapshot m
+  history
+    | Machine.halted m = s.history
+    | otherwise = prettyPrint root `cons` s.history
 
 clear :: State -> State
-clear = _ {expr = Nothing, history = []}
+clear s = s
+  { world = World.unfocus s.world
+  , machine = Nothing
+  , history = []
+  }
 
 toggleSugar :: State -> State
 toggleSugar s = s {rep = toggleRep s.rep}
@@ -264,7 +277,7 @@ save {rep, defs, history} =
     , [pure ""]
     , reverse history
     ]
-  text = intercalate "\n" $ map (\def -> selectRep def rep) allDefs
+  text = intercalate "\n" $ flip selectRep rep <$> allDefs
 
 alert :: Level -> String -> Tuple Level JSX
 alert level message =

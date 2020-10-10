@@ -6,15 +6,15 @@ import Prelude
 
 import Data.Maybe (Maybe, maybe)
 import Effect (Effect)
-import Language.Expr (Expr)
+import Machine (Machine)
 import Language.PrettyPrint (Rep, ifSugar)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (EventHandler, handler_)
 
 type Props =
-  { expr :: Maybe Expr
-  , onStep :: Expr -> Effect Unit
+  { machine :: Maybe Machine
+  , onStep :: Machine -> Effect Unit
   , onClear :: Effect Unit
   , onSave :: Effect Unit
   , onSugar :: Effect Unit
@@ -22,21 +22,21 @@ type Props =
   }
 
 component :: Props -> JSX
-component {expr, onStep, onClear, onSave, onSugar, rep} =
+component {machine, onStep, onClear, onSave, onSugar, rep} =
   R.div
     { className: "add-margin-medium btn-group pull-right"
     , children:
-      [ button expr
+      [ button machine
         { className: "btn btn-default"
         , onClick: onStep
         , label: "Step"
         }
-      , button expr
+      , button machine
         { className: "btn btn-default"
         , onClick: const onClear
         , label: "Clear"
         }
-      , button expr
+      , button machine
         { className: "btn btn-default"
         , onClick: const onSave
         , label: "Save"
