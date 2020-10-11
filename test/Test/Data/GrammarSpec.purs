@@ -2,17 +2,12 @@ module Test.Data.GrammarSpec
   ( spec
   ) where
 
-import Prelude
+import Test.Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Grammar (pluralizeWith, joinWith)
 import Data.Newtype (class Newtype, un)
-import Test.QuickCheck (class Arbitrary)
-import Test.QuickCheck.Gen (chooseInt)
-import Test.Spec (Spec, describe, it)
-import Test.Spec.Assertions (shouldEqual)
-import Test.Spec.QuickCheck (quickCheck)
 
 spec :: Spec Unit
 spec = describe "Data.Grammar" do
