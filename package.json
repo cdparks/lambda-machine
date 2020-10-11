@@ -20,6 +20,7 @@
     "start": "yarn build && parcel index.html",
     "bundle": "yarn build && parcel build --public-url='./' index.html",
     "build": "spago build --purs-args '--strict --stash'",
+    "test": "spago test",
     "repl": "spago repl",
     "clean": "rm -rf .cache .spago .psci_modules output dist",
     "reset": "yarn clean && rm -rf node_modules",
