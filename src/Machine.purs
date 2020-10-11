@@ -6,8 +6,6 @@ module Machine
   , remove
   , halted
   , snapshot
-  , testBig
-  , testSmall
   ) where
 
 import Prelude hiding (add)
@@ -265,58 +263,3 @@ snapshot = evalState do
   root <- formatNode =<< gets _.root
   trace <- formatTrace =<< gets _.trace
   pure { root, trace }
-
-testBig :: Int -> String -> Effect Unit
-testBig = testWith (stepWith interesting)
-
-testSmall :: Int -> String -> Effect Unit
-testSmall = testWith (stepWith $ const true)
-
-testWith :: (Machine -> Machine) -> Int -> String -> Effect Unit
-testWith next n = go 0 <<< new prelude <<< parse
- where
-  go i m
-    | i >= n = log $ "Did not halt in " <> show n <> " steps"
-    | otherwise = do
-        let { root, trace } = snapshot m
-        log $ "Step " <> show i
-        log $ "  trace: " <> trace
-        log $ "  root:  " <> formatSyntax root
-        case m.trace of
-          Halted _ -> pure unit
-          _ -> go (i + 1) $ next m
-
-parse :: String -> Expr
-parse = syntaxToExpr <<< unsafeParse parseSyntax
-
-def :: String -> String -> Tuple Name Expr
-def n = Tuple (name_ n) <<< parse
-
-infix 1 def as =.
-
-prelude :: Array (Tuple Name Expr)
-prelude =
-  [ "identity" =. "λx. x"
-  , "const" =. "λx y. x"
-  , "true" =. "λt f. t"
-  , "false" =. "λt f. f"
-  , "fix" =. "λf. (λx. f (x x)) (λy. f (y y))"
-  , "and" =. "λx y. x y false"
-  , "or" =. "λx y. x true y"
-  , "not" =. "λx. x false true"
-  , "foldr" =. "λf z l. l f z"
-  , "all" =. "foldr and true"
-  , "any" =. "foldr or false"
-  , "cons" =. "λx xs cons nil. cons x (xs cons nil)"
-  , "nil" =. "λx xs cons nil. nil"
-  , "iterate" =. "fix (λnext. λf x. cons x (next f (f x)))"
-  , "repeat" =. "fix (λnext. λx. cons x (next x))"
-  , "pair" =. "λa b f. f a b"
-  , "fst" =. "λp. p (λa b. a)"
-  , "snd" =. "λp. p (λa b. b)"
-  , "succ" =. "λn s z. s (n s z)"
-  , "add" =. "λm n s z. m s (n s z)"
-  , "mul" =. "λm n s z. m (n s) z"
-  , "pred" =. "λn f x. n (λg. λh. h (g f)) (λu. x) (λu. u)"
-  , "is-zero?" =. "λn. n (λx. false) true"
-  ]
