@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "parcel": "^1.12.4",
+    "purescript-psa": "^0.8.0",
     "purescript": "^0.13.8",
     "spago": "^0.16.0"
   },
@@ -18,7 +19,7 @@
     "setup": "yarn install && spago install",
     "start": "yarn build && parcel index.html",
     "bundle": "yarn build && parcel build --public-url='./' index.html",
-    "build": "spago build",
+    "build": "spago build --purs-args '--strict --stash'",
     "repl": "spago repl",
     "clean": "rm -rf .cache .spago .psci_modules output dist",
     "reset": "yarn clean && rm -rf node_modules",

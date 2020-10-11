@@ -1,4 +1,5 @@
 .cache
+.psa-stash
 .psc-package
 .psci_modules
 .purs-repl
