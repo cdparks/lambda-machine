@@ -200,7 +200,7 @@ parseText s =
 deleteDef :: Name -> State -> State
 deleteDef name s = case World.undefine name s.world of
   Left err ->
-    s {alert = pure $ alert Danger err}
+    s {alert = pure $ alert Danger $ show err}
   Right world -> s
     { defs = deleteByName name s.defs
     , world = world
@@ -214,7 +214,7 @@ deleteByName name = filter $ (_ /= name) <<< _.name
 addDef :: Definition -> State -> State
 addDef def s = case World.define def.name expr s.world of
   Left err ->
-    s {alert = pure $ alert Danger err}
+    s {alert = pure $ alert Danger $ show err}
   Right world -> s
     { text = ""
     , defs = deleteByName def.name s.defs `snoc` def
@@ -229,7 +229,7 @@ setExpr :: Syntax -> State -> State
 setExpr syntax s =
   case World.focus expr s.world of
     Left err ->
-      s {alert = pure $ alert Danger err}
+      s {alert = pure $ alert Danger $ show err}
     Right world -> s
       { text = ""
       , world = world

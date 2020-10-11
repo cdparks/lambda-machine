@@ -1,11 +1,14 @@
 module Language.World
   ( World
-  , Dependency(..)
+  , ConsistencyError(..)
+  , formatError
   , new
   , define
   , undefine
   , focus
   , unfocus
+  -- Exposed only for testing
+  , Dependency(..)
   ) where
 
 import Prelude hiding (add)
@@ -53,8 +56,19 @@ data ConsistencyError
   = Undefined (Set Name)
   | CannotDelete Name (Set Dependency)
 
-format :: ConsistencyError -> String
-format = case _ of
+derive instance genericConsistencyError :: Generic ConsistencyError _
+
+instance eqConsistencyError :: Eq ConsistencyError where
+  eq x = genericEq x
+
+instance ordConsistencyError :: Ord ConsistencyError where
+  compare x = genericCompare x
+
+instance showConsistencyError :: Show ConsistencyError where
+  show = formatError
+
+formatError :: ConsistencyError -> String
+formatError = case _ of
   Undefined missing -> fold
     [ "No top-level "
     , Grammar.pluralizeWith "s" (Set.size missing) "definition"
@@ -76,28 +90,28 @@ empty =
 
 new :: Array (Tuple Name Expr) -> World
 new prelude = case foldM (flip addGlobal) empty prelude of
-  Left err -> unsafeCrashWith $ "Malformed prelude: " <> err
+  Left err -> unsafeCrashWith $ "Malformed prelude: " <> formatError err
   Right world -> world
  where
   addGlobal (Tuple name expr) = add (Global name) expr
 
-define :: Name -> Expr -> World -> Either String World
+define :: Name -> Expr -> World -> Either ConsistencyError World
 define name = add $ Global name
 
-undefine :: Name -> World -> Either String World
+undefine :: Name -> World -> Either ConsistencyError World
 undefine name world = do
   let deps = fromMaybe Set.empty $ Map.lookup name world.nameToDeps
   if Set.size deps == 0
     then pure $ remove (Global name) world
-    else Left $ format $ CannotDelete name deps
+    else Left $ CannotDelete name deps
 
-focus :: Expr -> World -> Either String World
+focus :: Expr -> World -> Either ConsistencyError World
 focus = add Root
 
 unfocus :: World -> World
 unfocus = remove Root
 
-add :: Dependency -> Expr -> World -> Either String World
+add :: Dependency -> Expr -> World -> Either ConsistencyError World
 add dep expr world = do
   let
     newWorld = remove dep world
@@ -105,7 +119,7 @@ add dep expr world = do
     missing = fvs `Set.difference` globals newWorld
   if Set.size missing == 0
     then pure $ combine newWorld $ fromFreeVars dep fvs
-    else Left $ format $ Undefined missing
+    else Left $ Undefined missing
 
 remove :: Dependency -> World -> World
 remove dep world@{ nameToDeps, depToNames } =
@@ -113,10 +127,13 @@ remove dep world@{ nameToDeps, depToNames } =
     Nothing -> world
     Just names ->
       { depToNames: Map.delete dep depToNames
-      , nameToDeps: foldl eliminate nameToDeps names
+      , nameToDeps: foldl eliminate nameToDepsWithoutDep names
       }
  where
   eliminate m name = Map.update (pure <<< Set.delete dep) name m
+  nameToDepsWithoutDep = case dep of
+    Global name -> Map.delete name nameToDeps
+    Root -> nameToDeps
 
 globals :: World -> Set Name
 globals = Map.keys <<< _.nameToDeps

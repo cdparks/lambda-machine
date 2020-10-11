@@ -12,7 +12,7 @@ import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Control.Lazy (fix)
 import Data.Array (some, many, replicate)
-import Data.Either (Either(..), fromRight)
+import Data.Either (Either(..))
 import Data.Foldable (fold, foldl, foldr)
 import Data.Int (fromString)
 import Data.List (List(..))
@@ -20,7 +20,7 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.String.CodeUnits (fromCharArray)
 import Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
 import Language.Syntax (Definition, Syntax(..))
-import Partial.Unsafe (unsafePartial)
+import Partial.Unsafe (unsafeCrashWith, unsafePartial)
 import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
 import Text.Parsing.Parser.Combinators (between, sepBy, try)
 import Text.Parsing.Parser.Pos (Position(..))
@@ -33,7 +33,9 @@ parseAll :: forall a. Parser String a -> String -> Either ParseError a
 parseAll p s = runParser s (skipSpaces *> p <* eof)
 
 unsafeParse :: forall a. Parser String a -> String -> a
-unsafeParse p s = unsafePartial (fromRight (parseAll p s))
+unsafeParse p s = case parseAll p s of
+  Left err -> unsafeCrashWith $ formatParseError s err
+  Right a -> a
 
 formatParseError :: String -> ParseError -> String
 formatParseError text err =
