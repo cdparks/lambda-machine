@@ -19,7 +19,7 @@ spec = describe "Data.Grammar" do
       pluralizeWith "s" 1 "item" `shouldEqual` "item"
 
     it "pluralizes > 1 items" $ quickCheck \n ->
-      pluralizeWith "s" (un Positive n) "item" == "items"
+      pluralizeWith "s" (un Positive n) "item" === "items"
 
   describe "joinWith" do
     it "produces an empty string given an empty foldable" do

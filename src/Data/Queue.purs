@@ -7,20 +7,23 @@ module Data.Queue
   , pop
   , push
   , extend
+  , valid
   ) where
 
 import Prelude
 
 import Data.Array as Array
 import Data.Foldable (class Foldable, foldr, foldl, foldMap)
-import Data.List (List(..))
+import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Traversable (class Traversable, traverse, sequenceDefault)
 import Data.Tuple (Tuple(..))
 import Data.Unfoldable (class Unfoldable)
+import Test.QuickCheck (class Arbitrary, arbitrary)
 
+-- | Okasaki-style queue with amortized constant push and pop
 newtype Queue a = Queue
   { front :: List a
   , back :: List a
@@ -35,10 +38,7 @@ instance eqQueue :: Eq a => Eq (Queue a) where
   eq lhs rhs = eq (toList lhs) (toList rhs)
 
 instance functorQueue :: Functor Queue where
-  map f (Queue {front, back}) = Queue
-    { front: f <$> front
-    , back: f <$> back
-    }
+  map f (Queue {front, back}) = queue (f <$> front) (f <$> back)
 
 instance foldableQueue :: Foldable Queue where
   foldr f z = foldr f z <<< toList
@@ -46,38 +46,79 @@ instance foldableQueue :: Foldable Queue where
   foldMap f = foldMap f <<< toList
 
 instance traversableQueue :: Traversable Queue where
-  traverse f = map mk <<< traverse f <<< toList
-   where
-    mk front = Queue { front, back: Nil }
+  traverse f =
+    map (flip queue Nil)
+    <<< traverse f
+    <<< toList
   sequence = sequenceDefault
 
-fromFoldable :: forall a f. Foldable f => f a -> Queue a
-fromFoldable xs = Queue { front: List.fromFoldable xs, back: Nil }
+instance arbitraryQueue :: Arbitrary a => Arbitrary (Queue a) where
+  arbitrary = queue <$> arbitrary <*> arbitrary
 
+-- | Convert any `Foldable` to a `Queue`
+--
+-- O(n)
+--
+fromFoldable :: forall a f. Foldable f => f a -> Queue a
+fromFoldable = flip queue Nil <<< List.fromFoldable
+
+-- | Convert a `Queue` to any `Unfoldable`
+--
+-- O(n)
+--
 toUnfoldable :: forall a f. Unfoldable f => Queue a -> f a
 toUnfoldable = List.toUnfoldable <<< toList
 
+-- | The empty `Queue`
+--
+-- O(1)
+--
 empty :: forall a. Queue a
-empty = Queue {front: Nil, back: Nil}
+empty = queue Nil Nil
 
+-- | A `Queue` with only one element
+--
+-- O(1)
+--
 singleton :: forall a. a -> Queue a
-singleton a = Queue { front: Cons a Nil, back: Nil }
+singleton a = queue (a:Nil) Nil
 
+-- | Convert a `Queue` into a `List`
+--
+-- O(n)
+--
 toList :: forall a. Queue a -> List a
 toList (Queue { front, back }) = front <> List.reverse back
 
+-- | Push an element onto the back of the `Queue`
+--
+-- Amortized O(1)
+--
 push :: forall a. Queue a -> a -> Queue a
-push (Queue {front, back}) x = fixup (Cons x back) front
+push (Queue {front, back}) x = queue front $ x : back
 
+-- | Pop an element off of the front of the `Queue`
+--
+-- Amortized O(1)
+--
 pop :: forall a. Queue a -> Maybe (Tuple a (Queue a))
 pop (Queue {front, back}) = case front of
   Nil -> Nothing
-  Cons x xs -> Just $ Tuple x $ fixup back xs
+  Cons x xs -> Just $ Tuple x $ queue xs back
 
+-- | Push each element of a `Foldable` value onto the back of the `Queue`
+--
+-- Amortized O(n)
+--
 extend :: forall a f. Foldable f => Queue a -> f a -> Queue a
 extend = foldl push
 
-fixup :: forall a. List a -> List a -> Queue a
-fixup back = case _ of
+-- | Maintain the invariant that a non-empty `Queue` has a non-empty front list
+queue :: forall a. List a -> List a -> Queue a
+queue front back = case front of
   Nil -> Queue {front: List.reverse back, back: Nil}
-  front -> Queue {front, back}
+  _ -> Queue {front, back}
+
+-- | Validate that the invariant is maintained
+valid :: forall a. Queue a -> Boolean
+valid (Queue {front, back}) = not (List.null front) || List.null back
