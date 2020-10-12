@@ -11,6 +11,7 @@ import Control.Alt ((<|>))
 import Data.Foldable (fold)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.List (List(..), foldr, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Language.Name (Name)
@@ -46,6 +47,10 @@ derive instance genericSyntax :: Generic Syntax _
 
 instance showSyntax :: Show Syntax where
   show x = genericShow x
+
+-- | Warning - not alpha-equivalence; names matter here
+instance eqSyntax :: Eq Syntax where
+  eq x = genericEq x
 
 isComposite :: Syntax -> Boolean
 isComposite (Var _) = false

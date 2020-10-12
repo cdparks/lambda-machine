@@ -6,6 +6,8 @@ module Machine.Node
   , define
   , compile
   , instantiate
+  , instantiateAt
+  , children
   ) where
 
 import Prelude
@@ -14,6 +16,7 @@ import Control.Monad.State (class MonadState)
 import Data.Foldable (fold)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Array as Array
 import Data.List (List(..))
 import Data.List as List
 import Data.Maybe (Maybe(..))
@@ -91,10 +94,34 @@ instantiate env0 = case _ of
     Heap.alloc $ Node f a
   Bound i -> do
     pure $ deref i env0
-  Free name ->
-    Globals.get name >>= case _ of
-      Nothing -> do
-        stuck <- Heap.alloc $ Stuck $ StuckVar name
-        Globals.add name \_ -> pure $ Global name stuck
-        pure stuck
-      Just addr -> pure addr
+  Free name -> Globals.get name
+
+instantiateAt
+  :: forall s m
+   . MonadState { heap :: Heap Node, globals :: Globals | s } m
+  => Address
+  -> Env Address
+  -> Expr
+  -> m Unit
+instantiateAt target env0 = case _ of
+  Bind name body ->
+    Heap.update target $ Closure env0 name body
+  App f0 a0 -> do
+    a <- instantiate env0 a0
+    f <- instantiate env0 f0
+    Heap.update target $ Node f a
+  Bound i ->
+    Heap.update target $ Pointer $ deref i env0
+  Free name -> do
+    addr <- Globals.get name
+    Heap.update target $ Global name addr
+
+children :: Node -> Array Address
+children = case _ of
+  Node lhs rhs -> [lhs, rhs]
+  Closure env _ _ -> Array.fromFoldable env
+  Global _ addr -> [addr]
+  Stuck (StuckVar _) -> []
+  Stuck (StuckBind _ addr) -> [addr]
+  Stuck (StuckApp lhs rhs) -> [lhs, rhs]
+  Pointer addr -> [addr]

@@ -9,14 +9,14 @@ module Machine.Globals
 import Prelude hiding (add)
 
 import Control.Monad.State (class MonadState, gets, modify_)
-import Data.Foldable (for_)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Language.Name (Name)
 import Machine.Address (Address)
 import Machine.Heap (Heap)
 import Machine.Heap as Heap
+import Partial.Unsafe (unsafeCrashWith)
 
 type Globals = HashMap Name Address
 
@@ -39,16 +39,17 @@ get
   :: forall s m
    . MonadState { globals :: Globals | s } m
   => Name
-  -> m (Maybe Address)
-get name = gets $ HashMap.lookup name <<< _.globals
+  -> m Address
+get name = do
+  globals <- gets _.globals
+  case HashMap.lookup name globals of
+    Just addr -> pure addr
+    Nothing -> unsafeCrashWith $ "No global binding for " <> show name
 
 remove
   :: forall a s m. MonadState { heap :: Heap a, globals :: Globals | s} m
   => Name
   -> m Unit
 remove name = do
-  mAddr <- get name
-  for_ mAddr \addr -> do
-    Heap.free addr
-    globals <- gets _.globals
-    modify_ _ { globals = HashMap.delete name globals }
+  Heap.free =<< get name
+  modify_ \s@{globals} -> s { globals = HashMap.delete name globals }

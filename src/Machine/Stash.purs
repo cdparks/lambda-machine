@@ -3,16 +3,20 @@ module Machine.Stash
   , empty
   , suspend
   , restore
+  , roots
   ) where
 
 import Prelude
 
 import Control.Monad.State (class MonadState, gets, modify_)
+import Data.Array as Array
+import Data.Foldable (fold)
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, un)
 import Machine.Address (Address)
 import Machine.Stack (Stack, fromList)
+import Machine.Stack as Stack
 
 newtype Stash = Stash (List Stack)
 
@@ -44,3 +48,6 @@ restore = do
         }
       pure $ Just stack.top
     _ -> pure Nothing
+
+roots :: Stash -> Array Address
+roots = fold <<< Array.fromFoldable <<< map Stack.roots <<< un Stash

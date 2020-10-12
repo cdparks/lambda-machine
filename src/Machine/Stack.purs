@@ -6,11 +6,13 @@ module Machine.Stack
   , replace
   , peek
   , fromList
+  , roots
   ) where
 
 import Prelude
 
 import Control.Monad.State (class MonadState, gets, modify_)
+import Data.Array as Array
 import Data.List (List(..), index)
 import Data.Maybe (Maybe(..))
 import Machine.Address (Address)
@@ -49,3 +51,6 @@ fromList :: List Address -> Maybe Stack
 fromList = case _ of
   Nil -> Nothing
   Cons top rest -> Just {top, rest}
+
+roots :: Stack -> Array Address
+roots {top, rest} = [top] <> Array.fromFoldable rest

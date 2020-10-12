@@ -11,7 +11,7 @@ module Machine
 import Prelude hiding (add)
 
 import Control.Monad.Rec.Class (tailRecM, Step(..))
-import Control.Monad.State (class MonadState, evalState, execState, gets, modify_)
+import Control.Monad.State (class MonadState, evalState, execState, gets, get, modify_)
 import Data.Foldable (class Foldable, fold)
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..))
@@ -33,6 +33,7 @@ import Machine.Stack as Stack
 import Machine.Stash (Stash)
 import Machine.Stash as Stash
 import Machine.Trace (Trace(..))
+import Machine.Trace as Trace
 import Partial.Unsafe (unsafeCrashWith)
 
 type Machine =
@@ -80,15 +81,30 @@ step :: Machine -> Machine
 step = stepWith interesting
 
 stepWith :: (Trace -> Boolean) -> Machine -> Machine
-stepWith stop m = execState (tailRecM go unit) m
+stepWith stop = execState do
+  tailRecM go unit
+  roots <- getRoots
+  Heap.gc roots Node.children
  where
   go _ = do
     { top } <- gets _.stack
     eval top =<< Heap.fetch top
     trace <- gets _.trace
-    pure if stop trace
-      then Done unit
-      else Loop unit
+    pure $ next trace unit
+
+  next trace
+    | stop trace = Done
+    | otherwise = Loop
+
+getRoots :: forall m . MonadState Machine m => m (Array Address)
+getRoots = do
+  {root, stack, stash, trace} <- get
+  pure $ fold
+    [ [root]
+    , Stack.roots stack
+    , Stash.roots stash
+    , Trace.roots trace
+    ]
 
 interesting :: Trace -> Boolean
 interesting = case _ of
@@ -125,16 +141,13 @@ eval top = case _ of
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        node <- Node.instantiate (Cons arg env) e
-        Heap.update app $ Pointer node
+        Node.instantiateAt app (Cons arg env) e
         Stack.discard
-        Stack.replace node
         emit $ Substituted name arg
       Nothing -> do
         arg <- Heap.alloc $ Stuck $ StuckVar name
         node <- Node.instantiate (Cons arg env) e
-        stuck <- Heap.alloc $ Stuck $ StuckBind name node
-        Heap.update top $ Pointer stuck
+        Heap.update top $ Stuck $ StuckBind name node
         Stack.replace node
         emit $ WentUnder top
 
@@ -142,8 +155,7 @@ eval top = case _ of
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        stuck <- Heap.alloc $ Stuck $ StuckApp top arg
-        Heap.update app $ Pointer stuck
+        Heap.update app $ Stuck $ StuckApp top arg
         Stack.discard
         Stack.replace arg
         Stash.suspend
