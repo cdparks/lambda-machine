@@ -14,6 +14,7 @@ import Prelude
 
 import Control.Monad.State (class MonadState)
 import Data.Foldable (fold)
+import Data.Traversable (traverse)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Array as Array
@@ -31,7 +32,7 @@ import Partial.Unsafe (unsafeCrashWith)
 
 data Node
   = Node Address Address
-  | Closure (Env Address) Name Expr
+  | Closure (Array Address) (Env Address) Name Expr
   | Global Name Address
   | Stuck Stuck
   | Pointer Address
@@ -85,15 +86,16 @@ instantiate
   => Env Address
   -> Expr
   -> m Address
-instantiate env0 = case _ of
-  Bind name body ->
-    Heap.alloc $ Closure env0 name body
+instantiate env = case _ of
+  Bind name fvs body -> do
+    addrs <- traverse Globals.get $ Array.fromFoldable fvs
+    Heap.alloc $ Closure addrs env name body
   App f0 a0 -> do
-    a <- instantiate env0 a0
-    f <- instantiate env0 f0
+    a <- instantiate env a0
+    f <- instantiate env f0
     Heap.alloc $ Node f a
   Bound i -> do
-    pure $ deref i env0
+    pure $ deref i env
   Free name -> Globals.get name
 
 instantiateAt
@@ -103,15 +105,16 @@ instantiateAt
   -> Env Address
   -> Expr
   -> m Unit
-instantiateAt target env0 = case _ of
-  Bind name body ->
-    Heap.update target $ Closure env0 name body
+instantiateAt target env = case _ of
+  Bind name fvs body -> do
+    addrs <- traverse Globals.get $ Array.fromFoldable fvs
+    Heap.update target $ Closure addrs env name body
   App f0 a0 -> do
-    a <- instantiate env0 a0
-    f <- instantiate env0 f0
+    a <- instantiate env a0
+    f <- instantiate env f0
     Heap.update target $ Node f a
   Bound i ->
-    Heap.update target $ Pointer $ deref i env0
+    Heap.update target $ Pointer $ deref i env
   Free name -> do
     addr <- Globals.get name
     Heap.update target $ Global name addr
@@ -119,7 +122,7 @@ instantiateAt target env0 = case _ of
 children :: Node -> Array Address
 children = case _ of
   Node lhs rhs -> [lhs, rhs]
-  Closure env _ _ -> Array.fromFoldable env
+  Closure fvs env _ _ -> fvs <> Array.fromFoldable env
   Global _ addr -> [addr]
   Stuck (StuckVar _) -> []
   Stuck (StuckBind _ addr) -> [addr]

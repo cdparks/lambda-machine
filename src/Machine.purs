@@ -98,7 +98,7 @@ stepWith stop = execState do
 
 getRoots :: forall m . MonadState Machine m => m (Array Address)
 getRoots = do
-  {root, stack, stash, trace} <- get
+  {root, stack, stash, globals, trace} <- get
   pure $ fold
     [ [root]
     , Stack.roots stack
@@ -137,7 +137,7 @@ eval top = case _ of
     Stack.replace address
     emit $ Fetched name
 
-  Closure env name e ->
+  Closure _ env name e ->
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
@@ -180,7 +180,7 @@ formatNode address = do
   node <- Heap.fetch address
   case node of
     Node f a -> Apply <$> formatNode f <*> formatNode a
-    Closure env0 name e -> do
+    Closure _ env0 name e -> do
       env <- traverse formatNode env0
       pure $ Lambda name $ toSyntax (Var name : env) e
     Stuck term -> formatStuck term
@@ -189,7 +189,7 @@ formatNode address = do
 
 toSyntax :: List Syntax -> Expr -> Syntax
 toSyntax env = case _ of
-  Bind n e -> Lambda n $ toSyntax (Var n : env) e
+  Bind n _ e -> Lambda n $ toSyntax (Var n : env) e
   App f a -> Apply (toSyntax env f) (toSyntax env a)
   Bound i -> Node.deref i env
   Free n -> Var n
