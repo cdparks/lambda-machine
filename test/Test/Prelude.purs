@@ -22,7 +22,7 @@ import Language.Syntax (Definition, Syntax(..), defToSyntax) as Exports
 import Language.Syntax (Definition, Syntax, defToSyntax)
 import Test.QuickCheck (class Arbitrary, (===)) as Exports
 import Test.QuickCheck.Gen (chooseInt) as Exports
-import Test.Spec (Spec, describe, it, pending, pending') as Exports
+import Test.Spec (Spec, describe, it, itOnly, pending, pending') as Exports
 import Test.Spec.Assertions (shouldEqual) as Exports
 import Test.Spec.QuickCheck (quickCheck) as Exports
 
