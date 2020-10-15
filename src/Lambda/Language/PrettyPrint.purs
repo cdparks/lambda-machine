@@ -1,4 +1,4 @@
-module Language.PrettyPrint
+module Lambda.Language.PrettyPrint
   ( Rep(..)
   , ifSugar
   , selectRep

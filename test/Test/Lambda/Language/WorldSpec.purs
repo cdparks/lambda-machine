@@ -1,16 +1,16 @@
-module Test.Data.WorldSpec
+module Test.Lambda.Language.WorldSpec
   ( spec
   ) where
 
 import Test.Prelude
 
-import Language.World as World
-import Language.World (ConsistencyError(..), Dependency(..))
+import Lambda.Language.World as World
+import Lambda.Language.World (ConsistencyError(..), Dependency(..))
 import Data.Map as Map
 import Data.Set as Set
 
 spec :: Spec Unit
-spec = describe "Language.World" do
+spec = describe "Lambda.Language.World" do
   describe "World.define" do
     it "disallows definitions that depend on non-extant names" do
       let

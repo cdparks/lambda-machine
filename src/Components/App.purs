@@ -20,18 +20,18 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Save (saveTextAs)
-import Language.Expr
+import Lambda.Language.Expr
   ( Expr
   , syntaxToExpr
   )
-import Language.Name (Name)
-import Language.World (World)
-import Language.World as World
-import Language.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
-import Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
-import Language.Syntax (Definition, Syntax, defToDoc, defToSyntax)
-import Machine (Machine)
-import Machine as Machine
+import Lambda.Language.Name (Name)
+import Lambda.Language.World (World)
+import Lambda.Language.World as World
+import Lambda.Language.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
+import Lambda.Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
+import Lambda.Language.Syntax (Definition, Syntax, defToDoc, defToSyntax)
+import Lambda.Machine (Machine)
+import Lambda.Machine as Machine
 import React.Basic (JSX)
 import React.Basic as React
 import React.Basic.DOM as R

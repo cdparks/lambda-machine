@@ -1,4 +1,4 @@
-module Language.Name
+module Lambda.Language.Name
   ( isSubscriptChar
   , intToSubscript
   , subscriptToInt
@@ -22,7 +22,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Set as Set
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Tuple (Tuple(..))
-import Language.PrettyPrint (class PrettyPrint)
+import Lambda.Language.PrettyPrint (class PrettyPrint)
 import Partial.Unsafe (unsafePartial)
 
 data Name = Name String (Maybe Int)

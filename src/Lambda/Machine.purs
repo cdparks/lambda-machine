@@ -1,4 +1,4 @@
-module Machine
+module Lambda.Machine
   ( Machine(..)
   , new
   , step
@@ -17,23 +17,23 @@ import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, traverse_)
 import Data.Tuple (Tuple, uncurry)
-import Language.Expr (Expr(..))
-import Language.Name (Name)
-import Language.PrettyPrint (prettyPrint, sugar)
-import Language.Syntax (Syntax(..))
-import Machine.Address (Address)
-import Machine.Globals (Globals)
-import Machine.Globals as Globals
-import Machine.Heap (Heap)
-import Machine.Heap as Heap
-import Machine.Node (Node(..), Stuck(..))
-import Machine.Node as Node
-import Machine.Stack (Stack)
-import Machine.Stack as Stack
-import Machine.Stash (Stash)
-import Machine.Stash as Stash
-import Machine.Trace (Trace(..))
-import Machine.Trace as Trace
+import Lambda.Language.Expr (Expr(..))
+import Lambda.Language.Name (Name)
+import Lambda.Language.PrettyPrint (prettyPrint, sugar)
+import Lambda.Language.Syntax (Syntax(..))
+import Lambda.Machine.Address (Address)
+import Lambda.Machine.Globals (Globals)
+import Lambda.Machine.Globals as Globals
+import Lambda.Machine.Heap (Heap)
+import Lambda.Machine.Heap as Heap
+import Lambda.Machine.Node (Node(..), Stuck(..))
+import Lambda.Machine.Node as Node
+import Lambda.Machine.Stack (Stack)
+import Lambda.Machine.Stack as Stack
+import Lambda.Machine.Stash (Stash)
+import Lambda.Machine.Stash as Stash
+import Lambda.Machine.Trace (Trace(..))
+import Lambda.Machine.Trace as Trace
 import Partial.Unsafe (unsafeCrashWith)
 
 type Machine =

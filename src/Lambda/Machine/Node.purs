@@ -1,4 +1,4 @@
-module Machine.Node
+module Lambda.Machine.Node
   ( Node(..)
   , Stuck(..)
   , Env
@@ -21,13 +21,13 @@ import Data.Array as Array
 import Data.List (List(..))
 import Data.List as List
 import Data.Maybe (Maybe(..))
-import Language.Expr (Expr(..))
-import Language.Name (Name)
-import Machine.Address (Address)
-import Machine.Globals (Globals)
-import Machine.Globals as Globals
-import Machine.Heap (Heap)
-import Machine.Heap as Heap
+import Lambda.Language.Expr (Expr(..))
+import Lambda.Language.Name (Name)
+import Lambda.Machine.Address (Address)
+import Lambda.Machine.Globals (Globals)
+import Lambda.Machine.Globals as Globals
+import Lambda.Machine.Heap (Heap)
+import Lambda.Machine.Heap as Heap
 import Partial.Unsafe (unsafeCrashWith)
 
 data Node

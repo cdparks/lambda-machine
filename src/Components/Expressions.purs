@@ -4,7 +4,7 @@ module Components.Expressions
 
 import Prelude
 
-import Language.PrettyPrint (Rep, Doc, selectRep)
+import Lambda.Language.PrettyPrint (Rep, Doc, selectRep)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 

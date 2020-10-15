@@ -1,4 +1,4 @@
-module Language.World
+module Lambda.Language.World
   ( World
   , ConsistencyError(..)
   , formatError
@@ -26,8 +26,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Tuple (Tuple(..))
-import Language.Expr (Expr, freeVars)
-import Language.Name (Name)
+import Lambda.Language.Expr (Expr, freeVars)
+import Lambda.Language.Name (Name)
 import Partial.Unsafe (unsafeCrashWith)
 
 type World =

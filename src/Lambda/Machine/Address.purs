@@ -1,4 +1,4 @@
-module Machine.Address
+module Lambda.Machine.Address
   ( Address
   ) where
 

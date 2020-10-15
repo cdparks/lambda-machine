@@ -1,4 +1,4 @@
-module Test.Language.ExprSpec
+module Test.Lambda.Language.ExprSpec
   ( spec
   ) where
 
@@ -7,7 +7,7 @@ import Test.Prelude
 import Data.Set as Set
 
 spec :: Spec Unit
-spec = describe "Expr" do
+spec = describe "Lambda.Language.Expr" do
   describe "syntaxToExpr" do
     it "converts an AST to locally-nameless Expr" do
       let

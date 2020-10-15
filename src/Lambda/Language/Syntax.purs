@@ -1,4 +1,4 @@
-module Language.Syntax
+module Lambda.Language.Syntax
   ( Definition(..)
   , defToSyntax
   , defToDoc
@@ -14,8 +14,8 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.List (List(..), foldr, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Language.Name (Name)
-import Language.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
+import Lambda.Language.Name (Name)
+import Lambda.Language.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
 
 type Definition =
   { name :: Name

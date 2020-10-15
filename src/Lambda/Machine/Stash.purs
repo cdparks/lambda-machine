@@ -1,4 +1,4 @@
-module Machine.Stash
+module Lambda.Machine.Stash
   ( Stash(..)
   , empty
   , suspend
@@ -14,9 +14,9 @@ import Data.Foldable (fold)
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, un)
-import Machine.Address (Address)
-import Machine.Stack (Stack, fromList)
-import Machine.Stack as Stack
+import Lambda.Machine.Address (Address)
+import Lambda.Machine.Stack (Stack, fromList)
+import Lambda.Machine.Stack as Stack
 
 newtype Stash = Stash (List Stack)
 

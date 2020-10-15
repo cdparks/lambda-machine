@@ -1,4 +1,4 @@
-module Language.Expr
+module Lambda.Language.Expr
   ( Expr(..)
   , Environment(..)
   , syntaxToExpr
@@ -15,9 +15,9 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Set (Set)
 import Data.Set as Set
-import Language.Name (Name, next)
-import Language.PrettyPrint (class PrettyPrint, parensIf)
-import Language.Syntax (Syntax(..))
+import Lambda.Language.Name (Name, next)
+import Lambda.Language.PrettyPrint (class PrettyPrint, parensIf)
+import Lambda.Language.Syntax (Syntax(..))
 import Partial.Unsafe (unsafePartial)
 
 data Expr

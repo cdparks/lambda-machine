@@ -1,4 +1,4 @@
-module Language.Parse
+module Lambda.Language.Parse
   ( parseAll
   , parseDefinition
   , parseSyntax
@@ -18,8 +18,8 @@ import Data.Int (fromString)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.String.CodeUnits (fromCharArray)
-import Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
-import Language.Syntax (Definition, Syntax(..))
+import Lambda.Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
+import Lambda.Language.Syntax (Definition, Syntax(..))
 import Partial.Unsafe (unsafeCrashWith, unsafePartial)
 import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
 import Text.Parsing.Parser.Combinators (between, sepBy, try)

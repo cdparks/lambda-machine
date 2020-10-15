@@ -1,4 +1,4 @@
-module Machine.Trace
+module Lambda.Machine.Trace
   ( Trace(..)
   , roots
   ) where
@@ -7,8 +7,8 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Language.Name (Name)
-import Machine.Address (Address)
+import Lambda.Language.Name (Name)
+import Lambda.Machine.Address (Address)
 
 data Trace
   = Start

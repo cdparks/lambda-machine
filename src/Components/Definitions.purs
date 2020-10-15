@@ -5,9 +5,9 @@ module Components.Definitions
 import Prelude
 
 import Effect (Effect)
-import Language.Name (Name)
-import Language.PrettyPrint (Rep, selectRep)
-import Language.Syntax (Definition, defToDoc)
+import Lambda.Language.Name (Name)
+import Lambda.Language.PrettyPrint (Rep, selectRep)
+import Lambda.Language.Syntax (Definition, defToDoc)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)

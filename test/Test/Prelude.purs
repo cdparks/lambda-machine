@@ -13,13 +13,13 @@ import Data.Either (Either(..), either) as Exports
 import Data.Maybe (Maybe(..), fromMaybe, maybe) as Exports
 import Data.Tuple (Tuple(..))
 import Data.Tuple (Tuple(..), uncurry, fst, snd) as Exports
-import Language.Expr (Expr(..), syntaxToExpr) as Exports
-import Language.Expr (Expr, syntaxToExpr)
-import Language.Name (Name)
-import Language.Name (Name, name, name_) as Exports
-import Language.Parse (parseDefinition, parseSyntax, unsafeParse)
-import Language.Syntax (Definition, Syntax(..), defToSyntax) as Exports
-import Language.Syntax (Definition, Syntax, defToSyntax)
+import Lambda.Language.Expr (Expr(..), syntaxToExpr) as Exports
+import Lambda.Language.Expr (Expr, syntaxToExpr)
+import Lambda.Language.Name (Name)
+import Lambda.Language.Name (Name, name, name_) as Exports
+import Lambda.Language.Parse (parseDefinition, parseSyntax, unsafeParse)
+import Lambda.Language.Syntax (Definition, Syntax(..), defToSyntax) as Exports
+import Lambda.Language.Syntax (Definition, Syntax, defToSyntax)
 import Test.QuickCheck (class Arbitrary, (===)) as Exports
 import Test.QuickCheck.Gen (chooseInt) as Exports
 import Test.Spec (Spec, describe, it, itOnly, pending, pending') as Exports

@@ -1,4 +1,4 @@
-module Machine.Globals
+module Lambda.Machine.Globals
   ( Globals
   , empty
   , add
@@ -12,10 +12,10 @@ import Control.Monad.State (class MonadState, gets, modify_)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Maybe (Maybe(..))
-import Language.Name (Name)
-import Machine.Address (Address)
-import Machine.Heap (Heap)
-import Machine.Heap as Heap
+import Lambda.Language.Name (Name)
+import Lambda.Machine.Address (Address)
+import Lambda.Machine.Heap (Heap)
+import Lambda.Machine.Heap as Heap
 import Partial.Unsafe (unsafeCrashWith)
 
 type Globals = HashMap Name Address

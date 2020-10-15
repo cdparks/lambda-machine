@@ -1,4 +1,4 @@
-module Machine.Stack
+module Lambda.Machine.Stack
   ( Stack
   , singleton
   , push
@@ -15,7 +15,7 @@ import Control.Monad.State (class MonadState, gets, modify_)
 import Data.Array as Array
 import Data.List (List(..), index)
 import Data.Maybe (Maybe(..))
-import Machine.Address (Address)
+import Lambda.Machine.Address (Address)
 
 type Stack =
   { top :: Address

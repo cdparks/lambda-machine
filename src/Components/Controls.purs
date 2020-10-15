@@ -6,8 +6,8 @@ import Prelude
 
 import Data.Maybe (Maybe, maybe)
 import Effect (Effect)
-import Machine (Machine)
-import Language.PrettyPrint (Rep, ifSugar)
+import Lambda.Machine (Machine)
+import Lambda.Language.PrettyPrint (Rep, ifSugar)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (EventHandler, handler_)

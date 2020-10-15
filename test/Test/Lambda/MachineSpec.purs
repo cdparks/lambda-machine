@@ -5,7 +5,7 @@ module Test.MachineSpec
 import Test.Prelude
 
 import Data.Function (applyN)
-import Machine as Machine
+import Lambda.Machine as Machine
 
 spec :: Spec Unit
 spec = describe "Machine" do

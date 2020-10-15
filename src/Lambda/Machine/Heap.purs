@@ -1,4 +1,4 @@
-module Machine.Heap
+module Lambda.Machine.Heap
   ( Heap
   , empty
   , alloc
@@ -20,7 +20,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (wrap)
 import Data.Queue as Queue
 import Data.Tuple (Tuple(..))
-import Machine.Address (Address)
+import Lambda.Machine.Address (Address)
 import Partial.Unsafe (unsafeCrashWith)
 
 type Heap a =
