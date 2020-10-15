@@ -1,4 +1,4 @@
-module Test.Data.QueueSpec
+module Data.QueueSpec
   ( spec
   ) where
 

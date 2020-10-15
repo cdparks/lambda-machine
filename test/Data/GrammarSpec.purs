@@ -1,4 +1,4 @@
-module Test.Data.GrammarSpec
+module Data.GrammarSpec
   ( spec
   ) where
 

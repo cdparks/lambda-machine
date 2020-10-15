@@ -1,4 +1,4 @@
-module Test.Lambda.Language.ExprSpec
+module Lambda.Language.ExprSpec
   ( spec
   ) where
 

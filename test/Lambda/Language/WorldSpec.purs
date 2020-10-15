@@ -1,4 +1,4 @@
-module Test.Lambda.Language.WorldSpec
+module Lambda.Language.WorldSpec
   ( spec
   ) where
 

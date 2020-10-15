@@ -1,4 +1,4 @@
-module Test.MachineSpec
+module Lambda.MachineSpec
   ( spec
   ) where
 
