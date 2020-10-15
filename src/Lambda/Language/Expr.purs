@@ -1,6 +1,5 @@
 module Lambda.Language.Expr
   ( Expr(..)
-  , Environment(..)
   , syntaxToExpr
   , exprToSyntax
   , freeVars
@@ -21,8 +20,6 @@ data Expr
   | Free Name
   | Bind Name (Set Name) Expr
   | App Expr Expr
-
-type Environment a = Map.Map Name a
 
 derive instance genericExpr :: Generic Expr _
 
