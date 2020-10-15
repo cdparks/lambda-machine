@@ -16,7 +16,7 @@ import Data.Tuple (Tuple(..), uncurry, fst, snd) as Exports
 import Language.Expr (Expr(..), syntaxToExpr) as Exports
 import Language.Expr (Expr, syntaxToExpr)
 import Language.Name (Name)
-import Language.Name (Name, name_) as Exports
+import Language.Name (Name, name, name_) as Exports
 import Language.Parse (parseDefinition, parseSyntax, unsafeParse)
 import Language.Syntax (Definition, Syntax(..), defToSyntax) as Exports
 import Language.Syntax (Definition, Syntax, defToSyntax)

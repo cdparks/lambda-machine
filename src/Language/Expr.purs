@@ -33,6 +33,15 @@ derive instance genericExpr :: Generic Expr _
 instance showExpr :: Show Expr where
   show x = genericShow x
 
+-- | Alpha-equivalence
+instance eqExpr :: Eq Expr where
+  eq lhs rhs = case lhs, rhs of
+    Bound i, Bound j -> i == j
+    Free n, Free m -> n == m
+    Bind _ _ x, Bind _ _ y -> x == y
+    App f a, App g b -> f == g && a == b
+    _, _ -> false
+
 syntaxToExpr :: Syntax -> Expr
 syntaxToExpr = alpha <<< go Map.empty
  where
