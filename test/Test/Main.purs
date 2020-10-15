@@ -2,9 +2,8 @@ module Test.Main
   ( main
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Test.Spec.Discovery (discover)
 import Test.Spec.Reporter.Console (consoleReporter)

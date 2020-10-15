@@ -2,9 +2,8 @@ module Components.Definitions
   ( component
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Effect (Effect)
 import Lambda.Language.Name (Name)
 import Lambda.Language.PrettyPrint (Rep, selectRep)
 import Lambda.Language.Syntax (Definition, defToDoc)

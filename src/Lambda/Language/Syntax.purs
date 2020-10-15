@@ -5,15 +5,9 @@ module Lambda.Language.Syntax
   , Syntax(..)
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Control.Alt ((<|>))
-import Data.Foldable (fold)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.List (List(..), foldr, intercalate)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.List (intercalate)
 import Lambda.Language.Name (Name)
 import Lambda.Language.PrettyPrint (class PrettyPrint, Doc, doc, parensIf, prettyPrint, sugar, raw)
 

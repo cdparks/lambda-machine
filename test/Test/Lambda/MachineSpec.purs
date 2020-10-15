@@ -8,8 +8,8 @@ import Data.Function (applyN)
 import Lambda.Machine as Machine
 
 spec :: Spec Unit
-spec = describe "Machine" do
-  describe "Machine.step" do
+spec = describe "Lambda.Machine" do
+  describe "Lambda.Machine.step" do
     it "is stack-safe with programs that loop" do
       let result = stepN 100_000 [mkBind "f x = x x"] $ mkExpr "f f"
       result `shouldEqual` mkSyn "f f"

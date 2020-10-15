@@ -9,12 +9,10 @@ module Lambda.Machine.Stack
   , roots
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Control.Monad.State (class MonadState, gets, modify_)
 import Data.Array as Array
-import Data.List (List(..), index)
-import Data.Maybe (Maybe(..))
+import Data.List (index)
 import Lambda.Machine.Address (Address)
 
 type Stack =

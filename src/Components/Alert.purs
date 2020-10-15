@@ -3,9 +3,8 @@ module Components.Alert
   , component
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Effect (Effect)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)

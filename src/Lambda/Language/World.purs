@@ -11,21 +11,12 @@ module Lambda.Language.World
   , Dependency(..)
   ) where
 
-import Prelude hiding (add)
+import Lambda.Prelude hiding (add)
 
 import Data.Array as Array
-import Data.Either (Either(..))
-import Data.Foldable (foldM, foldl, fold)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Ord (genericCompare)
 import Data.Grammar as Grammar
-import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Set (Set)
 import Data.Set as Set
-import Data.Tuple (Tuple(..))
 import Lambda.Language.Expr (Expr, freeVars)
 import Lambda.Language.Name (Name)
 import Partial.Unsafe (unsafeCrashWith)

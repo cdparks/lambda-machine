@@ -3,28 +3,24 @@ module Test.Prelude
   , mkExpr
   , mkDef
   , mkBind
-  , module Exports
-  , module Prelude
+  , module Lambda.Prelude
+  , module X
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Data.Either (Either(..), either) as Exports
-import Data.Maybe (Maybe(..), fromMaybe, maybe) as Exports
-import Data.Tuple (Tuple(..))
-import Data.Tuple (Tuple(..), uncurry, fst, snd) as Exports
-import Lambda.Language.Expr (Expr(..), syntaxToExpr) as Exports
+import Lambda.Language.Expr (Expr(..), syntaxToExpr) as X
 import Lambda.Language.Expr (Expr, syntaxToExpr)
 import Lambda.Language.Name (Name)
-import Lambda.Language.Name (Name, name, name_) as Exports
+import Lambda.Language.Name (Name, name, name_) as X
 import Lambda.Language.Parse (parseDefinition, parseSyntax, unsafeParse)
-import Lambda.Language.Syntax (Definition, Syntax(..), defToSyntax) as Exports
+import Lambda.Language.Syntax (Definition, Syntax(..), defToSyntax) as X
 import Lambda.Language.Syntax (Definition, Syntax, defToSyntax)
-import Test.QuickCheck (class Arbitrary, (===)) as Exports
-import Test.QuickCheck.Gen (chooseInt) as Exports
-import Test.Spec (Spec, describe, it, itOnly, pending, pending') as Exports
-import Test.Spec.Assertions (shouldEqual) as Exports
-import Test.Spec.QuickCheck (quickCheck) as Exports
+import Test.QuickCheck (class Arbitrary, (===)) as X
+import Test.QuickCheck.Gen (chooseInt) as X
+import Test.Spec (Spec, describe, it, itOnly, pending, pending') as X
+import Test.Spec.Assertions (shouldEqual) as X
+import Test.Spec.QuickCheck (quickCheck) as X
 
 mkSyn :: String -> Syntax
 mkSyn = unsafeParse parseSyntax

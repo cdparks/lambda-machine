@@ -2,12 +2,10 @@ module Main
   ( main
   ) where
 
-import Prelude
-
-import Effect (Effect)
-import React.Render (renderTo)
+import Lambda.Prelude
 
 import Components.App (mkApp)
+import React.Render (renderTo)
 
 main :: Effect Unit
 main = do

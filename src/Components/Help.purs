@@ -2,7 +2,7 @@ module Components.Help
   ( component
   ) where
 
-import Prelude
+import Lambda.Prelude
 
 import React.Basic (JSX, fragment)
 import React.Basic.DOM as R

@@ -3,10 +3,7 @@ module Effect.Save
   , saveTextAs
   ) where
 
-import Prelude
-
-import Effect (Effect)
+import Lambda.Prelude
 
 type FileName = String
-
 foreign import saveTextAs :: String -> FileName -> Effect Unit

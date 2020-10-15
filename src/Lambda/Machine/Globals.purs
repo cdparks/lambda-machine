@@ -6,12 +6,9 @@ module Lambda.Machine.Globals
   , remove
   ) where
 
-import Prelude hiding (add)
+import Lambda.Prelude hiding (add, get)
 
-import Control.Monad.State (class MonadState, gets, modify_)
-import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
-import Data.Maybe (Maybe(..))
 import Lambda.Language.Name (Name)
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Heap (Heap)

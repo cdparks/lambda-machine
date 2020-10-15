@@ -10,17 +10,11 @@ module Data.Queue
   , valid
   ) where
 
-import Prelude
+import Lambda.Prelude
 
 import Data.Array as Array
-import Data.Foldable (class Foldable, foldr, foldl, foldMap)
-import Data.List (List(..), (:))
 import Data.List as List
-import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype)
-import Data.Traversable (class Traversable, traverse, sequenceDefault)
-import Data.Tuple (Tuple(..))
-import Data.Unfoldable (class Unfoldable)
+import Data.Traversable (sequenceDefault)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 
 -- | Okasaki-style queue with amortized constant push and pop

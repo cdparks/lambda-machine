@@ -4,10 +4,7 @@ module Test.Data.GrammarSpec
 
 import Test.Prelude
 
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Grammar (pluralizeWith, joinWith)
-import Data.Newtype (class Newtype, un)
 
 spec :: Spec Unit
 spec = describe "Data.Grammar" do

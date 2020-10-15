@@ -2,7 +2,7 @@ module Components.Expressions
   ( component
   ) where
 
-import Prelude
+import Lambda.Prelude
 
 import Lambda.Language.PrettyPrint (Rep, Doc, selectRep)
 import React.Basic (JSX)

@@ -10,17 +10,10 @@ module Lambda.Machine.Node
   , children
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Control.Monad.State (class MonadState)
-import Data.Foldable (fold)
-import Data.Traversable (traverse)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Array as Array
-import Data.List (List(..))
 import Data.List as List
-import Data.Maybe (Maybe(..))
 import Lambda.Language.Expr (Expr(..))
 import Lambda.Language.Name (Name)
 import Lambda.Machine.Address (Address)

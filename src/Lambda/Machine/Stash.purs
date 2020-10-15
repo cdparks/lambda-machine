@@ -6,14 +6,9 @@ module Lambda.Machine.Stash
   , roots
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Control.Monad.State (class MonadState, gets, modify_)
 import Data.Array as Array
-import Data.Foldable (fold)
-import Data.List (List(..), (:))
-import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (class Newtype, un)
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Stack (Stack, fromList)
 import Lambda.Machine.Stack as Stack

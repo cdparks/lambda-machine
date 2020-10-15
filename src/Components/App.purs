@@ -2,7 +2,7 @@ module Components.App
   ( mkApp
   ) where
 
-import Prelude
+import Lambda.Prelude
 
 import Components.Alert as Alert
 import Components.Alert (Level(..))
@@ -13,12 +13,7 @@ import Components.Footer as Footer
 import Components.Help as Help
 import Components.Input as Input
 import Data.Array (concat, cons, filter, reverse, snoc)
-import Data.Either (Either(..))
 import Data.Foldable (intercalate)
-import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
-import Data.Tuple.Nested ((/\))
-import Effect (Effect)
 import Effect.Save (saveTextAs)
 import Lambda.Language.Expr
   ( Expr

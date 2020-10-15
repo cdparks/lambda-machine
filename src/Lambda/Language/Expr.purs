@@ -6,14 +6,10 @@ module Lambda.Language.Expr
   , freeVars
   ) where
 
-import Prelude
+import Lambda.Prelude
 
 import Data.Array (cons, unsafeIndex)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
-import Data.Set (Set)
 import Data.Set as Set
 import Lambda.Language.Name (Name, next)
 import Lambda.Language.PrettyPrint (class PrettyPrint, parensIf)

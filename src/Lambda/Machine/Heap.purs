@@ -9,17 +9,11 @@ module Lambda.Machine.Heap
   , gc
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Control.Monad.Rec.Class (class MonadRec, tailRecM, Step(..))
-import Control.Monad.State (class MonadState, gets, modify_)
-import Data.Foldable (class Foldable, maximum)
-import Data.HashMap (HashMap)
+import Data.Foldable (maximum)
 import Data.HashMap as HashMap
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (wrap)
 import Data.Queue as Queue
-import Data.Tuple (Tuple(..))
 import Lambda.Machine.Address (Address)
 import Partial.Unsafe (unsafeCrashWith)
 

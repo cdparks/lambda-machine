@@ -8,20 +8,12 @@ module Lambda.Language.Name
   , next
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Control.Alt ((<|>))
 import Data.Array (unsafeIndex)
 import Data.Char (toCharCode)
-import Data.Foldable (foldl)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Ord (genericCompare)
-import Data.Hashable (class Hashable, hash)
-import Data.Maybe (Maybe(..), maybe)
 import Data.Set as Set
 import Data.String.CodeUnits (fromCharArray, toCharArray)
-import Data.Tuple (Tuple(..))
 import Lambda.Language.PrettyPrint (class PrettyPrint)
 import Partial.Unsafe (unsafePartial)
 

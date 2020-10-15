@@ -3,10 +3,8 @@ module Lambda.Machine.Trace
   , roots
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Lambda.Language.Name (Name)
 import Lambda.Machine.Address (Address)
 

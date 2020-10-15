@@ -2,10 +2,8 @@ module React.Render
   ( renderTo
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Data.Maybe (Maybe(..))
-import Effect (Effect)
 import Effect.Exception (throw)
 import React.Basic (JSX)
 import React.Basic.DOM (render)

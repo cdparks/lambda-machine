@@ -2,11 +2,7 @@ module Lambda.Machine.Address
   ( Address
   ) where
 
-import Prelude
-
-import Data.Generic.Rep (class Generic)
-import Data.Hashable (class Hashable)
-import Data.Newtype (class Newtype)
+import Lambda.Prelude
 
 newtype Address = Address Int
 

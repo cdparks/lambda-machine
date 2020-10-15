@@ -8,15 +8,8 @@ module Lambda.Machine
   , snapshot
   ) where
 
-import Prelude hiding (add)
+import Lambda.Prelude hiding (add)
 
-import Control.Monad.Rec.Class (tailRecM, Step(..))
-import Control.Monad.State (class MonadState, evalState, execState, gets, get, modify_)
-import Data.Foldable (class Foldable, fold)
-import Data.List (List(..), (:))
-import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse, traverse_)
-import Data.Tuple (Tuple, uncurry)
 import Lambda.Language.Expr (Expr(..))
 import Lambda.Language.Name (Name)
 import Lambda.Language.PrettyPrint (prettyPrint, sugar)

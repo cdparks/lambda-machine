@@ -12,7 +12,7 @@ module Lambda.Language.PrettyPrint
   , parensIf
   ) where
 
-import Prelude
+import Lambda.Prelude
 
 data Rep
   = Sugar

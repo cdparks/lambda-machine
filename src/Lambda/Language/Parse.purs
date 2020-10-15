@@ -7,16 +7,12 @@ module Lambda.Language.Parse
   , formatParseError
   ) where
 
-import Prelude hiding (between)
+import Lambda.Prelude hiding (between)
 
-import Control.Alt ((<|>))
 import Control.Lazy (fix)
 import Data.Array (some, many, replicate)
-import Data.Either (Either(..))
-import Data.Foldable (fold, foldl, foldr)
 import Data.Int (fromString)
-import Data.List (List(..))
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (fromJust)
 import Data.String.CodeUnits (fromCharArray)
 import Lambda.Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
 import Lambda.Language.Syntax (Definition, Syntax(..))

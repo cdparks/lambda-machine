@@ -2,10 +2,8 @@ module Components.Controls
   ( component
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Data.Maybe (Maybe, maybe)
-import Effect (Effect)
 import Lambda.Machine (Machine)
 import Lambda.Language.PrettyPrint (Rep, ifSugar)
 import React.Basic (JSX)

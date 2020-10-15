@@ -2,10 +2,8 @@ module Components.Input
   ( component
   ) where
 
-import Prelude
+import Lambda.Prelude
 
-import Data.Foldable (traverse_)
-import Effect (Effect)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue, preventDefault)

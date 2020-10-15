@@ -3,10 +3,9 @@ module Data.Grammar
   , joinWith
   ) where
 
-import Prelude hiding (join)
+import Lambda.Prelude hiding (join)
 
 import Data.Array as Array
-import Data.Foldable (class Foldable)
 import Data.Maybe (fromJust)
 import Partial.Unsafe (unsafePartial)
 
