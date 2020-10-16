@@ -44,7 +44,6 @@ component {text, onChange, onSubmit, onHelp} =
       ]
     }
 
-
 inputGroup :: Array JSX -> JSX
 inputGroup children =
   R.div

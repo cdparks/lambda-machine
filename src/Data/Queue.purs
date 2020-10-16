@@ -49,61 +49,37 @@ instance traversableQueue :: Traversable Queue where
 instance arbitraryQueue :: Arbitrary a => Arbitrary (Queue a) where
   arbitrary = queue <$> arbitrary <*> arbitrary
 
--- | Convert any `Foldable` to a `Queue`
---
--- O(n)
---
+-- | Convert any `Foldable` to a `Queue`, O(n)
 fromFoldable :: forall a f. Foldable f => f a -> Queue a
 fromFoldable = flip queue Nil <<< List.fromFoldable
 
--- | Convert a `Queue` to any `Unfoldable`
---
--- O(n)
---
+-- | Convert a `Queue` to any `Unfoldable`, O(n)
 toUnfoldable :: forall a f. Unfoldable f => Queue a -> f a
 toUnfoldable = List.toUnfoldable <<< toList
 
--- | The empty `Queue`
---
--- O(1)
---
+-- | The empty `Queue`, O(1)
 empty :: forall a. Queue a
 empty = queue Nil Nil
 
--- | A `Queue` with only one element
---
--- O(1)
---
+-- | A `Queue` with only one element, O(1)
 singleton :: forall a. a -> Queue a
 singleton a = queue (a:Nil) Nil
 
--- | Convert a `Queue` into a `List`
---
--- O(n)
---
+-- | Convert a `Queue` into a `List`, O(n)
 toList :: forall a. Queue a -> List a
 toList (Queue { front, back }) = front <> List.reverse back
 
--- | Push an element onto the back of the `Queue`
---
--- Amortized O(1)
---
+-- | Push an element onto the back of the `Queue`, amortized O(1)
 push :: forall a. Queue a -> a -> Queue a
 push (Queue {front, back}) x = queue front $ x : back
 
--- | Pop an element off of the front of the `Queue`
---
--- Amortized O(1)
---
+-- | Pop an element off of the front of the `Queue`, amortized O(1)
 pop :: forall a. Queue a -> Maybe (Tuple a (Queue a))
 pop (Queue {front, back}) = case front of
   Nil -> Nothing
   Cons x xs -> Just $ Tuple x $ queue xs back
 
--- | Push each element of a `Foldable` value onto the back of the `Queue`
---
--- Amortized O(n)
---
+-- | Push each element of a `Foldable` value onto the back of the `Queue`, amortized O(n)
 extend :: forall a f. Foldable f => Queue a -> f a -> Queue a
 extend = foldl push
 

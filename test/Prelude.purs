@@ -24,6 +24,8 @@ import Lambda.Language.Name (Name)
 import Lambda.Language.Parse (parseDefinition, parseSyntax, unsafeParse)
 import Lambda.Language.Syntax (Definition, Syntax, defToSyntax)
 
+-- Crashy test helpers for constructing terms
+
 mkSyn :: String -> Syntax
 mkSyn = unsafeParse parseSyntax
 

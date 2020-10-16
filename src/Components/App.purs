@@ -33,6 +33,8 @@ import React.Basic.DOM as R
 import React.Basic.Hooks (Component, component, mkReducer, useReducer)
 import React.Basic.Hooks as Hooks
 
+-- | Manages text-input, global definitions, semantic consistency
+-- | (world field), and machine state, if any.
 type State =
   { text :: String
   , defs :: Array Definition
@@ -95,6 +97,7 @@ mkApp = do
         ]
       }
 
+-- | Row containing a single full-width element
 row :: JSX -> JSX
 row child =
   R.div
@@ -102,6 +105,7 @@ row child =
     , children: [R.div {className: "col-sm-12", children: [child]}]
     }
 
+-- | Row containing two equal-width elements
 split :: JSX -> JSX -> JSX
 split lhs rhs =
   R.div
@@ -112,6 +116,7 @@ split lhs rhs =
       ]
     }
 
+-- | Default set of global definitions
 prelude :: Array Definition
 prelude =
   unsafeParse parseDefinition <$>
@@ -132,6 +137,7 @@ prelude =
     , "all = foldr and true"
     ]
 
+-- | Set of user-driven events
 data Action
   = ShowHelp
   | DismissAlert
@@ -144,6 +150,7 @@ data Action
   | Clear
   | ToggleSugar
 
+-- | Empty state with default global definitions
 initialState :: State
 initialState =
   { text: ""
@@ -155,6 +162,7 @@ initialState =
   , alert: Nothing
   }
 
+-- | Update `State` in response to an `Action`
 update :: State -> Action -> State
 update s = case _ of
   ShowHelp -> showHelp s
@@ -168,18 +176,24 @@ update s = case _ of
   Clear -> clear s
   ToggleSugar -> toggleSugar s
 
+-- | Present the tutorial alert
 showHelp :: State -> State
 showHelp =
   _ {alert = pure $ Tuple Info $ Help.component {} }
 
+-- | Dismiss any alert
 dismissAlert :: State -> State
 dismissAlert =
   _ {alert = Nothing}
 
+-- | Update input text
 updateText :: String -> State -> State
 updateText text =
   _ {alert = Nothing, text = text}
 
+-- | Attempt to parse the input. Input may be a definition, an
+-- | expression, or malformed, in which case, we'll surface a
+-- | syntax error.
 parseText :: State -> State
 parseText s
   | s.text == "" = s
@@ -192,6 +206,9 @@ parseText s =
     Right (Right syntax) ->
       setExpr syntax s
 
+-- | Attempt to delete a global definition. If the input or any other
+-- | global definition depends on it, we'll refuse to delete the
+-- | definition and present an error message.
 deleteDef :: Name -> State -> State
 deleteDef name s = case World.undefine name s.world of
   Left err ->
@@ -203,9 +220,13 @@ deleteDef name s = case World.undefine name s.world of
     , alert = Nothing
     }
 
+-- | Remove a definition by name. Used when deleting a definition or
+-- | redefining an extant definition.
 deleteByName :: Name -> Array Definition -> Array Definition
 deleteByName name = filter $ (_ /= name) <<< _.name
 
+-- | Attempt to add a new global definition. If the definition depends
+-- | on undefined names, present an error message.
 addDef :: Definition -> State -> State
 addDef def s = case World.define def.name expr s.world of
   Left err ->
@@ -220,6 +241,8 @@ addDef def s = case World.define def.name expr s.world of
  where
   expr = syntaxToExpr $ defToSyntax def
 
+-- | Attempt to set the main expression. If the expression depends on
+-- | undefined names, present an error message.
 setExpr :: Syntax -> State -> State
 setExpr syntax s =
   case World.focus expr s.world of
@@ -238,9 +261,11 @@ setExpr syntax s =
   history = pure $ prettyPrint syntax
   machine = pure $ Machine.new globals expr
 
+-- | Convert `Definition`s to pairs of names and expressions.
 defsToGlobals :: Array Definition -> Array (Tuple Name Expr)
 defsToGlobals = map \def -> Tuple def.name $ syntaxToExpr $ defToSyntax def
 
+-- | Do one step of evaluation and update the history.
 step :: Machine -> State -> State
 step m0 s =  s
   { machine = pure m
@@ -253,6 +278,7 @@ step m0 s =  s
     | Machine.halted m = s.history
     | otherwise = prettyPrint root `cons` s.history
 
+-- | Unload the `Machine` and unset the main expression
 clear :: State -> State
 clear s = s
   { world = World.unfocus s.world
@@ -260,9 +286,11 @@ clear s = s
   , history = []
   }
 
+-- | Toggle syntactic sugar for Church numerals and lists.
 toggleSugar :: State -> State
 toggleSugar s = s {rep = toggleRep s.rep}
 
+-- | Download the state as a text file.
 save :: State -> Effect Unit
 save {rep, defs, history} =
   saveTextAs text "evaluation.txt"
@@ -274,6 +302,7 @@ save {rep, defs, history} =
     ]
   text = intercalate "\n" $ flip selectRep rep <$> allDefs
 
+-- | Create an alert element with the specified message.
 alert :: Level -> String -> Tuple Level JSX
 alert level message =
   Tuple level body

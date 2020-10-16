@@ -12,6 +12,8 @@ import Web.HTML (window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
 import Web.HTML.Window (document)
 
+-- | Render a `JSX` element into the element with the specified id or
+-- | crash.
 renderTo :: String -> JSX -> Effect Unit
 renderTo id jsx = do
   mContainer <- getElementById id =<< (map toNonElementParentNode $ document =<< window)

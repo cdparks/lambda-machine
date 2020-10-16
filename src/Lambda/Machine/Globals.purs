@@ -15,11 +15,19 @@ import Lambda.Machine.Heap (Heap)
 import Lambda.Machine.Heap as Heap
 import Partial.Unsafe (unsafeCrashWith)
 
+-- | Top-level names
 type Globals = HashMap Name Address
 
+-- | Empty `Globals`
 empty :: Globals
 empty = HashMap.empty
 
+-- | Add a new top-level definition. Note that the way we reserve
+-- | memory for a global before defining it means we can support
+-- | direct recursion, but currently this is disallowed by the
+-- | consistency-checking in `World`. May relax that once we have
+-- | concrete syntax for let-rec/fix beyond what can be defined with
+-- | plain lambda calculus.
 add
   :: forall a s m. MonadState { heap :: Heap a , globals :: Globals | s} m
   => Name
@@ -32,6 +40,7 @@ add name gen = do
   node <- gen unit
   Heap.update p node
 
+-- | Fetch a top-level definition or crash.
 get
   :: forall s m
    . MonadState { globals :: Globals | s } m
@@ -43,6 +52,7 @@ get name = do
     Just addr -> pure addr
     Nothing -> unsafeCrashWith $ "No global binding for " <> show name
 
+-- | Remove a top-level definition.
 remove
   :: forall a s m. MonadState { heap :: Heap a, globals :: Globals | s} m
   => Name

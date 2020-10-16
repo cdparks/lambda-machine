@@ -25,6 +25,7 @@ data Leaf
 data Comment
   = Comment String (Array Leaf)
 
+-- | Convert `Markup` to styled `JSX`
 toJSX :: Markup -> JSX
 toJSX = case _ of
   Header t ->

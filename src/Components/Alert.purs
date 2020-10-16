@@ -9,7 +9,12 @@ import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)
 
-data Level = Info | Success | Warning | Danger
+-- | Style an alert based on its importance
+data Level
+  = Info
+  | Success
+  | Warning
+  | Danger
 
 instance showLevel :: Show Level where
   show Info = "info"

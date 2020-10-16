@@ -29,6 +29,36 @@ import Lambda.Machine.Trace (Trace(..))
 import Lambda.Machine.Trace as Trace
 import Partial.Unsafe (unsafeCrashWith)
 
+-- | Machine-state based roughly on the Template Instantiation Machine
+-- | from Simon Peyton-Jones & David Lester's _Implementing Functional
+-- | Languages: A Tutorial_.
+-- |
+-- | The Template Instantiation Machine is a very simple graph
+-- | reduction interpreter. It's too slow and inflexible for a "real"
+-- | implementation, but for Lambda Machine, all we care about is that
+-- | we can either retain or reconstruct enough syntactic information
+-- | to incrementally do lazy-evaluation in human-comprehensible steps.
+-- | The Template Instantiation Machine works for our use-case.
+-- |
+-- | Note that this implementation differs from the Template
+-- | Instantiation Machine as specified in the literature:
+-- | 1. We do not lambda-lift the program to supercombinators. Instead
+-- |    we construct closures for lambdas encountered at runtime.
+-- | 2. We evaluate applications one argument at a time, like a person
+-- |    might do using pen and paper.
+-- | 3. We evaluate inside of under-applied lambdas by secretly
+-- |    applying them to special `Stuck` values that cannot themselves
+-- |    be further evaluated. This makes certain functions (e.g. the
+-- |    predecessor function on Church numerals) work that would
+-- |    otherwise get stuck too early in a "real" language.
+-- | 4. We retain a pointer to the root expression even as we abandon
+-- |    the parts of it that we cannot reduce. This is the `root`
+-- |    field. Since the machine updates nodes when they're evaluated,
+-- |    we can dereference the `root` to track evaluation.
+-- | 5. We call the "dump" the "stash". I don't remember why; maybe it
+-- |    looks nice next to stack? This detail isn't important, it just
+-- |    helps if you're comparing directly.
+-- |
 type Machine =
   { root :: Address
   , stack :: Stack
@@ -38,6 +68,8 @@ type Machine =
   , trace :: Trace
   }
 
+-- | Create a new `Machine` given a list of top-level definitions and
+-- | a root expression to start evaluating.
 new :: forall f. Foldable f => f (Tuple Name Expr) -> Expr -> Machine
 new rawGlobals expr =
   { root
@@ -56,23 +88,39 @@ new rawGlobals expr =
     globals <- gets _.globals
     pure {root, globals, heap}
 
+-- | Has the `Machine` halted?
 halted :: Machine -> Boolean
 halted m = case m.trace of
   Halted _ -> true
   _ -> false
 
+-- | Add a new top-level definition to an already running `Machine`
 add :: Name -> Expr -> Machine -> Machine
 add name expr = execState $ Node.define name expr
 
+-- | Remove a top-level definition from an already running `Machine`
 remove :: Name -> Machine -> Machine
 remove name = execState $ Globals.remove name
 
+-- | Update the `trace` field with a summary of the most recent step.
 emit :: forall s m. MonadState { trace :: Trace | s } m => Trace -> m Unit
 emit message = modify_ _ { trace = message }
 
+-- | Perform one (big) step of evaluation. We consider the following to
+-- | be big steps:
+-- | 1. Replacing a global name with its definition
+-- | 2. Beta-reduction
+-- | 3. Halting
+-- |
+-- | See the `interesting` function for where this is exactly spelled
+-- | out.
 step :: Machine -> Machine
 step = stepWith interesting
 
+-- | Perform steps in constant stack space until the `Trace`
+-- | satisfies the first argument. Passing `const true` would
+-- | correspond to truly small-step evaluation. Specifically, you
+-- | would observe stack unwinding, pointer-chasing, etc.
 stepWith :: (Trace -> Boolean) -> Machine -> Machine
 stepWith stop = execState do
   tailRecM go unit
@@ -89,6 +137,8 @@ stepWith stop = execState do
     | stop trace = Done
     | otherwise = Loop
 
+-- | Find all root addresses for garbage collecting. Note that
+-- | top-level definitions are not considered roots.
 getRoots :: forall m . MonadState Machine m => m (Array Address)
 getRoots = do
   {root, stack, stash, globals, trace} <- get
@@ -99,6 +149,7 @@ getRoots = do
     , Trace.roots trace
     ]
 
+-- | Was the last step interesting?
 interesting :: Trace -> Boolean
 interesting = case _ of
   Fetched _ -> true
@@ -106,12 +157,18 @@ interesting = case _ of
   Halted _ -> true
   _ -> false
 
+-- | Perform one state transition based on the `Node` at the top
+-- | of the stack.
 eval :: forall m. MonadState Machine m => Address -> Node -> m Unit
 eval top = case _ of
+  -- Application node - unwind by pushing the left-hand-side onto the
+  -- stack
   Node f _ -> do
     Stack.push f
     emit $ Unwound f
 
+  -- Pointer node - dereference and push onto the stack. If the pointee
+  -- is being applied, update the application node to point at it.
   Pointer address -> do
     Stack.peek 1 >>= case _ of
       Just app -> do
@@ -121,6 +178,9 @@ eval top = case _ of
     Stack.replace address
     emit $ Followed address
 
+  -- Top-level definition - push the address onto the stack. If the
+  -- address is being applied, update the application node to point at
+  -- it.
   Global name address -> do
     Stack.peek 1 >>= case _ of
       Just app -> do
@@ -130,6 +190,13 @@ eval top = case _ of
     Stack.replace address
     emit $ Fetched name
 
+  -- Closure - if there is an argument, push it on the front of the
+  -- closure's environment and instantiate the body. Then update the
+  -- application node to point at the newly constructed node.
+  --
+  -- Otherwise, allocate a stuck value and instantiate the body with
+  -- that in the environment instead. Finally allocate a stuck lambda
+  -- and update the top of the stack to point at it.
   Closure _ env name e ->
     Stack.peek 1 >>= case _ of
       Just app -> do
@@ -144,6 +211,11 @@ eval top = case _ of
         Stack.replace node
         emit $ WentUnder top
 
+  -- Stuck node - if there is an argument, push everything beneath it
+  -- onto the stash, and continue evaluation on the argument.
+  --
+  -- Otherwise, attempt to restore the stash and keep going. If there's
+  -- nothing left, we're done.
   Stuck _ ->
     Stack.peek 1 >>= case _ of
       Just app -> do
@@ -158,6 +230,7 @@ eval top = case _ of
           Just arg -> emit $ Discarded top arg
           Nothing -> emit $ Halted top
 
+-- | Fetch the right-hand-side of an application node or crash
 fetchArg :: forall s m. MonadState { heap :: Heap Node | s } m => Address -> m Address
 fetchArg address = do
   node <- Heap.fetch address
@@ -168,6 +241,7 @@ fetchArg address = do
       , show node
       ]
 
+-- | Fetch the node and convert it to `Syntax`.
 formatNode :: forall s m. MonadState { heap :: Heap Node | s } m => Address -> m Syntax
 formatNode address = do
   node <- Heap.fetch address
@@ -180,6 +254,7 @@ formatNode address = do
     Pointer a -> formatNode a
     Global name _ -> pure $ Var name
 
+-- | Convert an `Expr` in a `Closure` to `Syntax`.
 toSyntax :: List Syntax -> Expr -> Syntax
 toSyntax env = case _ of
   Bind n _ e -> Lambda n $ toSyntax (Var n : env) e
@@ -187,15 +262,18 @@ toSyntax env = case _ of
   Bound i -> Node.deref i env
   Free n -> Var n
 
+-- | Format a `Stuck` node.
 formatStuck :: forall s m. MonadState { heap :: Heap Node | s } m => Stuck -> m Syntax
 formatStuck = case _ of
   StuckVar name -> pure $ Var name
   StuckBind name e  -> Lambda name <$> formatNode e
   StuckApp f a -> Apply <$> formatNode f <*> formatNode a
 
+-- | Pretty-print `Syntax`
 formatSyntax :: Syntax -> String
 formatSyntax = sugar <<< prettyPrint
 
+-- | Convert a `Trace` to a human-readable explanation.
 formatTrace :: forall s m. MonadState { heap :: Heap Node | s } m => Trace -> m String
 formatTrace = map fold <<< case _ of
   Start -> pure ["Start"]
@@ -260,6 +338,8 @@ formatTrace = map fold <<< case _ of
     Stuck _ -> true
     _ -> false
 
+-- | Take a snapshot of a `Machine` by formatting the `root` node and
+-- | producing a human-readable trace.
 snapshot :: Machine -> { root :: Syntax, trace :: String }
 snapshot = evalState do
   root <- formatNode =<< gets _.root

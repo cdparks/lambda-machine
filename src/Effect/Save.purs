@@ -5,5 +5,7 @@ module Effect.Save
 
 import Lambda.Prelude
 
-type FileName = String
+newtype FileName = FileName String
+
+-- | Save text to file
 foreign import saveTextAs :: String -> FileName -> Effect Unit

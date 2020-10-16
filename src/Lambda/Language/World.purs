@@ -21,11 +21,15 @@ import Lambda.Language.Expr (Expr, freeVars)
 import Lambda.Language.Name (Name)
 import Partial.Unsafe (unsafeCrashWith)
 
+-- | Representation of dependencies between global definitions and the
+-- | main expression.
 type World =
   { nameToDeps :: Map Name (Set Dependency)
   , depToNames :: Map Dependency (Set Name)
   }
 
+-- | A `Dependency` is either a global `Name`, or the root expression
+-- | under evaluation.
 data Dependency
   = Global Name
   | Root
@@ -43,6 +47,8 @@ instance showDependency :: Show Dependency where
     Global name -> show name
     Root -> "the input"
 
+-- | The `World` is inconsistent if anything depends on an undefined `Name`, or
+-- | if we attempt to delete a `Name` that is depended on by anything else.
 data ConsistencyError
   = Undefined (Set Name)
   | CannotDelete Name (Set Dependency)
@@ -58,6 +64,7 @@ instance ordConsistencyError :: Ord ConsistencyError where
 instance showConsistencyError :: Show ConsistencyError where
   show = formatError
 
+-- | Convert `ConsistencyError` to a humean-readable string.
 formatError :: ConsistencyError -> String
 formatError = case _ of
   Undefined missing -> fold
@@ -73,12 +80,15 @@ formatError = case _ of
     , Grammar.joinWith "and" $ show <$> Array.fromFoldable deps
     ]
 
+-- | An empty `World` has no definitions
 empty :: World
 empty =
   { nameToDeps: Map.empty
   , depToNames: Map.empty
   }
 
+-- | Create a new `World` given a list of top-level definitions. Crashes
+-- | if any definition depends on `Name`s that did not appear before it.
 new :: Array (Tuple Name Expr) -> World
 new prelude = case foldM (flip addGlobal) empty prelude of
   Left err -> unsafeCrashWith $ "Malformed prelude: " <> formatError err
@@ -86,9 +96,13 @@ new prelude = case foldM (flip addGlobal) empty prelude of
  where
   addGlobal (Tuple name expr) = add (Global name) expr
 
+-- | Attempt to define a new top-level definition. Fails if the
+-- | definition mentions other undefined `Name`s.
 define :: Name -> Expr -> World -> Either ConsistencyError World
 define name = add $ Global name
 
+-- | Attempt to delete an existing top-level definition. Fails if any
+-- | other definition still depends on it.
 undefine :: Name -> World -> Either ConsistencyError World
 undefine name world = do
   let deps = fromMaybe Set.empty $ Map.lookup name world.nameToDeps
@@ -96,12 +110,16 @@ undefine name world = do
     then pure $ remove (Global name) world
     else Left $ CannotDelete name deps
 
+-- | Attempt to focus the `World` on a new root expression. Fails if
+-- | the expression mentions any undefined `Name`s.
 focus :: Expr -> World -> Either ConsistencyError World
 focus = add Root
 
+-- | Remove root expression.
 unfocus :: World -> World
 unfocus = remove Root
 
+-- | Internal operation for adding a new element to the `World`.
 add :: Dependency -> Expr -> World -> Either ConsistencyError World
 add dep expr world = do
   let
@@ -112,6 +130,7 @@ add dep expr world = do
     then pure $ combine newWorld $ fromFreeVars dep fvs
     else Left $ Undefined missing
 
+-- | Internal operation for removing an element from the `World`.
 remove :: Dependency -> World -> World
 remove dep world@{ nameToDeps, depToNames } =
   case Map.lookup dep depToNames of
@@ -126,9 +145,12 @@ remove dep world@{ nameToDeps, depToNames } =
     Global name -> Map.delete name nameToDeps
     Root -> nameToDeps
 
+-- | Set of top-level `Name`s.
 globals :: World -> Set Name
 globals = Map.keys <<< _.nameToDeps
 
+-- | Create a minimal `World` based on an item's free variables
+-- | assuming nothing else can depend on this item yet.
 fromFreeVars :: Dependency -> Set Name -> World
 fromFreeVars dep fvs =
   { nameToDeps
@@ -143,6 +165,7 @@ fromFreeVars dep fvs =
     pure $ Tuple name $ Set.singleton dep
   depToNames = Map.singleton dep fvs
 
+-- | Monoidally combine `World`s by unioning `Map`s point-wise.
 combine :: World -> World -> World
 combine lhs rhs =
   { nameToDeps: Map.unionWith Set.union lhs.nameToDeps rhs.nameToDeps

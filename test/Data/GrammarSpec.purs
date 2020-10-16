@@ -31,6 +31,7 @@ spec = describe "Data.Grammar" do
     it "joins > 2 elements with commas and the conjunction" $ do
       joinWith "and" ["x", "y", "z"] `shouldEqual` "x, y, and z"
 
+-- | Generate positive integers only
 newtype Positive = Positive Int
 
 derive instance newtypePositive :: Newtype Positive _

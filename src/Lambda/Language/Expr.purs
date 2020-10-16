@@ -15,6 +15,12 @@ import Lambda.Language.PrettyPrint (class PrettyPrint, parensIf)
 import Lambda.Language.Syntax (Syntax(..))
 import Partial.Unsafe (unsafePartial)
 
+-- | Locally nameless expression tree using zero-based De-Bruijn
+-- | indexes. That is, `λx. x` is represented by `λx. 0`, and
+-- | `λx. λy. x` is represented by `λx. λy. 1`. Binders are annotated
+-- | with their source-level name for quoting back to `Syntax` as well
+-- | as the set of free-variables they reference. The latter is used
+-- | to avoid garbage-collecting global definitions.
 data Expr
   = Bound Int
   | Free Name
@@ -35,8 +41,9 @@ instance eqExpr :: Eq Expr where
     App f a, App g b -> f == g && a == b
     _, _ -> false
 
+-- | Convert plain `Syntax` to a locally-nameless `Expr`
 syntaxToExpr :: Syntax -> Expr
-syntaxToExpr = alpha <<< go Map.empty
+syntaxToExpr = alphaInternal <<< go Map.empty
  where
   go env = case _ of
     Var n ->
@@ -54,8 +61,13 @@ syntaxToExpr = alpha <<< go Map.empty
         a = go env a0
       in {expr: App f.expr a.expr, fvs: f.fvs <> a.fvs}
 
-alpha :: {expr :: Expr, fvs :: Set Name} -> Expr
-alpha x =
+-- | Alpha-convert an `Expr` such that no names are shadowed.
+alpha :: Expr -> Expr
+alpha expr = alphaInternal { expr, fvs: freeVars expr }
+
+-- | Alpha-conversion when we already have an `Expr`'s free variables.
+alphaInternal :: {expr :: Expr, fvs :: Set Name} -> Expr
+alphaInternal x =
   loop x.fvs x.expr
  where
   loop env = case _ of
@@ -69,11 +81,13 @@ alpha x =
     App f a ->
       App (loop env f) (loop env a)
 
+-- | Conjure a fresh name by appending a subscript
 fresh :: Set Name -> Name -> {used :: Set Name, new :: Name}
 fresh env n
   | n `Set.member` env = fresh env (next n)
   | otherwise = {used: Set.insert n env, new: n}
 
+-- | Access an `Expr`'s precomputed free variables.
 freeVars :: Expr -> Set Name
 freeVars = case _ of
   Bound _ -> Set.empty
@@ -81,6 +95,9 @@ freeVars = case _ of
   Bind _ fvs b -> fvs
   App f a -> freeVars f <> freeVars a
 
+-- | Quote an `Expr` back to `Syntax`. `Expr`s are alpha-converted,
+-- | so the resulting AST will be equivalent, but may have slightly
+-- | different names.
 exprToSyntax :: Expr -> Syntax
 exprToSyntax =
   loop []

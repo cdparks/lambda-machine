@@ -47,6 +47,8 @@ component {machine, onStep, onClear, onSave, onSugar, rep} =
       ]
     }
 
+-- | Create a button element enabled based on the presence of the first
+-- | argument.
 button
   :: forall a
    . Maybe a
@@ -63,10 +65,12 @@ button m {className, onClick, label} =
     , children: [R.text label]
     }
 
+-- | Build handler if second argument is present.
 maybeHandle :: forall a. (a -> Effect Unit) -> Maybe a -> EventHandler
 maybeHandle handle =
   handler_ <<< maybe (pure unit) handle
 
+-- | Enable element if second argument is present.
 maybeEnable :: forall a. String -> Maybe a -> String
 maybeEnable className =
   maybe

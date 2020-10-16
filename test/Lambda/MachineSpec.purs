@@ -32,6 +32,7 @@ spec = describe "Lambda.Machine" do
         result = normalize globals $ mkExpr "any (repeat true)"
       result `shouldEqual` mkSyn "λt. λ_. t"
 
+-- | Create a new `Machine` and step it N times.
 stepN :: Int -> Array (Tuple Name Expr) -> Expr -> Syntax
 stepN n globals =
   _.root
@@ -39,6 +40,7 @@ stepN n globals =
   <<< applyN Machine.step n
   <<< Machine.new globals
 
+-- | Create a new `Machine` and step it until it halts.
 normalize :: Array (Tuple Name Expr) -> Expr -> Syntax
 normalize globals =
   loop <<< Machine.new globals

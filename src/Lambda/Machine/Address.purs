@@ -4,6 +4,7 @@ module Lambda.Machine.Address
 
 import Lambda.Prelude
 
+-- | Heap address for nodes in a graph
 newtype Address = Address Int
 
 derive instance newtypeAddress :: Newtype Address _
