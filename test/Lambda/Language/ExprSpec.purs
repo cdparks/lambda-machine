@@ -31,7 +31,6 @@ spec = describe "Lambda.Language.Expr" do
           $ Bound 0
       expr `shouldEqual` expr
 
-
 x :: Name
 x = name_ "x"
 

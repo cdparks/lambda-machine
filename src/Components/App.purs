@@ -4,8 +4,8 @@ module Components.App
 
 import Lambda.Prelude
 
-import Components.Alert as Alert
 import Components.Alert (Level(..))
+import Components.Alert as Alert
 import Components.Controls as Controls
 import Components.Definitions as Definitions
 import Components.Expressions as Expressions
@@ -20,11 +20,11 @@ import Lambda.Language.Expr
   , syntaxToExpr
   )
 import Lambda.Language.Name (Name)
-import Lambda.Language.World (World)
-import Lambda.Language.World as World
 import Lambda.Language.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
 import Lambda.Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
 import Lambda.Language.Syntax (Definition, Syntax, defToDoc, defToSyntax)
+import Lambda.Language.World (World)
+import Lambda.Language.World as World
 import Lambda.Machine (Machine)
 import Lambda.Machine as Machine
 import React.Basic (JSX)

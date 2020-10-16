@@ -4,10 +4,10 @@ module Lambda.Language.WorldSpec
 
 import Test.Prelude
 
-import Lambda.Language.World as World
-import Lambda.Language.World (ConsistencyError(..), Dependency(..))
 import Data.Map as Map
 import Data.Set as Set
+import Lambda.Language.World (ConsistencyError(..), Dependency(..))
+import Lambda.Language.World as World
 
 spec :: Spec Unit
 spec = describe "Lambda.Language.World" do

@@ -4,8 +4,8 @@ module Components.Controls
 
 import Lambda.Prelude
 
-import Lambda.Machine (Machine)
 import Lambda.Language.PrettyPrint (Rep, ifSugar)
+import Lambda.Machine (Machine)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (EventHandler, handler_)
