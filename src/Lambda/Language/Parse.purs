@@ -5,12 +5,13 @@ module Lambda.Language.Parse
   , parseEither
   , unsafeParse
   , formatParseError
+  , module X
   ) where
 
 import Lambda.Prelude hiding (between)
 
 import Control.Lazy (fix)
-import Data.Array (some, many, replicate)
+import Data.Array as Array
 import Data.Int (fromString)
 import Data.Maybe (fromJust)
 import Data.String.CodeUnits (fromCharArray)
@@ -18,6 +19,7 @@ import Lambda.Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
 import Lambda.Language.Syntax (Definition, Syntax(..))
 import Partial.Unsafe (unsafeCrashWith, unsafePartial)
 import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
+import Text.Parsing.Parser (ParseError) as X
 import Text.Parsing.Parser.Combinators (between, sepBy, try)
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
@@ -30,27 +32,27 @@ parseAll p s = runParser s (skipSpaces *> p <* eof)
 -- | only for trusted input, e.g. in tests or default definitions.
 unsafeParse :: forall a. Parser String a -> String -> a
 unsafeParse p s = case parseAll p s of
-  Left err -> unsafeCrashWith $ formatParseError s err
+  Left err ->
+    let { message, source, caret } = formatParseError s err
+    in unsafeCrashWith $ Array.intercalate "\n"
+      [ message
+      , source
+      , caret
+      ]
   Right a -> a
 
 -- | Format a parse error to highlight the position where the malformed
 -- | input was encountered.
-formatParseError :: String -> ParseError -> String
+formatParseError :: String -> ParseError -> { message :: String, source :: String, caret :: String }
 formatParseError text err =
-  fold
-    [ "Parse error: "
-    , message
-    , " at column "
-    , show column
-    , "\n"
-    , text
-    , "\n"
-    , caretLine
-    ]
+  { message: "Parse error: " <> message <> " at column " <> show column
+  , source: text
+  , caret: caret
+  }
  where
   message = parseErrorMessage err
   column = positionColumn $ parseErrorPosition err
-  caretLine = fromCharArray (replicate (column - 1) ' ') <> "^"
+  caret = fromCharArray (Array.replicate (column - 1) ' ') <> "^"
 
 -- | Project column from `Position`
 positionColumn :: Position -> Int
@@ -70,7 +72,7 @@ parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
 parseDefinition :: Parser String Definition
 parseDefinition = {name:_, args:_, syntax:_}
   <$> parseName
-  <*> many parseName
+  <*> Array.many parseName
   <*> (token (string "=") *> parseSyntax)
 
 -- | Parse an expression
@@ -100,7 +102,7 @@ parseSyntax =
  where
   parseApply p = do
     first <- parseAtom
-    rest <- many parseAtom
+    rest <- Array.many parseAtom
     case rest of
       [] -> pure first
       _  -> pure (foldl Apply first rest)
@@ -111,7 +113,7 @@ parseSyntax =
     parseLambda :: Parser String Syntax
     parseLambda = do
       void $ token $ string "\\" <|> string "λ"
-      names <- some parseName
+      names <- Array.some parseName
       void $ token $ string "."
       body <- p
       pure $ foldr Lambda body names
@@ -152,7 +154,7 @@ toChurch n =
 -- | Parse a natural number.
 parseNat :: Parser String Syntax
 parseNat = token do
-  digits <- some $ satisfy isDigit
+  digits <- Array.some $ satisfy isDigit
   let n = unsafePartial $ fromJust $ fromString $ fromCharArray digits
   pure $ toChurch n
 
@@ -193,7 +195,7 @@ parseVar = Var <$> parseName
 parseName :: Parser String Name
 parseName = token do
   first <- satisfy firstChar
-  body <- many $ satisfy bodyChar
+  body <- Array.many $ satisfy bodyChar
   question <- string "?" <|> pure ""
   subscript <- Just <$> parseSubscript <|> pure Nothing
   let var = fromCharArray ([first] <> body) <> question
@@ -201,7 +203,7 @@ parseName = token do
 
 -- | Parse subscripts for a `Name`
 parseSubscript :: Parser String Int
-parseSubscript = subscriptToInt <<< fromCharArray <$> some (satisfy isSubscriptChar)
+parseSubscript = subscriptToInt <<< fromCharArray <$> Array.some (satisfy isSubscriptChar)
 
 -- | Parse the first character of a `Name`
 firstChar :: Char -> Boolean

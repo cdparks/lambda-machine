@@ -1,7 +1,6 @@
 module Lambda.Language.World
   ( World
   , ConsistencyError(..)
-  , formatError
   , new
   , define
   , undefine
@@ -62,23 +61,24 @@ instance ordConsistencyError :: Ord ConsistencyError where
   compare x = genericCompare x
 
 instance showConsistencyError :: Show ConsistencyError where
-  show = formatError
-
--- | Convert `ConsistencyError` to a humean-readable string.
-formatError :: ConsistencyError -> String
-formatError = case _ of
-  Undefined missing -> fold
-    [ "No top-level "
-    , Grammar.pluralizeWith "s" (Set.size missing) "definition"
-    , " for "
-    , Grammar.joinWith "and" $ show <$> Array.fromFoldable missing
-    ]
-  CannotDelete name deps -> fold
-    [ "Cannot delete "
-    , show name
-    , " because it's still referenced by "
-    , Grammar.joinWith "and" $ show <$> Array.fromFoldable deps
-    ]
+  show = case _ of
+    Undefined missing -> fold
+      [ "No top-level "
+      , Grammar.pluralizeWith "s" (Set.size missing) "definition"
+      , " for "
+      , join missing
+      ]
+    CannotDelete name deps -> fold
+      [ "Cannot delete "
+      , show name
+      , " because it's still referenced by "
+      , join deps
+      ]
+   where
+    join :: forall a f. Show a => Foldable f => f a -> String
+    join = Grammar.joinWith {inject: identity, conjunction: "and" }
+      <<< map (show <<< show)
+      <<< Array.fromFoldable
 
 -- | An empty `World` has no definitions
 empty :: World
@@ -91,7 +91,7 @@ empty =
 -- | if any definition depends on `Name`s that did not appear before it.
 new :: Array (Tuple Name Expr) -> World
 new prelude = case foldM (flip addGlobal) empty prelude of
-  Left err -> unsafeCrashWith $ "Malformed prelude: " <> formatError err
+  Left err -> unsafeCrashWith $ "Malformed prelude: " <> show err
   Right world -> world
  where
   addGlobal (Tuple name expr) = add (Global name) expr

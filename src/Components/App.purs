@@ -6,12 +6,14 @@ import Lambda.Prelude
 
 import Components.Alert (Level(..))
 import Components.Alert as Alert
+import Components.ConsistencyError as ConsistencyError
 import Components.Controls as Controls
 import Components.Definitions as Definitions
 import Components.Expressions as Expressions
 import Components.Footer as Footer
 import Components.Help as Help
 import Components.Input as Input
+import Components.ParseError as ParseError
 import Data.Array (concat, cons, filter, reverse, snoc)
 import Data.Foldable (intercalate)
 import Effect.Save (FileName(..), saveTextAs)
@@ -20,7 +22,7 @@ import Lambda.Language.Expr
   , syntaxToExpr
   )
 import Lambda.Language.Name (Name)
-import Lambda.Language.Parse (formatParseError, parseAll, parseDefinition, parseEither, unsafeParse)
+import Lambda.Language.Parse (parseAll, parseDefinition, parseEither, unsafeParse)
 import Lambda.Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
 import Lambda.Language.Syntax (Definition, Syntax, defToDoc, defToSyntax)
 import Lambda.Language.World (World)
@@ -199,8 +201,14 @@ parseText s
   | s.text == "" = s
 parseText s =
   case parseAll parseEither s.text of
-    Left error ->
-      s {alert = pure $ alert Danger $ formatParseError s.text error}
+    Left error -> s
+      { alert = pure
+        $ Tuple Danger
+        $ ParseError.component
+          { input: s.text
+          , error
+          }
+      }
     Right (Left def) ->
       addDef def s
     Right (Right syntax) ->
@@ -211,8 +219,13 @@ parseText s =
 -- | definition and present an error message.
 deleteDef :: Name -> State -> State
 deleteDef name s = case World.undefine name s.world of
-  Left err ->
-    s {alert = pure $ alert Danger $ show err}
+  Left error -> s
+    { alert = pure
+      $ Tuple Danger
+      $ ConsistencyError.component
+        { error
+        }
+    }
   Right world -> s
     { defs = deleteByName name s.defs
     , world = world
@@ -228,8 +241,13 @@ deleteByName name = filter $ (_ /= name) <<< _.name
 -- | on undefined names, present an error message.
 addDef :: Definition -> State -> State
 addDef def s = case World.define def.name expr s.world of
-  Left err ->
-    s {alert = pure $ alert Danger $ show err}
+  Left error -> s
+    { alert = pure
+      $ Tuple Danger
+      $ ConsistencyError.component
+        { error
+        }
+    }
   Right world -> s
     { text = ""
     , defs = deleteByName def.name s.defs `snoc` def
@@ -244,20 +262,23 @@ addDef def s = case World.define def.name expr s.world of
 setExpr :: Syntax -> State -> State
 setExpr syntax s =
   case World.focus expr s.world of
-    Left err ->
-      s {alert = pure $ alert Danger $ show err}
+    Left error -> s
+      { alert = pure
+        $ Tuple Danger
+        $ ConsistencyError.component
+          { error
+          }
+      }
     Right world -> s
       { text = ""
       , world = world
-      , machine = machine
-      , history = history
+      , machine = pure $ Machine.new globals expr
+      , history = pure $ prettyPrint syntax
       , alert = Nothing
       }
  where
   expr = syntaxToExpr syntax
   globals = defsToGlobals s.defs
-  history = pure $ prettyPrint syntax
-  machine = pure $ Machine.new globals expr
 
 -- | Convert `Definition`s to pairs of names and expressions.
 defsToGlobals :: Array Definition -> Array (Tuple Name Expr)
