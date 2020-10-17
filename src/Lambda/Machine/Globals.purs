@@ -3,7 +3,6 @@ module Lambda.Machine.Globals
   , empty
   , add
   , get
-  , remove
   ) where
 
 import Lambda.Prelude hiding (add, get)
@@ -51,12 +50,3 @@ get name = do
   case HashMap.lookup name globals of
     Just addr -> pure addr
     Nothing -> unsafeCrashWith $ "No global binding for " <> show name
-
--- | Remove a top-level definition.
-remove
-  :: forall a s m. MonadState { heap :: Heap a, globals :: Globals | s} m
-  => Name
-  -> m Unit
-remove name = do
-  Heap.free =<< get name
-  modify_ \s@{globals} -> s { globals = HashMap.delete name globals }

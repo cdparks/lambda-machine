@@ -2,13 +2,11 @@ module Lambda.Machine
   ( Machine(..)
   , new
   , step
-  , add
-  , remove
   , halted
   , snapshot
   ) where
 
-import Lambda.Prelude hiding (add)
+import Lambda.Prelude
 
 import Lambda.Language.Expr (Expr(..))
 import Lambda.Language.Name (Name)
@@ -95,14 +93,6 @@ halted :: Machine -> Boolean
 halted m = case m.trace of
   Halted _ -> true
   _ -> false
-
--- | Add a new top-level definition to an already running `Machine`
-add :: Name -> Expr -> Machine -> Machine
-add name expr = execState $ Node.define name expr
-
--- | Remove a top-level definition from an already running `Machine`
-remove :: Name -> Machine -> Machine
-remove name = execState $ Globals.remove name
 
 -- | Update the `trace` field with a summary of the most recent step.
 emit :: forall s m. MonadState { trace :: Trace | s } m => Trace -> m Unit

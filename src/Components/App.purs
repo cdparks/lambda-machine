@@ -216,7 +216,6 @@ deleteDef name s = case World.undefine name s.world of
   Right world -> s
     { defs = deleteByName name s.defs
     , world = world
-    , machine = Machine.remove name <$> s.machine
     , alert = Nothing
     }
 
@@ -235,7 +234,6 @@ addDef def s = case World.define def.name expr s.world of
     { text = ""
     , defs = deleteByName def.name s.defs `snoc` def
     , world = world
-    , machine = Machine.add def.name expr <$> s.machine
     , alert = Nothing
     }
  where
