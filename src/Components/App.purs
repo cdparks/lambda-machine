@@ -14,7 +14,7 @@ import Components.Help as Help
 import Components.Input as Input
 import Data.Array (concat, cons, filter, reverse, snoc)
 import Data.Foldable (intercalate)
-import Effect.Save (saveTextAs)
+import Effect.Save (FileName(..), saveTextAs)
 import Lambda.Language.Expr
   ( Expr
   , syntaxToExpr
@@ -293,7 +293,7 @@ toggleSugar s = s {rep = toggleRep s.rep}
 -- | Download the state as a text file.
 save :: State -> Effect Unit
 save {rep, defs, history} =
-  saveTextAs text "evaluation.txt"
+  saveTextAs text $ FileName "evaluation.txt"
  where
   allDefs = concat
     [ map defToDoc defs
