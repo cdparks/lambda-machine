@@ -2,7 +2,7 @@ module Data.GrammarSpec
   ( spec
   ) where
 
-import Test.Prelude
+import Test.Prelude hiding (join)
 
 import Data.Grammar (pluralizeWith, joinWith)
 
@@ -19,17 +19,18 @@ spec = describe "Data.Grammar" do
       pluralizeWith "s" (un Positive n) "item" === "items"
 
   describe "joinWith" do
+    let join = joinWith {inject: identity, conjunction: "and"}
     it "produces an empty string given an empty foldable" do
-      joinWith "and" [] `shouldEqual` ""
+      join [] `shouldEqual` ""
 
     it "returns the only element of a singleton foldable" do
-      joinWith "and" ["x"] `shouldEqual` "x"
+      join ["x"] `shouldEqual` "x"
 
     it "joins 2 elements with the conjunction" $ do
-      joinWith "and" ["x", "y"] `shouldEqual` "x and y"
+      join ["x", "y"] `shouldEqual` "x and y"
 
     it "joins > 2 elements with commas and the conjunction" $ do
-      joinWith "and" ["x", "y", "z"] `shouldEqual` "x, y, and z"
+      join ["x", "y", "z"] `shouldEqual` "x, y, and z"
 
 -- | Generate positive integers only
 newtype Positive = Positive Int

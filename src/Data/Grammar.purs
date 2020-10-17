@@ -17,19 +17,29 @@ pluralizeWith suffix n text
 
 -- | Join `Foldable` of `String`s with commas and a conjunction,
 -- | if necessary.
-joinWith :: forall f. Foldable f => String -> f String -> String
-joinWith conj = join conj <<< Array.fromFoldable
+joinWith
+  :: forall m f
+   . Monoid m
+  => Foldable f
+  => { inject :: String -> m, conjunction :: m }
+  -> f m
+  -> m
+joinWith options = joinInternal options <<< Array.fromFoldable
 
 -- | Implementation of `joinWith` that operates on `Array`.
-join :: String -> Array String -> String
-join conj xs = case Array.length xs of
-  0 -> ""
-  1 -> Array.intercalate "" xs
-  2 -> Array.intercalate " " $ withConj conj 1 xs
-  n -> Array.intercalate ", " $ withConj conj (n - 1) xs
-
--- | Prepend conjunction to last element of array.
-withConj :: String -> Int -> Array String -> Array String
-withConj conj i xs = unsafePartial $ fromJust $ Array.modifyAt i addConj xs
+joinInternal
+  :: forall m
+   . Monoid m
+  => { inject :: String -> m, conjunction :: m }
+  -> Array m
+  -> m
+joinInternal {inject, conjunction} xs = case Array.length xs of
+  0 -> mempty
+  1 -> Array.intercalate mempty xs
+  2 -> Array.intercalate space $ conjOnLast 1
+  n -> Array.intercalate comma $ conjOnLast $ n - 1
  where
-  addConj x = conj <> " " <> x
+  space = inject " "
+  comma = inject ", "
+  conjOnLast i = unsafePartial $ fromJust $ Array.modifyAt i prepend xs
+  prepend x = conjunction <> space <> x
