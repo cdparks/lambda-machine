@@ -69,7 +69,8 @@ type Machine =
   }
 
 -- | Create a new `Machine` given a list of top-level definitions and
--- | a root expression to start evaluating.
+-- | a root expression to start evaluating. Run a garbage collection
+-- | up front to drop globals we won't need.
 new :: forall f. Foldable f => f (Tuple Name Expr) -> Expr -> Machine
 new rawGlobals expr =
   { root
@@ -84,6 +85,7 @@ new rawGlobals expr =
   {root, globals, heap} = flip evalState empty $ do
     traverse_ (uncurry Node.define) rawGlobals
     root <- Node.compile expr
+    Heap.gc [root] Node.children
     heap <- gets _.heap
     globals <- gets _.globals
     pure {root, globals, heap}
