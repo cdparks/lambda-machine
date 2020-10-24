@@ -5,31 +5,29 @@ module Lambda.Language.ExprSpec
 import Test.Prelude
 
 import Data.Set as Set
+import Lambda.Language.Expr (Expr(..))
 
 spec :: Spec Unit
 spec = describe "Lambda.Language.Expr" do
   describe "syntaxToExpr" do
     it "converts an AST to locally-nameless Expr" do
       let
-        ast = Lambda x
-          $ Lambda y
-          $ Apply (Apply (Var f) (Var y))
-          $ Var x
+        ast = mkSyn "λx y. f y x"
         expr = syntaxToExpr ast
-        expected = Bind x (Set.singleton f)
-          $ Bind y (Set.singleton f)
-          $ App (App (Free f) (Bound 0))
+        expected = Lambda x (Set.singleton f)
+          $ Lambda y (Set.singleton f)
+          $ Apply (Apply (Free f) (Bound 0))
           $ Bound 1
       expr `shouldEqual` expected
 
     it "renames names that would otherwise shadow" do
       let
-        ast = Lambda x $ Lambda x $ Var x
+        ast = mkSyn "λx x. x"
         expr = syntaxToExpr ast
-        expected = Bind x Set.empty
-          $ Bind (name "x" $ pure 0) Set.empty
+        expected = Lambda x Set.empty
+          $ Lambda (name "x" $ pure 0) Set.empty
           $ Bound 0
-      expr `shouldEqual` expr
+      expr `shouldEqual` expected
 
 x :: Name
 x = name_ "x"

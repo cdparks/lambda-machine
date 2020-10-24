@@ -10,9 +10,9 @@ module Test.Prelude
 import Lambda.Prelude
 
 -- Re-exports
-import Lambda.Language.Expr (Expr(..), syntaxToExpr) as X
+import Lambda.Language.Expr (Expr, syntaxToExpr) as X
 import Lambda.Language.Name (Name, name, name_) as X
-import Lambda.Language.Syntax (Definition, Syntax(..), defToSyntax) as X
+import Lambda.Language.Syntax (Definition, Syntax, defToSyntax) as X
 import Test.QuickCheck (class Arbitrary, (===)) as X
 import Test.QuickCheck.Gen (chooseInt) as X
 import Test.Spec (Spec, describe, it, itOnly, pending, pending') as X

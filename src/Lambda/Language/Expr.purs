@@ -12,7 +12,8 @@ import Data.Map as Map
 import Data.Set as Set
 import Lambda.Language.Name (Name, next)
 import Lambda.Language.PrettyPrint (class PrettyPrint, parensIf)
-import Lambda.Language.Syntax (Syntax(..))
+import Lambda.Language.Syntax (Syntax)
+import Lambda.Language.Syntax as Syntax
 import Partial.Unsafe (unsafePartial)
 
 -- | Locally nameless expression tree using zero-based De-Bruijn
@@ -24,8 +25,8 @@ import Partial.Unsafe (unsafePartial)
 data Expr
   = Bound Int
   | Free Name
-  | Bind Name (Set Name) Expr
-  | App Expr Expr
+  | Lambda Name (Set Name) Expr
+  | Apply Expr Expr
 
 derive instance genericExpr :: Generic Expr _
 
@@ -37,8 +38,8 @@ instance eqExpr :: Eq Expr where
   eq lhs rhs = case lhs, rhs of
     Bound i, Bound j -> i == j
     Free n, Free m -> n == m
-    Bind _ _ x, Bind _ _ y -> x == y
-    App f a, App g b -> f == g && a == b
+    Lambda _ _ x, Lambda _ _ y -> x == y
+    Apply f a, Apply g b -> f == g && a == b
     _, _ -> false
 
 -- | Convert plain `Syntax` to a locally-nameless `Expr`
@@ -46,20 +47,20 @@ syntaxToExpr :: Syntax -> Expr
 syntaxToExpr = alphaInternal <<< go Map.empty
  where
   go env = case _ of
-    Var n ->
+    Syntax.Var n ->
       case Map.lookup n env of
         Nothing -> {expr: Free n, fvs: Set.singleton n}
         Just i -> {expr: Bound i, fvs: Set.empty}
-    Lambda n body ->
+    Syntax.Lambda n body ->
       let
         shifted = Map.insert n 0 $ (_ + 1) <$> env
         {expr, fvs} = go shifted body
-      in {expr: Bind n fvs expr, fvs}
-    Apply f0 a0 ->
+      in {expr: Lambda n fvs expr, fvs}
+    Syntax.Apply f0 a0 ->
       let
         f = go env f0
         a = go env a0
-      in {expr: App f.expr a.expr, fvs: f.fvs <> a.fvs}
+      in {expr: Apply f.expr a.expr, fvs: f.fvs <> a.fvs}
 
 -- | Alpha-convert an `Expr` such that no names are shadowed.
 alpha :: Expr -> Expr
@@ -75,11 +76,11 @@ alphaInternal x =
       Bound i
     Free n ->
       Free n
-    Bind n fvs b ->
+    Lambda n fvs b ->
       let {used, new} = fresh env n
-      in Bind new fvs $ loop used b
-    App f a ->
-      App (loop env f) (loop env a)
+      in Lambda new fvs $ loop used b
+    Apply f a ->
+      Apply (loop env f) (loop env a)
 
 -- | Conjure a fresh name by appending a subscript
 fresh :: Set Name -> Name -> {used :: Set Name, new :: Name}
@@ -92,8 +93,8 @@ freeVars :: Expr -> Set Name
 freeVars = case _ of
   Bound _ -> Set.empty
   Free n -> Set.singleton n
-  Bind _ fvs b -> fvs
-  App f a -> freeVars f <> freeVars a
+  Lambda _ fvs b -> fvs
+  Apply f a -> freeVars f <> freeVars a
 
 -- | Quote an `Expr` back to `Syntax`. `Expr`s are alpha-converted,
 -- | so the resulting AST will be equivalent, but may have slightly
@@ -104,13 +105,13 @@ exprToSyntax =
  where
   loop env = case _ of
     Bound i ->
-      Var $ unsafePartial $ env `unsafeIndex` i
+      Syntax.Var $ unsafePartial $ env `unsafeIndex` i
     Free n ->
-      Var n
-    Bind n _ b ->
-      Lambda n $ loop (n `cons` env) b
-    App f a ->
-      Apply (loop env f) (loop env a)
+      Syntax.Var n
+    Lambda n _ b ->
+      Syntax.Lambda n $ loop (n `cons` env) b
+    Apply f a ->
+      Syntax.Apply (loop env f) (loop env a)
 
 instance prettyPrintExpr :: PrettyPrint Expr where
   prettyPrint =
@@ -121,9 +122,9 @@ instance prettyPrintExpr :: PrettyPrint Expr where
         pure $ show i
       Free n ->
         pure $ show n
-      Bind _ _ b ->
+      Lambda _ _ b ->
         parensIf inApp $ pure "λ. " <> walk false b
-      App f a ->
+      Apply f a ->
         walk true f <> pure " " <> walk true a
 
 {-
@@ -135,29 +136,29 @@ syntaxToExpr syn = go Nil $ Down {env: Map.empty, syn}
  where
   go stack = case _ of
     Down {env, syn} -> case syn of
-      Var n ->
+      Syntax.Var n ->
         case Map.lookup n env of
           Nothing -> go stack $ Up {fvs: Set.singleton n, expr:  Free n}
           Just i -> go stack $ Up {fvs: Set.empty, expr: Bound i}
-      Lambda n b ->
+      Syntax.Lambda n b ->
         let shifted = Map.insert n 0 $ (_ + 1) <$> env
-        in go (MkBind n : stack) $ Down {env: shifted, syn: b}
-      Apply f a ->
+        in go (MkLambda n : stack) $ Down {env: shifted, syn: b}
+      Syntax.Apply f a ->
         go (GoRight a env : stack) $ Down {env, syn: f}
 
     Up {fvs, expr} -> case stack of
       Nil -> expr
       Cons x xs -> case x of
-        MkBind n -> go xs $ Up {fvs, expr: Bind n fvs expr}
-        GoRight syn env -> go (MkApp expr fvs : xs) $ Down {env, syn}
-        MkApp f ffvs -> go xs $ Up {fvs: fvs <> ffvs, expr: App f expr}
+        MkLambda n -> go xs $ Up {fvs, expr: Lambda n fvs expr}
+        GoRight syn env -> go (MkApply expr fvs : xs) $ Down {env, syn}
+        MkApply f ffvs -> go xs $ Up {fvs: fvs <> ffvs, expr: Apply f expr}
 
 data Direction
   = Down { env :: Map Name Int, syn :: Syntax }
   | Up { fvs :: Set Name, expr :: Expr }
 
 data Step
-  = MkBind Name
+  = MkLambda Name
   | GoRight Syntax (Map Name Int)
-  | MkApp Expr (Set Name)
+  | MkApply Expr (Set Name)
 -}

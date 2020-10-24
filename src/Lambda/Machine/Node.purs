@@ -14,7 +14,8 @@ import Lambda.Prelude
 
 import Data.Array as Array
 import Data.List as List
-import Lambda.Language.Expr (Expr(..))
+import Lambda.Language.Expr (Expr)
+import Lambda.Language.Expr as Expr
 import Lambda.Language.Name (Name)
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)
@@ -23,12 +24,12 @@ import Lambda.Machine.Heap (Heap)
 import Lambda.Machine.Heap as Heap
 import Partial.Unsafe (unsafeCrashWith)
 
--- | Nodes in the graph. The main binary `Node` represents application.
--- | Closures contain references to the global addresses they use as
--- | well as their local environment. `Stuck` nodes cannot be evaluated
--- | any further. Pointers are used in certain kinds of updates.
+-- | Nodes in the graph.  Closures contain references to the global
+-- | addresses they use as well as their local environment. `Stuck`
+-- | nodes cannot be evaluated any further. Pointers are used in
+-- | certain kinds of updates.
 data Node
-  = Node Address Address
+  = Apply Address Address
   | Closure (Array Address) (Env Address) Name Expr
   | Global Name Address
   | Stuck Stuck
@@ -42,8 +43,8 @@ instance showNode :: Show Node where
 -- | Stuck nodes cannot be evaluated any further.
 data Stuck
   = StuckVar Name
-  | StuckBind Name Address
-  | StuckApp Address Address
+  | StuckLambda Name Address
+  | StuckApply Address Address
 
 derive instance genericStuck :: Generic Stuck _
 
@@ -94,16 +95,16 @@ instantiate
   -> Expr
   -> m Address
 instantiate env = case _ of
-  Bind name fvs body -> do
+  Expr.Lambda name fvs body -> do
     addrs <- traverse Globals.get $ Array.fromFoldable fvs
     Heap.alloc $ Closure addrs env name body
-  App f0 a0 -> do
+  Expr.Apply f0 a0 -> do
     a <- instantiate env a0
     f <- instantiate env f0
-    Heap.alloc $ Node f a
-  Bound i -> do
+    Heap.alloc $ Apply f a
+  Expr.Bound i -> do
     pure $ deref i env
-  Free name -> Globals.get name
+  Expr.Free name -> Globals.get name
 
 -- | Instantiate an expression in an environment and overwrite the
 -- | given address. Generates fewer pointer chains since we don't
@@ -116,16 +117,16 @@ instantiateAt
   -> Expr
   -> m Unit
 instantiateAt target env = case _ of
-  Bind name fvs body -> do
+  Expr.Lambda name fvs body -> do
     addrs <- traverse Globals.get $ Array.fromFoldable fvs
     Heap.update target $ Closure addrs env name body
-  App f0 a0 -> do
+  Expr.Apply f0 a0 -> do
     a <- instantiate env a0
     f <- instantiate env f0
-    Heap.update target $ Node f a
-  Bound i ->
+    Heap.update target $ Apply f a
+  Expr.Bound i ->
     Heap.update target $ Pointer $ deref i env
-  Free name -> do
+  Expr.Free name -> do
     addr <- Globals.get name
     Heap.update target $ Global name addr
 
@@ -133,10 +134,10 @@ instantiateAt target env = case _ of
 -- | in garbage collection.
 children :: Node -> Array Address
 children = case _ of
-  Node lhs rhs -> [lhs, rhs]
+  Apply lhs rhs -> [lhs, rhs]
   Closure fvs env _ _ -> fvs <> Array.fromFoldable env
   Global _ addr -> [addr]
   Stuck (StuckVar _) -> []
-  Stuck (StuckBind _ addr) -> [addr]
-  Stuck (StuckApp lhs rhs) -> [lhs, rhs]
+  Stuck (StuckLambda _ addr) -> [addr]
+  Stuck (StuckApply lhs rhs) -> [lhs, rhs]
   Pointer addr -> [addr]

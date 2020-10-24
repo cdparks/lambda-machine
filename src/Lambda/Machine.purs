@@ -8,10 +8,12 @@ module Lambda.Machine
 
 import Lambda.Prelude
 
-import Lambda.Language.Expr (Expr(..))
+import Lambda.Language.Expr (Expr)
+import Lambda.Language.Expr as Expr
 import Lambda.Language.Name (Name)
 import Lambda.Language.PrettyPrint (prettyPrint, sugar)
-import Lambda.Language.Syntax (Syntax(..))
+import Lambda.Language.Syntax (Syntax)
+import Lambda.Language.Syntax as Syntax
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)
 import Lambda.Machine.Globals as Globals
@@ -155,7 +157,7 @@ eval :: forall m. MonadState Machine m => Address -> Node -> m Unit
 eval top = case _ of
   -- Application node - unwind by pushing the left-hand-side onto the
   -- stack
-  Node f _ -> do
+  Apply f _ -> do
     Stack.push f
     emit $ Unwound f
 
@@ -165,7 +167,7 @@ eval top = case _ of
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        Heap.update app $ Node address arg
+        Heap.update app $ Apply address arg
       Nothing -> pure unit
     Stack.replace address
     emit $ Followed address
@@ -177,7 +179,7 @@ eval top = case _ of
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        Heap.update app $ Node address arg
+        Heap.update app $ Apply address arg
       Nothing -> Heap.update top $ Pointer address
     Stack.replace address
     emit $ Fetched name
@@ -199,7 +201,7 @@ eval top = case _ of
       Nothing -> do
         arg <- Heap.alloc $ Stuck $ StuckVar name
         node <- Node.instantiate (Cons arg env) e
-        Heap.update top $ Stuck $ StuckBind name node
+        Heap.update top $ Stuck $ StuckLambda name node
         Stack.replace node
         emit $ WentUnder top
 
@@ -212,7 +214,7 @@ eval top = case _ of
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        Heap.update app $ Stuck $ StuckApp top arg
+        Heap.update app $ Stuck $ StuckApply top arg
         Stack.discard
         Stack.replace arg
         Stash.suspend
@@ -227,7 +229,7 @@ fetchArg :: forall s m. MonadState { heap :: Heap Node | s } m => Address -> m A
 fetchArg address = do
   node <- Heap.fetch address
   case node of
-    Node _ arg -> pure arg
+    Apply _ arg -> pure arg
     _ -> unsafeCrashWith $ fold
       [ "Non-application below top of stack: "
       , show node
@@ -238,28 +240,28 @@ formatNode :: forall s m. MonadState { heap :: Heap Node | s } m => Address -> m
 formatNode address = do
   node <- Heap.fetch address
   case node of
-    Node f a -> Apply <$> formatNode f <*> formatNode a
+    Apply f a -> Syntax.Apply <$> formatNode f <*> formatNode a
     Closure _ env0 name e -> do
       env <- traverse formatNode env0
-      pure $ Lambda name $ toSyntax (Var name : env) e
+      pure $ Syntax.Lambda name $ toSyntax (Syntax.Var name : env) e
     Stuck term -> formatStuck term
     Pointer a -> formatNode a
-    Global name _ -> pure $ Var name
+    Global name _ -> pure $ Syntax.Var name
 
 -- | Convert an `Expr` in a `Closure` to `Syntax`.
 toSyntax :: List Syntax -> Expr -> Syntax
 toSyntax env = case _ of
-  Bind n _ e -> Lambda n $ toSyntax (Var n : env) e
-  App f a -> Apply (toSyntax env f) (toSyntax env a)
-  Bound i -> Node.deref i env
-  Free n -> Var n
+  Expr.Lambda n _ e -> Syntax.Lambda n $ toSyntax (Syntax.Var n : env) e
+  Expr.Apply f a -> Syntax.Apply (toSyntax env f) (toSyntax env a)
+  Expr.Bound i -> Node.deref i env
+  Expr.Free n -> Syntax.Var n
 
 -- | Format a `Stuck` node.
 formatStuck :: forall s m. MonadState { heap :: Heap Node | s } m => Stuck -> m Syntax
 formatStuck = case _ of
-  StuckVar name -> pure $ Var name
-  StuckBind name e  -> Lambda name <$> formatNode e
-  StuckApp f a -> Apply <$> formatNode f <*> formatNode a
+  StuckVar name -> pure $ Syntax.Var name
+  StuckLambda name e  -> Syntax.Lambda name <$> formatNode e
+  StuckApply f a -> Syntax.Apply <$> formatNode f <*> formatNode a
 
 -- | Pretty-print `Syntax`
 formatSyntax :: Syntax -> String
