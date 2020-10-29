@@ -17,14 +17,12 @@ import Components.ParseError as ParseError
 import Data.Array (concat, cons, filter, reverse, snoc)
 import Data.Foldable (intercalate)
 import Effect.Save (FileName(..), saveTextAs)
-import Lambda.Language.Expr
-  ( Expr
-  , syntaxToExpr
-  )
 import Lambda.Language.Name (Name)
-import Lambda.Language.Parse (parseAll, parseDefinition, parseEither, unsafeParse)
+import Lambda.Language.Nameless as Nameless
+import Lambda.Language.Parse (parseAll, parseDefinition, parseStatement, unsafeParse)
 import Lambda.Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
-import Lambda.Language.Syntax (Definition, Syntax, defToDoc, defToSyntax)
+import Lambda.Language.Syntax (Statement(..), Definition(..), fromDef)
+import Lambda.Language.Syntax as Syntax
 import Lambda.Language.World (World)
 import Lambda.Language.World as World
 import Lambda.Machine (Machine)
@@ -147,7 +145,7 @@ data Action
   | ParseText
   | DeleteDef Name
   | AddDef Definition
-  | SetExpr Syntax
+  | SetExpr Syntax.Expression
   | Step Machine
   | Clear
   | ToggleSugar
@@ -200,7 +198,7 @@ parseText :: State -> State
 parseText s
   | s.text == "" = s
 parseText s =
-  case parseAll parseEither s.text of
+  case parseAll parseStatement s.text of
     Left error -> s
       { alert = pure
         $ Tuple Danger
@@ -209,9 +207,9 @@ parseText s =
           , error
           }
       }
-    Right (Left def) ->
+    Right (Define def) ->
       addDef def s
-    Right (Right syntax) ->
+    Right (Eval syntax) ->
       setExpr syntax s
 
 -- | Attempt to delete a global definition. If the input or any other
@@ -235,12 +233,12 @@ deleteDef name s = case World.undefine name s.world of
 -- | Remove a definition by name. Used when deleting a definition or
 -- | redefining an extant definition.
 deleteByName :: Name -> Array Definition -> Array Definition
-deleteByName name = filter $ (_ /= name) <<< _.name
+deleteByName name = filter $ (_ /= name) <<< _.name <<< un Definition
 
 -- | Attempt to add a new global definition. If the definition depends
 -- | on undefined names, present an error message.
 addDef :: Definition -> State -> State
-addDef def s = case World.define def.name expr s.world of
+addDef def s = case World.define name nameless s.world of
   Left error -> s
     { alert = pure
       $ Tuple Danger
@@ -250,16 +248,17 @@ addDef def s = case World.define def.name expr s.world of
     }
   Right world -> s
     { text = ""
-    , defs = deleteByName def.name s.defs `snoc` def
+    , defs = deleteByName name s.defs `snoc` def
     , world = world
     , alert = Nothing
     }
  where
-  expr = syntaxToExpr $ defToSyntax def
+  { expr, name } = fromDef def
+  nameless = Nameless.from expr
 
 -- | Attempt to set the main expression. If the expression depends on
 -- | undefined names, present an error message.
-setExpr :: Syntax -> State -> State
+setExpr :: Syntax.Expression -> State -> State
 setExpr syntax s =
   case World.focus expr s.world of
     Left error -> s
@@ -277,12 +276,14 @@ setExpr syntax s =
       , alert = Nothing
       }
  where
-  expr = syntaxToExpr syntax
+  expr = Nameless.from syntax
   globals = defsToGlobals s.defs
 
 -- | Convert `Definition`s to pairs of names and expressions.
-defsToGlobals :: Array Definition -> Array (Tuple Name Expr)
-defsToGlobals = map \def -> Tuple def.name $ syntaxToExpr $ defToSyntax def
+defsToGlobals :: Array Definition -> Array (Tuple Name Nameless.Expression)
+defsToGlobals = map \def ->
+  let {expr, name} = fromDef def
+  in Tuple name $ Nameless.from expr
 
 -- | Do one step of evaluation and update the history.
 step :: Machine -> State -> State
@@ -315,7 +316,7 @@ save {rep, defs, history} =
   saveTextAs text $ FileName "evaluation.txt"
  where
   allDefs = concat
-    [ map defToDoc defs
+    [ map prettyPrint defs
     , [pure ""]
     , reverse history
     ]

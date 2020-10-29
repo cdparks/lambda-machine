@@ -1,7 +1,7 @@
-module Lambda.Language.Expr
-  ( Expr(..)
-  , syntaxToExpr
-  , exprToSyntax
+module Lambda.Language.Nameless
+  ( Expression(..)
+  , from
+  , syntax
   , freeVars
   ) where
 
@@ -12,7 +12,6 @@ import Data.Map as Map
 import Data.Set as Set
 import Lambda.Language.Name (Name, next)
 import Lambda.Language.PrettyPrint (class PrettyPrint, parensIf)
-import Lambda.Language.Syntax (Syntax)
 import Lambda.Language.Syntax as Syntax
 import Partial.Unsafe (unsafePartial)
 
@@ -22,19 +21,19 @@ import Partial.Unsafe (unsafePartial)
 -- | with their source-level name for quoting back to `Syntax` as well
 -- | as the set of free-variables they reference. The latter is used
 -- | to avoid garbage-collecting global definitions.
-data Expr
+data Expression
   = Bound Int
   | Free Name
-  | Lambda Name (Set Name) Expr
-  | Apply Expr Expr
+  | Lambda Name (Set Name) Expression
+  | Apply Expression Expression
 
-derive instance genericExpr :: Generic Expr _
+derive instance genericExpression :: Generic Expression _
 
-instance showExpr :: Show Expr where
+instance showExpression :: Show Expression where
   show x = genericShow x
 
 -- | Alpha-equivalence
-instance eqExpr :: Eq Expr where
+instance eqExpression :: Eq Expression where
   eq lhs rhs = case lhs, rhs of
     Bound i, Bound j -> i == j
     Free n, Free m -> n == m
@@ -42,9 +41,9 @@ instance eqExpr :: Eq Expr where
     Apply f a, Apply g b -> f == g && a == b
     _, _ -> false
 
--- | Convert plain `Syntax` to a locally-nameless `Expr`
-syntaxToExpr :: Syntax -> Expr
-syntaxToExpr = alphaInternal <<< go Map.empty
+-- | Create a locally-nameless `Expression` from an AST
+from :: Syntax.Expression -> Expression
+from = alphaInternal <<< go Map.empty
  where
   go env = case _ of
     Syntax.Var n ->
@@ -62,12 +61,12 @@ syntaxToExpr = alphaInternal <<< go Map.empty
         a = go env a0
       in {expr: Apply f.expr a.expr, fvs: f.fvs <> a.fvs}
 
--- | Alpha-convert an `Expr` such that no names are shadowed.
-alpha :: Expr -> Expr
+-- | Alpha-convert an `Expression` such that no names are shadowed.
+alpha :: Expression -> Expression
 alpha expr = alphaInternal { expr, fvs: freeVars expr }
 
--- | Alpha-conversion when we already have an `Expr`'s free variables.
-alphaInternal :: {expr :: Expr, fvs :: Set Name} -> Expr
+-- | Alpha-conversion when we already have an `Expression`'s free variables.
+alphaInternal :: {expr :: Expression, fvs :: Set Name} -> Expression
 alphaInternal x =
   loop x.fvs x.expr
  where
@@ -88,19 +87,19 @@ fresh env n
   | n `Set.member` env = fresh env (next n)
   | otherwise = {used: Set.insert n env, new: n}
 
--- | Access an `Expr`'s precomputed free variables.
-freeVars :: Expr -> Set Name
+-- | Access an `Expression`'s precomputed free variables.
+freeVars :: Expression -> Set Name
 freeVars = case _ of
   Bound _ -> Set.empty
   Free n -> Set.singleton n
   Lambda _ fvs b -> fvs
   Apply f a -> freeVars f <> freeVars a
 
--- | Quote an `Expr` back to `Syntax`. `Expr`s are alpha-converted,
--- | so the resulting AST will be equivalent, but may have slightly
--- | different names.
-exprToSyntax :: Expr -> Syntax
-exprToSyntax =
+-- | Quote an `Expression` back to `Syntax.Expression`. `Expression`s
+-- | are alpha-converted, so the resulting AST will be equivalent, but
+-- | may have slightly different names.
+syntax :: Expression -> Syntax.Expression
+syntax =
   loop []
  where
   loop env = case _ of
@@ -113,7 +112,7 @@ exprToSyntax =
     Apply f a ->
       Syntax.Apply (loop env f) (loop env a)
 
-instance prettyPrintExpr :: PrettyPrint Expr where
+instance prettyPrintExpression :: PrettyPrint Expression where
   prettyPrint =
     walk false
    where
@@ -131,8 +130,8 @@ instance prettyPrintExpr :: PrettyPrint Expr where
 
 -- PSC can TCO this, but it's a mess to read
 
-syntaxToExpr :: Syntax -> Expr
-syntaxToExpr syn = go Nil $ Down {env: Map.empty, syn}
+to :: Syntax.Expression -> Expression
+to syn = go Nil $ Down {env: Map.empty, syn}
  where
   go stack = case _ of
     Down {env, syn} -> case syn of
@@ -155,10 +154,10 @@ syntaxToExpr syn = go Nil $ Down {env: Map.empty, syn}
 
 data Direction
   = Down { env :: Map Name Int, syn :: Syntax }
-  | Up { fvs :: Set Name, expr :: Expr }
+  | Up { fvs :: Set Name, expr :: Expression }
 
 data Step
   = MkLambda Name
   | GoRight Syntax (Map Name Int)
-  | MkApply Expr (Set Name)
+  | MkApply Expression (Set Name)
 -}

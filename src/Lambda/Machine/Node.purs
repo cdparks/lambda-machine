@@ -14,9 +14,9 @@ import Lambda.Prelude
 
 import Data.Array as Array
 import Data.List as List
-import Lambda.Language.Expr (Expr)
-import Lambda.Language.Expr as Expr
 import Lambda.Language.Name (Name)
+import Lambda.Language.Nameless (Expression)
+import Lambda.Language.Nameless as Nameless
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)
 import Lambda.Machine.Globals as Globals
@@ -30,7 +30,7 @@ import Partial.Unsafe (unsafeCrashWith)
 -- | certain kinds of updates.
 data Node
   = Apply Address Address
-  | Closure (Array Address) (Env Address) Name Expr
+  | Closure (Array Address) (Env Address) Name Expression
   | Global Name Address
   | Stuck Stuck
   | Pointer Address
@@ -72,7 +72,7 @@ define
   :: forall s m
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
   => Name
-  -> Expr
+  -> Expression
   -> m Unit
 define name expr = Globals.add name \_ ->
   Global name <$> compile expr
@@ -81,7 +81,7 @@ define name expr = Globals.add name \_ ->
 compile
   :: forall s m
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
-  => Expr
+  => Expression
   -> m Address
 compile = instantiate Nil
 
@@ -92,19 +92,19 @@ instantiate
   :: forall s m
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
   => Env Address
-  -> Expr
+  -> Expression
   -> m Address
 instantiate env = case _ of
-  Expr.Lambda name fvs body -> do
+  Nameless.Lambda name fvs body -> do
     addrs <- traverse Globals.get $ Array.fromFoldable fvs
     Heap.alloc $ Closure addrs env name body
-  Expr.Apply f0 a0 -> do
+  Nameless.Apply f0 a0 -> do
     a <- instantiate env a0
     f <- instantiate env f0
     Heap.alloc $ Apply f a
-  Expr.Bound i -> do
+  Nameless.Bound i -> do
     pure $ deref i env
-  Expr.Free name -> Globals.get name
+  Nameless.Free name -> Globals.get name
 
 -- | Instantiate an expression in an environment and overwrite the
 -- | given address. Generates fewer pointer chains since we don't
@@ -114,19 +114,19 @@ instantiateAt
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
   => Address
   -> Env Address
-  -> Expr
+  -> Expression
   -> m Unit
 instantiateAt target env = case _ of
-  Expr.Lambda name fvs body -> do
+  Nameless.Lambda name fvs body -> do
     addrs <- traverse Globals.get $ Array.fromFoldable fvs
     Heap.update target $ Closure addrs env name body
-  Expr.Apply f0 a0 -> do
+  Nameless.Apply f0 a0 -> do
     a <- instantiate env a0
     f <- instantiate env f0
     Heap.update target $ Apply f a
-  Expr.Bound i ->
+  Nameless.Bound i ->
     Heap.update target $ Pointer $ deref i env
-  Expr.Free name -> do
+  Nameless.Free name -> do
     addr <- Globals.get name
     Heap.update target $ Global name addr
 

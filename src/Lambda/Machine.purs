@@ -8,11 +8,9 @@ module Lambda.Machine
 
 import Lambda.Prelude
 
-import Lambda.Language.Expr (Expr)
-import Lambda.Language.Expr as Expr
 import Lambda.Language.Name (Name)
+import Lambda.Language.Nameless as Nameless
 import Lambda.Language.PrettyPrint (prettyPrint, sugar)
-import Lambda.Language.Syntax (Syntax)
 import Lambda.Language.Syntax as Syntax
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)
@@ -71,7 +69,10 @@ type Machine =
 -- | Create a new `Machine` given a list of top-level definitions and
 -- | a root expression to start evaluating. Run a garbage collection
 -- | up front to drop globals we won't need.
-new :: forall f. Foldable f => f (Tuple Name Expr) -> Expr -> Machine
+new
+  :: forall f. Foldable f
+  => f (Tuple Name Nameless.Expression)
+  -> Nameless.Expression -> Machine
 new rawGlobals expr =
   { root
   , heap
@@ -235,8 +236,8 @@ fetchArg address = do
       , show node
       ]
 
--- | Fetch the node and convert it to `Syntax`.
-formatNode :: forall s m. MonadState { heap :: Heap Node | s } m => Address -> m Syntax
+-- | Fetch the node and convert it to `Syntax.Expression`.
+formatNode :: forall s m. MonadState { heap :: Heap Node | s } m => Address -> m Syntax.Expression
 formatNode address = do
   node <- Heap.fetch address
   case node of
@@ -248,23 +249,26 @@ formatNode address = do
     Pointer a -> formatNode a
     Global name _ -> pure $ Syntax.Var name
 
--- | Convert an `Expr` in a `Closure` to `Syntax`.
-toSyntax :: List Syntax -> Expr -> Syntax
+-- | Convert a `Nameless.Expression` in a `Closure` to `Syntax.Expression`
+toSyntax
+  :: List Syntax.Expression
+  -> Nameless.Expression
+  -> Syntax.Expression
 toSyntax env = case _ of
-  Expr.Lambda n _ e -> Syntax.Lambda n $ toSyntax (Syntax.Var n : env) e
-  Expr.Apply f a -> Syntax.Apply (toSyntax env f) (toSyntax env a)
-  Expr.Bound i -> Node.deref i env
-  Expr.Free n -> Syntax.Var n
+  Nameless.Lambda n _ e -> Syntax.Lambda n $ toSyntax (Syntax.Var n : env) e
+  Nameless.Apply f a -> Syntax.Apply (toSyntax env f) (toSyntax env a)
+  Nameless.Bound i -> Node.deref i env
+  Nameless.Free n -> Syntax.Var n
 
 -- | Format a `Stuck` node.
-formatStuck :: forall s m. MonadState { heap :: Heap Node | s } m => Stuck -> m Syntax
+formatStuck :: forall s m. MonadState { heap :: Heap Node | s } m => Stuck -> m Syntax.Expression
 formatStuck = case _ of
   StuckVar name -> pure $ Syntax.Var name
   StuckLambda name e  -> Syntax.Lambda name <$> formatNode e
   StuckApply f a -> Syntax.Apply <$> formatNode f <*> formatNode a
 
--- | Pretty-print `Syntax`
-formatSyntax :: Syntax -> String
+-- | Pretty-print `Syntax.Expression`
+formatSyntax :: Syntax.Expression -> String
 formatSyntax = sugar <<< prettyPrint
 
 -- | Convert a `Trace` to a human-readable explanation.
@@ -334,7 +338,7 @@ formatTrace = map fold <<< case _ of
 
 -- | Take a snapshot of a `Machine` by formatting the `root` node and
 -- | producing a human-readable trace.
-snapshot :: Machine -> { root :: Syntax, trace :: String }
+snapshot :: Machine -> { root :: Syntax.Expression, trace :: String }
 snapshot = evalState do
   root <- formatNode =<< gets _.root
   trace <- formatTrace =<< gets _.trace

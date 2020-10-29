@@ -5,18 +5,20 @@ module Lambda.MachineSpec
 import Test.Prelude
 
 import Data.Function (applyN)
+import Lambda.Language.Nameless as Nameless
+import Lambda.Language.Syntax as Syntax
 import Lambda.Machine as Machine
 
 spec :: Spec Unit
 spec = describe "Lambda.Machine" do
   describe "Lambda.Machine.step" do
     it "is stack-safe with programs that loop" do
-      let result = stepN 100_000 [mkBind "f x = x x"] $ mkExpr "f f"
-      result `shouldEqual` mkSyn "f f"
+      let result = stepN 100_000 [mkBind "f x = x x"] $ mkAnon "f f"
+      result `shouldEqual` mkAst "f f"
 
     it "evaluates addition of church numerals" do
-      let result = normalize [mkBind "add m n s z = m s (n s z)"] $ mkExpr "add 2 3"
-      result `shouldEqual` mkSyn "5"
+      let result = normalize [mkBind "add m n s z = m s (n s z)"] $ mkAnon "add 2 3"
+      result `shouldEqual` mkAst "5"
 
     it "lazily consumes an infinite list" do
       let
@@ -29,11 +31,15 @@ spec = describe "Lambda.Machine" do
           , mkBind "cons x xs c n = c x (xs c n)"
           , mkBind "repeat x = fix (λnext. cons x next)"
           ]
-        result = normalize globals $ mkExpr "any (repeat true)"
-      result `shouldEqual` mkSyn "λt. λ_. t"
+        result = normalize globals $ mkAnon "any (repeat true)"
+      result `shouldEqual` mkAst "λt. λ_. t"
 
 -- | Create a new `Machine` and step it N times.
-stepN :: Int -> Array (Tuple Name Expr) -> Expr -> Syntax
+stepN
+  :: Int
+  -> Array (Tuple Name Nameless.Expression)
+  -> Nameless.Expression
+  -> Syntax.Expression
 stepN n globals =
   _.root
   <<< Machine.snapshot
@@ -41,7 +47,10 @@ stepN n globals =
   <<< Machine.new globals
 
 -- | Create a new `Machine` and step it until it halts.
-normalize :: Array (Tuple Name Expr) -> Expr -> Syntax
+normalize
+  :: Array (Tuple Name Nameless.Expression)
+  -> Nameless.Expression
+  -> Syntax.Expression
 normalize globals =
   loop <<< Machine.new globals
  where

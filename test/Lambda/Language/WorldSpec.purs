@@ -57,13 +57,13 @@ spec = describe "Lambda.Language.World" do
     it "disallows root expressions that depend on non-extant names" do
       let
         world = World.new []
-        result = World.focus (mkExpr "y") world
+        result = World.focus (mkAnon "y") world
       result `shouldEqual` Left (Undefined $ Set.singleton y)
 
     it "allows root expressions that depend on extant names" do
       let
         world = World.new [mkBind "y = λa. a"]
-        result = World.focus (mkExpr "y") world
+        result = World.focus (mkAnon "y") world
       result `shouldEqual` Right
         { nameToDeps: Map.fromFoldable
           [ Tuple y $ Set.fromFoldable [Root]
@@ -77,7 +77,7 @@ spec = describe "Lambda.Language.World" do
   describe "World.unfocus" do
     it "removes root as a dependency" do
       let
-        world = World.focus (mkExpr "y") $ World.new [mkBind "y = λa. a"]
+        world = World.focus (mkAnon "y") $ World.new [mkBind "y = λa. a"]
         result = World.unfocus <$> world
       result `shouldEqual` Right
         { nameToDeps: Map.fromFoldable

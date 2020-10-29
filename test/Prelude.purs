@@ -1,6 +1,6 @@
 module Test.Prelude
-  ( mkSyn
-  , mkExpr
+  ( mkAst
+  , mkAnon
   , mkDef
   , mkBind
   , module Lambda.Prelude
@@ -10,33 +10,33 @@ module Test.Prelude
 import Lambda.Prelude
 
 -- Re-exports
-import Lambda.Language.Expr (Expr, syntaxToExpr) as X
 import Lambda.Language.Name (Name, name, name_) as X
-import Lambda.Language.Syntax (Definition, Syntax, defToSyntax) as X
+import Lambda.Language.Syntax (Statement, Definition) as X
 import Test.QuickCheck (class Arbitrary, (===)) as X
 import Test.QuickCheck.Gen (chooseInt) as X
 import Test.Spec (Spec, describe, it, itOnly, pending, pending') as X
 import Test.Spec.Assertions (shouldEqual) as X
 import Test.Spec.QuickCheck (quickCheck) as X
 
-import Lambda.Language.Expr (Expr, syntaxToExpr)
+-- Imports for test helpers below
 import Lambda.Language.Name (Name)
-import Lambda.Language.Parse (parseDefinition, parseSyntax, unsafeParse)
-import Lambda.Language.Syntax (Definition, Syntax, defToSyntax)
+import Lambda.Language.Nameless as Nameless
+import Lambda.Language.Parse (parseDefinition, parseExpression, unsafeParse)
+import Lambda.Language.Syntax as Syntax
 
 -- Crashy test helpers for constructing terms
 
-mkSyn :: String -> Syntax
-mkSyn = unsafeParse parseSyntax
+mkAst :: String -> Syntax.Expression
+mkAst = unsafeParse parseExpression
 
-mkExpr :: String -> Expr
-mkExpr = syntaxToExpr <<< mkSyn
+mkAnon :: String -> Nameless.Expression
+mkAnon = Nameless.from <<< mkAst
 
-mkDef :: String -> Definition
+mkDef :: String -> Syntax.Definition
 mkDef = unsafeParse parseDefinition
 
-mkBind :: String -> Tuple Name Expr
-mkBind text = Tuple def.name expr
+mkBind :: String -> Tuple Name Nameless.Expression
+mkBind text = Tuple name nameless
  where
-  def = mkDef text
-  expr = syntaxToExpr $ defToSyntax def
+  {name, expr} = Syntax.fromDef $ mkDef text
+  nameless = Nameless.from expr

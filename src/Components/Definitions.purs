@@ -5,8 +5,8 @@ module Components.Definitions
 import Lambda.Prelude
 
 import Lambda.Language.Name (Name)
-import Lambda.Language.PrettyPrint (Rep, selectRep)
-import Lambda.Language.Syntax (Definition, defToDoc)
+import Lambda.Language.PrettyPrint (Rep, selectRep, prettyPrint)
+import Lambda.Language.Syntax (Definition(..))
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)
@@ -24,15 +24,15 @@ component {defs, rep, onDelete} =
     , children: map renderDef defs
     }
  where
-  renderDef def =
+  renderDef def@(Definition { name }) =
     R.li
       { className: "definition"
       , children:
         [ R.span
           { className: "cursor-pointer glyphicon glyphicon-remove"
-          , onClick: handler_ $ onDelete def.name
+          , onClick: handler_ $ onDelete name
           , children: []
           }
-        , R.text $ " " <> selectRep (defToDoc def) rep
+        , R.text $ " " <> selectRep (prettyPrint def) rep
         ]
       }

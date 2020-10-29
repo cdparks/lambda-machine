@@ -1,8 +1,8 @@
 module Lambda.Language.Parse
   ( parseAll
+  , parseStatement
   , parseDefinition
-  , parseSyntax
-  , parseEither
+  , parseExpression
   , unsafeParse
   , formatParseError
   , module X
@@ -16,10 +16,10 @@ import Data.Int (fromString)
 import Data.Maybe (fromJust)
 import Data.String.CodeUnits (fromCharArray)
 import Lambda.Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
-import Lambda.Language.Syntax (Definition, Syntax(..))
+import Lambda.Language.Syntax (Statement(..), Definition(..), Expression(..))
 import Partial.Unsafe (unsafeCrashWith, unsafePartial)
-import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
 import Text.Parsing.Parser (ParseError) as X
+import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
 import Text.Parsing.Parser.Combinators (between, sepBy, try)
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
@@ -59,8 +59,8 @@ positionColumn :: Position -> Int
 positionColumn (Position {column}) = column
 
 -- | Parse a `Definition` or an expression
-parseEither :: Parser String (Either Definition Syntax)
-parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
+parseStatement :: Parser String Statement
+parseStatement = try (Define <$> parseDefinition) <|> (Eval <$> parseExpression)
 
 -- | Parse a `Definition`
 -- |
@@ -70,10 +70,11 @@ parseEither = try (Left <$> parseDefinition) <|> (Right <$> parseSyntax)
 -- | ```
 -- |
 parseDefinition :: Parser String Definition
-parseDefinition = {name:_, args:_, syntax:_}
+parseDefinition = map Definition
+  $ {name:_, args:_, expr:_}
   <$> parseName
   <*> Array.many parseName
-  <*> (token (string "=") *> parseSyntax)
+  <*> (token (string "=") *> parseExpression)
 
 -- | Parse an expression
 -- |
@@ -96,8 +97,8 @@ parseDefinition = {name:_, args:_, syntax:_}
 -- |   ;
 -- | ```
 -- |
-parseSyntax :: Parser String Syntax
-parseSyntax =
+parseExpression :: Parser String Expression
+parseExpression =
   fix parseApply
  where
   parseApply p = do
@@ -107,10 +108,10 @@ parseSyntax =
       [] -> pure first
       _  -> pure (foldl Apply first rest)
    where
-    parseAtom :: Parser String Syntax
+    parseAtom :: Parser String Expression
     parseAtom = parseLambda <|> parseNat <|> parseList p <|> parens p <|> parseVar
 
-    parseLambda :: Parser String Syntax
+    parseLambda :: Parser String Expression
     parseLambda = do
       void $ token $ string "\\" <|> string "λ"
       names <- Array.some parseName
@@ -131,7 +132,7 @@ brackets :: forall a. Parser String a -> Parser String a
 brackets = balance '[' ']'
 
 -- | Convert comma-delimited list to Church-encoded list.
-toList :: List Syntax -> Syntax
+toList :: List Expression -> Expression
 toList xs =
   Lambda cons (Lambda nil (loop xs))
  where
@@ -141,7 +142,7 @@ toList xs =
   loop (Cons y ys) = Apply (Apply (Var cons) y) (loop ys)
 
 -- | Convert a natural number to a Church numeral
-toChurch :: Int -> Syntax
+toChurch :: Int -> Expression
 toChurch n =
   Lambda s (Lambda z (loop n))
  where
@@ -152,18 +153,18 @@ toChurch n =
     | otherwise = Apply (Var s) (loop (k - 1))
 
 -- | Parse a natural number.
-parseNat :: Parser String Syntax
+parseNat :: Parser String Expression
 parseNat = token do
   digits <- Array.some $ satisfy isDigit
   let n = unsafePartial $ fromJust $ fromString $ fromCharArray digits
   pure $ toChurch n
 
 -- | Parse a comma-separated list between brackets.
-parseList :: Parser String Syntax -> Parser String Syntax
+parseList :: Parser String Expression -> Parser String Expression
 parseList p = toList <$> brackets (p `sepBy` token (char ','))
 
 -- | Parse a variable.
-parseVar :: Parser String Syntax
+parseVar :: Parser String Expression
 parseVar = Var <$> parseName
 
 -- | Parse a `Name`. This is one of the more complicated parsers,

@@ -1,19 +1,19 @@
-module Lambda.Language.ExprSpec
+module Lambda.Language.NamelessSpec
   ( spec
   ) where
 
 import Test.Prelude
 
 import Data.Set as Set
-import Lambda.Language.Expr (Expr(..))
+import Lambda.Language.Nameless (Expression(..))
+import Lambda.Language.Nameless as Nameless
 
 spec :: Spec Unit
-spec = describe "Lambda.Language.Expr" do
-  describe "syntaxToExpr" do
+spec = describe "Lambda.Language.Nameless" do
+  describe "Nameless.to" do
     it "converts an AST to locally-nameless Expr" do
       let
-        ast = mkSyn "λx y. f y x"
-        expr = syntaxToExpr ast
+        expr = Nameless.from $ mkAst "λx y. f y x"
         expected = Lambda x (Set.singleton f)
           $ Lambda y (Set.singleton f)
           $ Apply (Apply (Free f) (Bound 0))
@@ -22,8 +22,7 @@ spec = describe "Lambda.Language.Expr" do
 
     it "renames names that would otherwise shadow" do
       let
-        ast = mkSyn "λx x. x"
-        expr = syntaxToExpr ast
+        expr = Nameless.from $ mkAst "λx x. x"
         expected = Lambda x Set.empty
           $ Lambda (name "x" $ pure 0) Set.empty
           $ Bound 0
