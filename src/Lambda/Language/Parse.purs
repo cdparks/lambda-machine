@@ -88,6 +88,7 @@ parseDefinition = map Definition
 -- |   | {digit}                                  (* Natural number *)
 -- |   | "[", [expressions], "]"                  (* List *)
 -- |   ;
+-- |
 -- | expressions
 -- |   = expression, [",", expressions] ;         (* One or more comma-separated expressions *)
 -- |
@@ -98,26 +99,21 @@ parseDefinition = map Definition
 -- | ```
 -- |
 parseExpression :: Parser String Expression
-parseExpression =
-  fix parseApply
- where
-  parseApply p = do
-    first <- parseAtom
-    rest <- Array.many parseAtom
-    case rest of
-      [] -> pure first
-      _  -> pure (foldl Apply first rest)
-   where
-    parseAtom :: Parser String Expression
-    parseAtom = parseLambda <|> parseNat <|> parseList p <|> parens p <|> parseVar
+parseExpression = fix \parseExpr -> foldl Apply
+  <$> parseAtom parseExpr
+  <*> Array.many (parseAtom parseExpr)
 
-    parseLambda :: Parser String Expression
-    parseLambda = do
-      void $ token $ string "\\" <|> string "λ"
-      names <- Array.some parseName
-      void $ token $ string "."
-      body <- p
-      pure $ foldr Lambda body names
+parseAtom :: Parser String Expression -> Parser String Expression
+parseAtom parseExpr =
+  parseLambda <|> parseNat <|> parseList parseExpr <|> parens parseExpr <|> parseVar
+ where
+  parseLambda :: Parser String Expression
+  parseLambda = do
+    void $ token $ string "\\" <|> string "λ"
+    names <- Array.some parseName
+    void $ token $ string "."
+    body <- parseExpr
+    pure $ foldr Lambda body names
 
 -- | Apply a parser between two grouping characters.
 balance :: forall a. Char -> Char -> Parser String a -> Parser String a
