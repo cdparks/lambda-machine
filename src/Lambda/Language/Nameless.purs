@@ -92,7 +92,7 @@ freeVars :: Expression -> Set Name
 freeVars = case _ of
   Bound _ -> Set.empty
   Free n -> Set.singleton n
-  Lambda _ fvs b -> fvs
+  Lambda _ fvs _ -> fvs
   Apply f a -> freeVars f <> freeVars a
 
 -- | Quote an `Expression` back to `Syntax.Expression`. `Expression`s
@@ -125,39 +125,3 @@ instance prettyPrintExpression :: PrettyPrint Expression where
         parensIf inApp $ pure "λ. " <> walk false b
       Apply f a ->
         walk true f <> pure " " <> walk true a
-
-{-
-
--- PSC can TCO this, but it's a mess to read
-
-to :: Syntax.Expression -> Expression
-to syn = go Nil $ Down {env: Map.empty, syn}
- where
-  go stack = case _ of
-    Down {env, syn} -> case syn of
-      Syntax.Var n ->
-        case Map.lookup n env of
-          Nothing -> go stack $ Up {fvs: Set.singleton n, expr:  Free n}
-          Just i -> go stack $ Up {fvs: Set.empty, expr: Bound i}
-      Syntax.Lambda n b ->
-        let shifted = Map.insert n 0 $ (_ + 1) <$> env
-        in go (MkLambda n : stack) $ Down {env: shifted, syn: b}
-      Syntax.Apply f a ->
-        go (GoRight a env : stack) $ Down {env, syn: f}
-
-    Up {fvs, expr} -> case stack of
-      Nil -> expr
-      Cons x xs -> case x of
-        MkLambda n -> go xs $ Up {fvs, expr: Lambda n fvs expr}
-        GoRight syn env -> go (MkApply expr fvs : xs) $ Down {env, syn}
-        MkApply f ffvs -> go xs $ Up {fvs: fvs <> ffvs, expr: Apply f expr}
-
-data Direction
-  = Down { env :: Map Name Int, syn :: Syntax }
-  | Up { fvs :: Set Name, expr :: Expression }
-
-data Step
-  = MkLambda Name
-  | GoRight Syntax (Map Name Int)
-  | MkApply Expression (Set Name)
--}
