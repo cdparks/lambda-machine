@@ -1,6 +1,7 @@
 module Lambda.Machine.Node
   ( Node(..)
   , Stuck(..)
+  , Closure
   , Env
   , deref
   , define
@@ -24,16 +25,23 @@ import Lambda.Machine.Heap (Heap)
 import Lambda.Machine.Heap as Heap
 import Partial.Unsafe (unsafeCrashWith)
 
--- | Nodes in the graph.  Closures contain references to the global
+-- | Nodes in the graph. Closures contain references to the global
 -- | addresses they use as well as their local environment. `Stuck`
 -- | nodes cannot be evaluated any further. Pointers are used in
--- | certain kinds of updates.
+-- | updates.
 data Node
   = Apply Address Address
-  | Closure (Array Address) (Env Address) Name Expression
+  | Closure Closure
   | Global Name Address
   | Stuck Stuck
   | Pointer Address
+
+type Closure =
+  { fvs :: Array Address
+  , env :: Env Address
+  , name :: Name
+  , body :: Expression
+  }
 
 derive instance genericNode :: Generic Node _
 
@@ -95,14 +103,14 @@ instantiate
   -> Expression
   -> m Address
 instantiate env = case _ of
-  Nameless.Lambda name fvs body -> do
-    addrs <- traverse Globals.get $ Array.fromFoldable fvs
-    Heap.alloc $ Closure addrs env name body
+  Nameless.Lambda name fvs0 body -> do
+    fvs <- traverse Globals.get $ Array.fromFoldable fvs0
+    Heap.alloc $ Closure { fvs, env, name, body }
   Nameless.Apply f0 a0 -> do
     a <- instantiate env a0
     f <- instantiate env f0
     Heap.alloc $ Apply f a
-  Nameless.Bound i -> do
+  Nameless.Bound i ->
     pure $ deref i env
   Nameless.Free name -> Globals.get name
 
@@ -117,9 +125,9 @@ instantiateAt
   -> Expression
   -> m Unit
 instantiateAt target env = case _ of
-  Nameless.Lambda name fvs body -> do
-    addrs <- traverse Globals.get $ Array.fromFoldable fvs
-    Heap.update target $ Closure addrs env name body
+  Nameless.Lambda name fvs0 body -> do
+    fvs <- traverse Globals.get $ Array.fromFoldable fvs0
+    Heap.update target $ Closure {fvs, env, name, body}
   Nameless.Apply f0 a0 -> do
     a <- instantiate env a0
     f <- instantiate env f0
@@ -135,7 +143,7 @@ instantiateAt target env = case _ of
 children :: Node -> Array Address
 children = case _ of
   Apply lhs rhs -> [lhs, rhs]
-  Closure fvs env _ _ -> fvs <> Array.fromFoldable env
+  Closure {fvs, env} -> fvs <> Array.fromFoldable env
   Global _ addr -> [addr]
   Stuck (StuckVar _) -> []
   Stuck (StuckLambda _ addr) -> [addr]

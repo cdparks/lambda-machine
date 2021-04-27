@@ -192,16 +192,16 @@ eval top = case _ of
   -- Otherwise, allocate a stuck value and instantiate the body with
   -- that in the environment instead. Finally allocate a stuck lambda
   -- and update the top of the stack to point at it.
-  Closure _ env name e ->
+  Closure {env, name, body} ->
     Stack.peek 1 >>= case _ of
       Just app -> do
         arg <- fetchArg app
-        Node.instantiateAt app (Cons arg env) e
+        Node.instantiateAt app (Cons arg env) body
         Stack.discard
         emit $ Substituted name arg
       Nothing -> do
         arg <- Heap.alloc $ Stuck $ StuckVar name
-        node <- Node.instantiate (Cons arg env) e
+        node <- Node.instantiate (Cons arg env) body
         Heap.update top $ Stuck $ StuckLambda name node
         Stack.replace node
         emit $ WentUnder top
@@ -242,9 +242,9 @@ formatNode address = do
   node <- Heap.fetch address
   case node of
     Apply f a -> Syntax.Apply <$> formatNode f <*> formatNode a
-    Closure _ env0 name e -> do
-      env <- traverse formatNode env0
-      pure $ Syntax.Lambda name $ toSyntax (Syntax.Var name : env) e
+    Closure {env, name, body} -> do
+      formatted <- traverse formatNode env
+      pure $ Syntax.Lambda name $ toSyntax (Syntax.Var name : formatted) body
     Stuck term -> formatStuck term
     Pointer a -> formatNode a
     Global name _ -> pure $ Syntax.Var name
