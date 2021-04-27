@@ -126,7 +126,10 @@ add dep expr world = do
     newWorld = remove dep world
     fvs = freeVars expr
     missing = fvs `Set.difference` globals newWorld
-  if Set.size missing == 0
+    isClosed = case dep of
+      Global name -> Set.size missing == 0 || missing == Set.singleton name
+      Root -> Set.size missing == 0
+  if isClosed
     then pure $ combine newWorld $ fromFreeVars dep fvs
     else Left $ Undefined missing
 
