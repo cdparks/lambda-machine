@@ -2,6 +2,7 @@ module Lambda.Language.PrettyPrint
   ( Rep(..)
   , ifSugar
   , selectRep
+  , withRep
   , toggleRep
   , Doc
   , doc
@@ -22,6 +23,10 @@ data Rep
 -- | Project the appropriate `Doc` representation.
 selectRep :: forall a. Doc a -> Rep -> a
 selectRep (Doc s r) = ifSugar s r
+
+-- | Flipped version of 'selectRep'
+withRep :: forall a. Rep -> Doc a -> a
+withRep = flip selectRep
 
 -- | Flip `Raw` to `Sugar` and vice-versa.
 toggleRep :: Rep -> Rep
