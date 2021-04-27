@@ -14,13 +14,14 @@ import Components.Footer as Footer
 import Components.Help as Help
 import Components.Input as Input
 import Components.ParseError as ParseError
-import Data.Array (concat, cons, filter, reverse, snoc)
+import Data.Array as Array
 import Data.Foldable (intercalate)
+import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Language.Parse (parseAll, parseDefinition, parseStatement, unsafeParse)
-import Lambda.Language.PrettyPrint (Rep(..), Doc, prettyPrint, selectRep, toggleRep)
+import Lambda.Language.PrettyPrint (Rep(..), Doc, prettyPrint, withRep, toggleRep)
 import Lambda.Language.Syntax (Statement(..), Definition(..), fromDef)
 import Lambda.Language.Syntax as Syntax
 import Lambda.Language.World (World)
@@ -40,7 +41,7 @@ type State =
   , defs :: Array Definition
   , world :: World
   , machine :: Maybe Machine
-  , history :: Array (Doc String)
+  , history :: List (Doc String)
   , rep :: Rep
   , alert :: Maybe (Tuple Level JSX)
   }
@@ -122,19 +123,24 @@ prelude =
   unsafeParse parseDefinition <$>
     [ "identity x = x"
     , "const x y = x"
-    , "fix f = (λx. f (x x)) (λy. f (y y))"
+    , "fix f = f (fix f)"
     , "true t f = t"
     , "false t f = f"
     , "and x y = x y false"
     , "or x y = x true y"
+    , "not x = x false true"
     , "succ n s z = s (n s z)"
     , "pred n f x = n (λg. λh. h (g f)) (λu. x) (λu. u)"
     , "add m n s z = m s (n s z)"
     , "mul m n s z = m (n s) z"
-    , "is-zero? n = n (λx. false) true"
+    , "zero? n = n (λx. false) true"
     , "foldr f z l = l f z"
     , "any = foldr or false"
     , "all = foldr and true"
+    , "cons x xs f z = f x (xs f z)"
+    , "nil f z = z"
+    , "iterate f x = cons x (iterate f (f x))"
+    , "repeat x = cons x (repeat x)"
     ]
 
 -- | Set of user-driven events
@@ -157,7 +163,7 @@ initialState =
   , defs: prelude
   , world: World.new $ defsToGlobals prelude
   , machine: Nothing
-  , history: []
+  , history: Nil
   , rep: Raw
   , alert: Nothing
   }
@@ -233,7 +239,7 @@ deleteDef name s = case World.undefine name s.world of
 -- | Remove a definition by name. Used when deleting a definition or
 -- | redefining an extant definition.
 deleteByName :: Name -> Array Definition -> Array Definition
-deleteByName name = filter $ (_ /= name) <<< _.name <<< un Definition
+deleteByName name = Array.filter $ (_ /= name) <<< _.name <<< un Definition
 
 -- | Attempt to add a new global definition. If the definition depends
 -- | on undefined names, present an error message.
@@ -248,7 +254,7 @@ addDef def s = case World.define name nameless s.world of
     }
   Right world -> s
     { text = ""
-    , defs = deleteByName name s.defs `snoc` def
+    , defs = deleteByName name s.defs `Array.snoc` def
     , world = world
     , alert = Nothing
     }
@@ -296,14 +302,14 @@ step m0 s =  s
   { root } = Machine.snapshot m
   history
     | Machine.halted m = s.history
-    | otherwise = prettyPrint root `cons` s.history
+    | otherwise = prettyPrint root : s.history
 
 -- | Unload the `Machine` and unset the main expression
 clear :: State -> State
 clear s = s
   { world = World.unfocus s.world
   , machine = Nothing
-  , history = []
+  , history = Nil
   }
 
 -- | Toggle syntactic sugar for Church numerals and lists.
@@ -315,12 +321,12 @@ save :: State -> Effect Unit
 save {rep, defs, history} =
   saveTextAs text $ FileName "evaluation.txt"
  where
-  allDefs = concat
+  allDefs = Array.concat
     [ map prettyPrint defs
     , [pure ""]
-    , reverse history
+    , Array.fromFoldable $ List.reverse history
     ]
-  text = intercalate "\n" $ flip selectRep rep <$> allDefs
+  text = intercalate "\n" $ withRep rep <$> allDefs
 
 -- | Create an alert element with the specified message.
 alert :: Level -> String -> Tuple Level JSX
