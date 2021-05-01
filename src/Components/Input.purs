@@ -30,6 +30,10 @@ component {text, onChange, onSubmit, onHelp} =
           }
         , R.input
           { className: "form-control monospace-font"
+          , autoComplete: "off"
+          , autoCorrect: "off"
+          , autoCapitalize: "off"
+          , spellCheck: false
           , placeholder: "expression or definition"
           , onChange: handler targetValue $ traverse_ onChange
           , value: text
