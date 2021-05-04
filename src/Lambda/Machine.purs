@@ -10,7 +10,6 @@ import Lambda.Prelude
 
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless as Nameless
-import Lambda.Language.PrettyPrint (prettyPrint, sugar)
 import Lambda.Language.Syntax as Syntax
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)

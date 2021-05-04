@@ -18,10 +18,10 @@ import Data.Array as Array
 import Data.Foldable (intercalate)
 import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
+import Lambda.Language.Display (Rep(..), toggle, pretty)
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Language.Parse (parseAll, parseDefinition, parseStatement, unsafeParse)
-import Lambda.Language.PrettyPrint (Rep(..), Doc, prettyPrint, withRep, toggleRep)
 import Lambda.Language.Syntax (Statement(..), Definition(..), fromDef)
 import Lambda.Language.Syntax as Syntax
 import Lambda.Language.World (World)
@@ -41,7 +41,7 @@ type State =
   , defs :: Array Definition
   , world :: World
   , machine :: Maybe Machine
-  , history :: List (Doc String)
+  , history :: List Syntax.Expression
   , rep :: Rep
   , alert :: Maybe (Tuple Level JSX)
   }
@@ -274,13 +274,17 @@ setExpr syntax s =
           { error
           }
       }
-    Right world -> s
-      { text = ""
-      , world = world
-      , machine = pure $ Machine.new globals expr
-      , history = pure $ prettyPrint syntax
-      , alert = Nothing
-      }
+    Right world ->
+      let
+        machine = Machine.new globals expr
+        snapshot = Machine.snapshot machine
+      in s
+        { text = ""
+        , world = world
+        , machine = pure machine
+        , history = pure snapshot
+        , alert = Nothing
+        }
  where
   expr = Nameless.from syntax
   globals = defsToGlobals s.defs
@@ -299,10 +303,8 @@ step m0 s =  s
   }
  where
   m = Machine.step m0
-  { root } = Machine.snapshot m
-  history
-    | Machine.halted m = s.history
-    | otherwise = prettyPrint root : s.history
+  snapshot = Machine.snapshot m
+  history = snapshot : s.history
 
 -- | Unload the `Machine` and unset the main expression
 clear :: State -> State
@@ -314,19 +316,18 @@ clear s = s
 
 -- | Toggle syntactic sugar for Church numerals and lists.
 toggleSugar :: State -> State
-toggleSugar s = s {rep = toggleRep s.rep}
+toggleSugar s = s {rep = toggle s.rep}
 
 -- | Download the state as a text file.
 save :: State -> Effect Unit
 save {rep, defs, history} =
   saveTextAs text $ FileName "evaluation.txt"
  where
-  allDefs = Array.concat
-    [ map prettyPrint defs
-    , [pure ""]
-    , Array.fromFoldable $ List.reverse history
+  text = intercalate "\n" $ fold
+    [ pretty rep <$> defs
+    , pure ""
+    , pretty rep <$> Array.fromFoldable (List.reverse history)
     ]
-  text = intercalate "\n" $ withRep rep <$> allDefs
 
 -- | Create an alert element with the specified message.
 alert :: Level -> String -> Tuple Level JSX

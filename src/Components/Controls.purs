@@ -4,7 +4,7 @@ module Components.Controls
 
 import Lambda.Prelude
 
-import Lambda.Language.PrettyPrint (Rep, ifSugar)
+import Lambda.Language.Display (Rep, select)
 import Lambda.Machine (Machine)
 import React.Basic (JSX)
 import React.Basic.DOM as R
@@ -40,9 +40,15 @@ component {machine, onStep, onClear, onSave, onSugar, rep} =
         , label: "Save"
         }
       , button (pure unit)
-        { className: "btn " <> ifSugar "btn-danger" "btn-success" rep
+        { className: select rep
+          { sugar: "btn btn-danger"
+          , raw: "btn btn-success"
+          }
         , onClick: const onSugar
-        , label: ifSugar "Raw" "Sugar" rep
+        , label: select rep
+            { sugar: "Raw"
+            , raw: "Sugar"
+            }
         }
       ]
     }

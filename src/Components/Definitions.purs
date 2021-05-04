@@ -5,7 +5,7 @@ module Components.Definitions
 import Lambda.Prelude
 
 import Lambda.Language.Name (Name)
-import Lambda.Language.PrettyPrint (Rep, selectRep, prettyPrint)
+import Lambda.Language.Display (pretty, Rep)
 import Lambda.Language.Syntax (Definition(..))
 import React.Basic (JSX)
 import React.Basic.DOM as R
@@ -33,6 +33,7 @@ component {defs, rep, onDelete} =
           , onClick: handler_ $ onDelete name
           , children: []
           }
-        , R.text $ " " <> selectRep (prettyPrint def) rep
+        , R.text " "
+        , pretty rep def
         ]
       }

@@ -51,3 +51,19 @@ li.expression:first-child {
   font-style: italic;
   padding-left: 30px;
 }
+
+
+.highlight-function {
+  text-decoration: underline 2px blue;
+  -webkit-text-decoration: underline 2px blue;
+}
+
+.highlight-argument {
+  text-decoration: underline 2px red;
+  -webkit-text-decoration: underline 2px red;
+}
+
+.highlight-global {
+  text-decoration: underline 2px lightgreen;
+  -webkit-text-decoration: underline 2px lightgreen;
+}

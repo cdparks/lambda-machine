@@ -14,7 +14,6 @@ import Data.Array (unsafeIndex)
 import Data.Char (toCharCode)
 import Data.Set as Set
 import Data.String.CodeUnits (fromCharArray, toCharArray)
-import Lambda.Language.PrettyPrint (class PrettyPrint)
 import Partial.Unsafe (unsafePartial)
 
 -- | Source-level name with an optional subscript.
@@ -36,9 +35,6 @@ derive instance genericName :: Generic Name _
 
 instance showName :: Show Name where
   show (Name n ms) = n <> maybe "" intToSubscript ms
-
-instance prettyPrintName :: PrettyPrint Name where
-  prettyPrint = pure <<< show
 
 instance eqName :: Eq Name where
   eq = genericEq

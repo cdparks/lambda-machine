@@ -11,7 +11,7 @@ import Data.Array (cons, unsafeIndex)
 import Data.Map as Map
 import Data.Set as Set
 import Lambda.Language.Name (Name, next)
-import Lambda.Language.PrettyPrint (class PrettyPrint, parensIf)
+import Lambda.Language.Display (class Pretty, text, parensIf)
 import Lambda.Language.Syntax as Syntax
 import Partial.Unsafe (unsafePartial)
 
@@ -60,6 +60,7 @@ from = alphaInternal <<< go Map.empty
         f = go env f0
         a = go env a0
       in {expr: Apply f.expr a.expr, fvs: f.fvs <> a.fvs}
+    Syntax.Highlight x -> go env x
 
 -- | Alpha-convert an `Expression` such that no names are shadowed.
 alpha :: Expression -> Expression
@@ -112,16 +113,16 @@ syntax =
     Apply f a ->
       Syntax.Apply (loop env f) (loop env a)
 
-instance prettyPrintExpression :: PrettyPrint Expression where
-  prettyPrint =
+instance prettyExpression :: Pretty Expression where
+  pretty rep =
     walk false
    where
     walk inApp = case _ of
       Bound i ->
-        pure $ show i
+        text $ show i
       Free n ->
-        pure $ show n
+        text $ show n
       Lambda _ _ b ->
-        parensIf inApp $ pure "λ. " <> walk false b
+        parensIf inApp $ text "λ. " <> walk false b
       Apply f a ->
-        walk true f <> pure " " <> walk true a
+        walk true f <> text " " <> walk true a

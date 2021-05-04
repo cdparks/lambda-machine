@@ -3,13 +3,14 @@ module Lambda.Language.Syntax
   , Definition(..)
   , Expression(..)
   , fromDef
+  , unHighlight
   ) where
 
 import Lambda.Prelude
 
-import Data.List (intercalate)
+import Data.Foldable (intercalate)
+import Lambda.Language.Display(Rep(..), class Display, text, style, class Pretty, pretty, parensIf)
 import Lambda.Language.Name (Name)
-import Lambda.Language.PrettyPrint (class PrettyPrint, doc, parensIf, prettyPrint, sugar, raw)
 
 -- | A `Statement` is either a top-level `Definition` or an
 -- | `Expression` to be evaluated
@@ -26,10 +27,10 @@ instance showStatement :: Show Statement where
 instance eqStatement :: Eq Statement where
   eq x = genericEq x
 
-instance prettyPrintStatement :: PrettyPrint Statement where
-  prettyPrint = case _ of
-    Define def -> prettyPrint def
-    Eval expr -> prettyPrint expr
+instance prettyStatement :: Pretty Statement where
+  pretty rep = case _ of
+    Define def -> pretty rep def
+    Eval expr -> pretty rep expr
 
 -- | A top-level definition
 newtype Definition = Definition
@@ -44,27 +45,38 @@ derive newtype instance showDefinition :: Show Definition
 -- | Warning - not alpha-equivalence; names matter here
 derive newtype instance eqDefinition :: Eq Definition
 
-instance prettyPrintDefinition :: PrettyPrint Definition where
-  prettyPrint (Definition {name, args, expr}) = fold
-    [ pure $ show name
-    , prettyArgs args
-    , pure " = "
-    , prettyPrint expr
+instance prettyDefinition :: Pretty Definition where
+  pretty rep (Definition {name, args, expr}) = fold
+    [ text $ formatPrefix name args
+    , pretty rep expr
     ]
    where
-    prettyArgs [] = pure ""
-    prettyArgs as = pure " " <> intercalate (pure " ") (map prettyPrint as)
+    formatPrefix name args = fold
+      [ show name
+      , " "
+      , intercalate " " $ (show <$> args) <> ["= "]
+      ]
 
 -- | Convert a `Definition` to an `Expression` returning the `Name`
 fromDef :: Definition -> {name :: Name, expr :: Expression}
 fromDef (Definition {name, args, expr}) = {name, expr: foldr Lambda expr args}
 
 -- | Source-level syntax minus syntactic sugar for lists and natural
--- | numbers; those are eliminated in the parser.
+-- | numbers; those are eliminated in the parser. The Highlight
+-- | constructor is for marking interesting nodes.
 data Expression
   = Var Name
   | Lambda Name Expression
   | Apply Expression Expression
+  | Highlight Expression
+
+-- | Expression with no Highlight nodes
+unHighlight :: Expression -> Expression
+unHighlight = case _ of
+  e@(Var _) -> e
+  Lambda n e -> Lambda n $ unHighlight e
+  Apply f a -> Apply (unHighlight f) (unHighlight a)
+  Highlight e -> unHighlight e
 
 derive instance genericExpression :: Generic Expression _
 
@@ -75,21 +87,49 @@ instance showExpression :: Show Expression where
 instance eqExpression :: Eq Expression where
   eq x = genericEq x
 
-instance prettyPrintExpression :: PrettyPrint Expression where
-  prettyPrint =
-    walk false
+instance prettyExpression :: Pretty Expression where
+  pretty rep = loop false
    where
-    walk inApp = case _ of
+    loop inApp = case _ of
       Var v ->
-        pure $ show v
-      l@(Lambda n b) ->
+        text $ show v
+      Lambda name body ->
         let
-          simple = parensIf inApp (pure "λ" <> prettyPrint n <> pure ". " <> walk false b)
-          literal = tryFromChurch l <|> tryFromList l
-        in
-          doc {raw: raw simple, sugar: fromMaybe (sugar simple) literal}
+          raw = parensIf inApp $ fold
+            [ text $ "λ" <> show name <> ". "
+            , loop false body
+            ]
+          lam = unHighlight $ Lambda name body
+        in case rep of
+          Sugar | Just lit <- asNatural lam <|> asList lam -> lit
+          _ -> raw
       Apply f a ->
-        parensIf inApp (walk (isLambda f) f <> pure " " <> walk (isComposite a) a)
+        parensIf inApp $ fold
+          [ loop (isLambda f) f
+          , text " "
+          , loop (isComposite a) a
+          ]
+      Highlight (Apply f a) ->
+        parensIf inApp $ fold
+          [ highlight Function $ loop (isLambda f) f
+          , text " "
+          , highlight Argument $ loop (isComposite a) a
+          ]
+      Highlight x ->
+        highlight Global $ loop inApp x
+
+-- | What's being highlighted in an expression
+data Highlight
+  = Function
+  | Argument
+  | Global
+
+-- | Highlight interesting parts of the redex
+highlight :: forall r. Display r => Highlight -> r -> r
+highlight = style <<< case _ of
+  Function -> "highlight-function"
+  Argument -> "highlight-argument"
+  Global -> "highlight-global"
 
 -- | Is node an application or lambda?
 isComposite :: Expression -> Boolean
@@ -105,33 +145,32 @@ isLambda = case _ of
   _ -> false
 
 -- | Attempt to interpret syntax as a Church natural.
-tryFromChurch :: Expression -> Maybe String
-tryFromChurch (Lambda s (Lambda z body)) =
-  show <$> walk body
+asNatural :: forall r. Display r => Expression -> Maybe r
+asNatural (Lambda s0 (Lambda z0 body)) =
+  text <<< show <$> walk body
  where
-  walk (Apply (Var s') arg)
-    | s' == s = (_ + 1) <$> walk arg
+  walk (Apply (Var s) arg)
+    | s == s0 = (_ + 1) <$> walk arg
     | otherwise = Nothing
-  walk (Var z')
-    | z' == z = pure 0
+  walk (Var z)
+    | z == z0 = pure 0
     | otherwise = Nothing
   walk _ = Nothing
-tryFromChurch _ = Nothing
+asNatural _ = Nothing
 
 -- | Attempt to interpret syntax as a Church-encoded list.
-tryFromList :: Expression -> Maybe String
-tryFromList (Lambda c (Lambda n body)) =
-  listToString <$> walk body
+asList :: forall r. Display r => Expression -> Maybe r
+asList (Lambda cons0 (Lambda nil0 body)) =
+  commaSep <$> walk body
  where
-  walk (Apply (Apply (Var c') x) xs)
-    | c' == c = Cons (sugar $ prettyPrint x) <$> walk xs
+  walk (Apply (Apply (Var cons) x) xs)
+    | cons == cons0 = Cons (pretty Sugar x) <$> walk xs
     | otherwise = Nothing
-  walk (Var n')
-    | n' == n = pure Nil
+  walk (Var nil)
+    | nil == nil0 = pure Nil
     | otherwise = Nothing
   walk _ = Nothing
-tryFromList _ = Nothing
+asList _ = Nothing
 
--- | Stringify bracketed, comma-separated list.
-listToString :: List String -> String
-listToString xs = "[" <> intercalate ", " xs <> "]"
+commaSep :: forall r. Display r => List r -> r
+commaSep xs = text "[" <> intercalate (text ", ") xs <> text "]"

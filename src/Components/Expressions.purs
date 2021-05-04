@@ -5,12 +5,13 @@ module Components.Expressions
 import Lambda.Prelude
 
 import Data.Array as Array
-import Lambda.Language.PrettyPrint (Rep, Doc, withRep)
+import Lambda.Language.Display (Rep, class Pretty, class Display, text, pretty)
+import Lambda.Language.Syntax (Expression)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 
 type Props =
-  { history :: List (Doc String)
+  { history :: List Expression
   , rep :: Rep
   }
 
@@ -20,18 +21,18 @@ component {history, rep} = R.ul
   , children: truncate rep history
   }
 
-truncate :: Rep -> List (Doc String) -> Array JSX
+truncate :: Rep -> List Expression -> Array JSX
 truncate rep = Array.fromFoldable <<< loop 20
  where
-  loop :: Int -> List (Doc String) -> List JSX
+  loop :: Int -> List Expression -> List JSX
   loop n = case _ of
     Nil -> Nil
-    Cons t ts
-      | n <= 0 -> item "…" : Nil
-      | otherwise -> item (withRep rep t) : loop (n - 1) ts
+    Cons e es
+      | n <= 0 -> item (text" …") : Nil
+      | otherwise -> item (pretty rep e) : loop (n - 1) es
 
-  item :: String -> JSX
-  item t = R.li
+  item :: JSX -> JSX
+  item body = R.li
     { className: "expression"
-    , children: [R.text t]
+    , children: [body]
     }

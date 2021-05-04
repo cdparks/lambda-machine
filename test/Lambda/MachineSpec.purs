@@ -14,7 +14,7 @@ spec = describe "Lambda.Machine" do
   describe "Lambda.Machine.step" do
     it "is stack-safe with programs that loop" do
       let result = stepN 100_000 [mkBind "f x = x x"] $ mkAnon "f f"
-      result `shouldEqual` mkAst "f f"
+      Syntax.unHighlight result `shouldEqual` mkAst "f f"
 
     it "evaluates addition of church numerals" do
       let result = normalize [mkBind "add m n s z = m s (n s z)"] $ mkAnon "add 2 3"
