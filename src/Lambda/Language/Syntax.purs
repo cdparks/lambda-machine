@@ -9,6 +9,7 @@ module Lambda.Language.Syntax
 import Lambda.Prelude
 
 import Data.Foldable (intercalate)
+import Data.List as List
 import Lambda.Language.Display(Rep(..), class Display, text, style, class Pretty, pretty, parensIf)
 import Lambda.Language.Name (Name)
 
@@ -79,7 +80,7 @@ unHighlight = case _ of
   e@(Var _) -> e
   Lambda n e -> Lambda n $ unHighlight e
   Apply f a -> Apply (unHighlight f) (unHighlight a)
-  Highlight e -> unHighlight e
+  Highlight e -> e
   Cycle -> Cycle
 
 derive instance genericExpression :: Generic Expression _
@@ -97,13 +98,12 @@ instance prettyExpression :: Pretty Expression where
     loop inApp = case _ of
       Var v ->
         text $ show v
-      Lambda name body ->
+      lam@(Lambda name body) ->
         let
           raw = parensIf inApp $ fold
             [ text $ "λ" <> show name <> ". "
             , loop false body
             ]
-          lam = unHighlight $ Lambda name body
         in case rep of
           Sugar | Just lit <- asNatural lam <|> asList lam -> lit
           _ -> raw
@@ -151,31 +151,30 @@ isLambda = case _ of
 
 -- | Attempt to interpret syntax as a Church natural.
 asNatural :: forall r. Display r => Expression -> Maybe r
-asNatural (Lambda s0 (Lambda z0 body)) =
-  text <<< show <$> walk body
+asNatural = case _ of
+  Lambda s (Highlight (Lambda z body)) -> asNatural $ Lambda s $ Lambda z body
+  Lambda s (Lambda z body) -> text <<< show <$> walk s z 0 body
+  _ -> Nothing
  where
-  walk (Apply (Var s) arg)
-    | s == s0 = (_ + 1) <$> walk arg
-    | otherwise = Nothing
-  walk (Var z)
-    | z == z0 = pure 0
-    | otherwise = Nothing
-  walk _ = Nothing
-asNatural _ = Nothing
+  walk s0 z0 acc (Apply (Var s) arg)
+    | s == s0 = walk s0 z0 (1 + acc) arg
+  walk _ z0 acc (Var z)
+    | z == z0 = pure acc
+  walk _ _ _ _ = Nothing
 
 -- | Attempt to interpret syntax as a Church-encoded list.
 asList :: forall r. Display r => Expression -> Maybe r
-asList (Lambda cons0 (Lambda nil0 body)) =
-  commaSep <$> walk body
+asList = case _ of
+  Lambda cons (Highlight (Lambda nil body)) -> asList $ Lambda cons $ Lambda nil body
+  Lambda cons (Lambda nil body) -> commaSep <$> walk cons nil Nil body
+  _ -> Nothing
  where
-  walk (Apply (Apply (Var cons) x) xs)
-    | cons == cons0 = Cons (pretty Sugar x) <$> walk xs
-    | otherwise = Nothing
-  walk (Var nil)
-    | nil == nil0 = pure Nil
-    | otherwise = Nothing
-  walk _ = Nothing
-asList _ = Nothing
+  walk :: Name -> Name -> List r -> Expression -> Maybe (List r)
+  walk cons0 nil0 acc (Apply (Apply (Var cons) x) xs)
+    | cons == cons0 = walk cons0 nil0 (Cons (pretty Sugar x) acc) xs
+  walk _ nil0 acc (Var nil)
+    | nil == nil0 = pure $ List.reverse acc
+  walk _ _ _ _ = Nothing
 
 commaSep :: forall r. Display r => List r -> r
 commaSep xs = text "[" <> intercalate (text ", ") xs <> text "]"
