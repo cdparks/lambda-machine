@@ -13,7 +13,7 @@ import Data.Set as Set
 import Lambda.Language.Name (Name, next)
 import Lambda.Language.Display (class Pretty, text, parensIf)
 import Lambda.Language.Syntax as Syntax
-import Partial.Unsafe (unsafePartial)
+import Partial.Unsafe (unsafePartial, unsafeCrashWith)
 
 -- | Locally nameless expression tree using zero-based De-Bruijn
 -- | indexes. That is, `λx. x` is represented by `λx. 0`, and
@@ -61,6 +61,7 @@ from = alphaInternal <<< go Map.empty
         a = go env a0
       in {expr: Apply f.expr a.expr, fvs: f.fvs <> a.fvs}
     Syntax.Highlight x -> go env x
+    Syntax.Cycle -> unsafeCrashWith "Parser should never produce a cycle"
 
 -- | Alpha-convert an `Expression` such that no names are shadowed.
 alpha :: Expression -> Expression

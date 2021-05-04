@@ -41,8 +41,7 @@ stepN
   -> Nameless.Expression
   -> Syntax.Expression
 stepN n globals =
-  _.root
-  <<< Machine.snapshot
+  Machine.snapshot
   <<< applyN Machine.step n
   <<< Machine.new globals
 
@@ -55,5 +54,5 @@ normalize globals =
   loop <<< Machine.new globals
  where
   loop m
-   | Machine.halted m = _.root $ Machine.snapshot m
+   | m.halted = Machine.snapshot m
    | otherwise = loop $ Machine.step m

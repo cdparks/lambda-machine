@@ -19,7 +19,7 @@ import Lambda.Language.Name (Name, isSubscriptChar, name, name_, subscriptToInt)
 import Lambda.Language.Syntax (Statement(..), Definition(..), Expression(..))
 import Partial.Unsafe (unsafeCrashWith, unsafePartial)
 import Text.Parsing.Parser (ParseError) as X
-import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, runParser)
+import Text.Parsing.Parser (ParseError, Parser, parseErrorMessage, parseErrorPosition, fail, runParser)
 import Text.Parsing.Parser.Combinators (between, sepBy, try)
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, eof, satisfy, skipSpaces, string)
@@ -105,7 +105,7 @@ parseExpression = fix \parseExpr -> foldl Apply
 
 parseAtom :: Parser String Expression -> Parser String Expression
 parseAtom parseExpr =
-  parseLambda <|> parseNat <|> parseList parseExpr <|> parens parseExpr <|> parseVar
+  failCycle <|> parseLambda <|> parseNat <|> parseList parseExpr <|> parens parseExpr <|> parseVar
  where
   parseLambda :: Parser String Expression
   parseLambda = do
@@ -138,8 +138,8 @@ toList xs =
   loop (Cons y ys) = Apply (Apply (Var cons) y) (loop ys)
 
 -- | Convert a natural number to a Church numeral
-toChurch :: Int -> Expression
-toChurch n =
+toNat :: Int -> Expression
+toNat n =
   Lambda s (Lambda z (loop n))
  where
   s = name_ "s"
@@ -148,12 +148,22 @@ toChurch n =
     | k <= 0 = Var z
     | otherwise = Apply (Var s) (loop (k - 1))
 
+-- | Fail if the user pastes a cycle's representation (… or ...) back into the input
+failCycle :: Parser String Expression
+failCycle = token do
+  ellipsis <- string "…" <|> string "..."
+  fail $ fold
+    [ "We don't know how to parse “"
+    , ellipsis
+    , "”! (Hint: it might indicate cyclic data or truncated output) "
+    ]
+
 -- | Parse a natural number.
 parseNat :: Parser String Expression
 parseNat = token do
   digits <- Array.some $ satisfy isDigit
   let n = unsafePartial $ fromJust $ fromString $ fromCharArray digits
-  pure $ toChurch n
+  pure $ toNat n
 
 -- | Parse a comma-separated list between brackets.
 parseList :: Parser String Expression -> Parser String Expression

@@ -47,11 +47,11 @@ derive newtype instance eqDefinition :: Eq Definition
 
 instance prettyDefinition :: Pretty Definition where
   pretty rep (Definition {name, args, expr}) = fold
-    [ text $ formatPrefix name args
+    [ text prefix
     , pretty rep expr
     ]
    where
-    formatPrefix name args = fold
+    prefix = fold
       [ show name
       , " "
       , intercalate " " $ (show <$> args) <> ["= "]
@@ -63,12 +63,15 @@ fromDef (Definition {name, args, expr}) = {name, expr: foldr Lambda expr args}
 
 -- | Source-level syntax minus syntactic sugar for lists and natural
 -- | numbers; those are eliminated in the parser. The Highlight
--- | constructor is for marking interesting nodes.
+-- | constructor is for marking interesting nodes. Cycles are rare
+-- | but can technically be created by evaluating recursively defined
+-- | fix with no argument.
 data Expression
   = Var Name
   | Lambda Name Expression
   | Apply Expression Expression
   | Highlight Expression
+  | Cycle
 
 -- | Expression with no Highlight nodes
 unHighlight :: Expression -> Expression
@@ -77,6 +80,7 @@ unHighlight = case _ of
   Lambda n e -> Lambda n $ unHighlight e
   Apply f a -> Apply (unHighlight f) (unHighlight a)
   Highlight e -> unHighlight e
+  Cycle -> Cycle
 
 derive instance genericExpression :: Generic Expression _
 
@@ -117,6 +121,7 @@ instance prettyExpression :: Pretty Expression where
           ]
       Highlight x ->
         highlight Global $ loop inApp x
+      Cycle -> text "…"
 
 -- | What's being highlighted in an expression
 data Highlight
@@ -131,7 +136,7 @@ highlight = style <<< case _ of
   Argument -> "highlight-argument"
   Global -> "highlight-global"
 
--- | Is node an application or lambda?
+-- | Is node an application or a lambda?
 isComposite :: Expression -> Boolean
 isComposite = case _ of
   Apply _ _  -> true

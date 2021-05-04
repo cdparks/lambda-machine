@@ -5,7 +5,7 @@ module Components.Expressions
 import Lambda.Prelude
 
 import Data.Array as Array
-import Lambda.Language.Display (Rep, class Pretty, class Display, text, pretty)
+import Lambda.Language.Display (Rep, text, pretty)
 import Lambda.Language.Syntax (Expression)
 import React.Basic (JSX)
 import React.Basic.DOM as R

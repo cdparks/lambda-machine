@@ -24,7 +24,7 @@ component {machine, onStep, onClear, onSave, onSugar, rep} =
   R.div
     { className: "add-margin-medium btn-group pull-right"
     , children:
-      [ button machine
+      [ button (running =<< machine)
         { className: "btn btn-default"
         , onClick: onStep
         , label: "Step"
@@ -82,3 +82,7 @@ maybeEnable className =
   maybe
     (className <> " disabled")
     (const className)
+
+-- | A machine that hasn't halted
+running :: Machine -> Maybe Machine
+running machine = machine <$ guard (not $ machine.halted)
