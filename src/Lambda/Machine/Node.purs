@@ -43,13 +43,11 @@ type Closure =
   , body :: Expression
   }
 
+derive instance eqNode :: Eq Node
 derive instance genericNode :: Generic Node _
 
 instance showNode :: Show Node where
   show x = genericShow x
-
-instance eqNode :: Eq Node where
-  eq x = genericEq x
 
 -- | Stuck nodes cannot be evaluated any further.
 data Stuck
@@ -57,13 +55,11 @@ data Stuck
   | StuckLambda Name Address
   | StuckApply Address Address
 
+derive instance eqStuck :: Eq Stuck
 derive instance genericStuck :: Generic Stuck _
 
 instance showStuck :: Show Stuck where
   show x = genericShow x
-
-instance eqStuck :: Eq Stuck where
-  eq x = genericEq x
 
 -- | Closure environments are lists. Construction is fast; indexing is
 -- | slow. Environments should be small enough that it doesn't matter.

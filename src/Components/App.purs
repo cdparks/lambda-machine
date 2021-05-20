@@ -330,13 +330,3 @@ save {rep, defs, history} =
     , pure ""
     , Array.fromFoldable $ List.reverse $ History.toStrings rep history
     ]
-
--- | Create an alert element with the specified message.
-alert :: Level -> String -> Tuple Level JSX
-alert level message =
-  Tuple level body
- where
-  body = R.p
-    { className: "preformatted"
-    , children: [R.text message]
-    }

@@ -23,8 +23,6 @@ newtype Queue a = Queue
   , back :: List a
   }
 
-derive instance newtypeQueue :: Newtype (Queue a) _
-
 instance showQueue :: Show a => Show (Queue a) where
   show q = "fromFoldable " <> show (Array.fromFoldable q)
 

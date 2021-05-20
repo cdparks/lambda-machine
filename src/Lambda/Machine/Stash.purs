@@ -1,5 +1,5 @@
 module Lambda.Machine.Stash
-  ( Stash(..)
+  ( Stash
   , empty
   , suspend
   , restore
@@ -16,9 +16,6 @@ import Lambda.Machine.Stack as Stack
 -- | A `Stash` is a possibly empty stack of `Stack`s on which we
 -- | intend to resume evaluation later.
 newtype Stash = Stash (List Stack)
-
-derive instance newtypeStash :: Newtype Stash _
-derive newtype instance showStash :: Show Stash
 
 -- | Empty `Stash`
 empty :: Stash
@@ -53,4 +50,7 @@ restore = do
 
 -- | Return all addresses from the `Stash` for garbage collection.
 roots :: Stash -> Array Address
-roots = fold <<< Array.fromFoldable <<< map Stack.roots <<< un Stash
+roots = fold <<< Array.fromFoldable <<< map Stack.roots <<< unStash
+ where
+  unStash :: Stash -> List Stack
+  unStash = coerce

@@ -15,8 +15,8 @@ spec = describe "Data.Grammar" do
     it "does not pluralize 1 item" do
       pluralizeWith "s" 1 "item" `shouldEqual` "item"
 
-    it "pluralizes > 1 items" $ quickCheck \n ->
-      pluralizeWith "s" (un Positive n) "item" === "items"
+    it "pluralizes > 1 items" $ quickCheck \(Positive n) ->
+      pluralizeWith "s" n "item" === "items"
 
   describe "joinWith" do
     let join = joinWith {inject: identity, conjunction: "and"}
@@ -34,12 +34,6 @@ spec = describe "Data.Grammar" do
 
 -- | Generate positive integers only
 newtype Positive = Positive Int
-
-derive instance newtypePositive :: Newtype Positive _
-derive instance genericPosition :: Generic Positive _
-
-instance showPosition :: Show Positive where
-  show x = genericShow x
 
 instance arbitraryPosition :: Arbitrary Positive where
   arbitrary = Positive <$> chooseInt 1 top

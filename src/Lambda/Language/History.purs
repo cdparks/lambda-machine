@@ -23,8 +23,6 @@ newtype History = History
   , raw :: List Bundle
   }
 
-derive instance newtypeHistory :: Newtype History _
-
 -- | No history
 empty :: History
 empty = History {sugar: Nil, raw: Nil}
@@ -50,7 +48,7 @@ toJSX = toListWith $ _.jsx
 
 -- | Extract one list of pretty-printed elments from the history
 toListWith :: forall r. (Bundle -> r) -> Rep -> History -> List r
-toListWith f rep = map f <<< select rep <<< un History
+toListWith f rep = map f <<< select rep <<< coerce
 
 -- | Pretty print and bundle JSX and text representations
 bundle :: forall a. Pretty a => Rep -> a -> Bundle

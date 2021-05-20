@@ -122,7 +122,7 @@ step = execState do
 -- | top-level definitions are not considered roots.
 getRoots :: forall m . MonadState Machine m => m (Array Address)
 getRoots = do
-  {root, stack, stash, globals} <- get
+  {root, stack, stash} <- get
   pure $ fold
     [ [root]
     , Stack.roots stack
@@ -155,14 +155,6 @@ type Redex =
   -- | Expression to instantiate in the environment
   , body :: Nameless.Expression
   }
-
-derive instance genericFocus :: Generic Focus _
-
-instance showFocus :: Show Focus where
-  show x = genericShow x
-
-instance eqFocus :: Eq Focus where
-  eq x = genericEq x
 
 -- | Evaluate a global or redex
 eval :: forall m. MonadState Machine m => Focus -> m Unit
@@ -276,41 +268,21 @@ fetchArg address = do
       , show node
       ]
 
--- | Hide the focus until the argument finishes
-hideFocus :: forall s r m. MonadState { focus :: Maybe Focus | s } m => m r -> m r
-hideFocus = refocusWith $ const Nothing
-
--- | Restore the focus if the argument drops it
-restoreFocus :: forall s r m. MonadState { focus :: Maybe Focus | s } m => m r -> m r
-restoreFocus = refocusWith identity
-
--- | Modify the focus before running the body, then restore the original focus
-refocusWith
-  :: forall s r m
-   . MonadState { focus :: Maybe Focus | s } m
-  => (Maybe Focus -> Maybe Focus)
-  -> m r
-  -> m r
-refocusWith f body = do
-  focus <- gets _.focus
-  modify_ _ { focus = f focus }
-  r <- body
-  modify_ _ { focus = focus }
-  pure r
-
-formatNode
-  :: forall s m
-   . MonadState { focus :: Maybe Focus, heap :: Heap Node | s } m
-  => Address
-  -> m Syntax.Expression
-formatNode = hideFocus <<< formatNodeWith HashSet.empty
-
+-- | Format the root node
 formatRoot
   :: forall s m
    . MonadState { focus :: Maybe Focus, heap :: Heap Node | s } m
   => Address
   -> m Syntax.Expression
 formatRoot = restoreFocus <<< formatNodeWith HashSet.empty
+
+-- | Restore the focus if the argument drops it
+restoreFocus :: forall s r m. MonadState { focus :: Maybe Focus | s } m => m r -> m r
+restoreFocus body = do
+  focus <- gets _.focus
+  r <- body
+  modify_ _ { focus = focus }
+  pure r
 
 -- | Fetch the node and convert it to `Syntax.Expression`.
 formatNodeWith

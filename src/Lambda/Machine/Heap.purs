@@ -14,7 +14,7 @@ import Lambda.Prelude
 import Data.Foldable (maximum)
 import Data.HashMap as HashMap
 import Data.Queue as Queue
-import Lambda.Machine.Address (Address)
+import Lambda.Machine.Address (Address, baseptr, nullptr, offset)
 import Partial.Unsafe (unsafeCrashWith)
 
 -- | Heap memory represented by a map from addresses to nodes.
@@ -25,20 +25,20 @@ type Heap a =
 
 -- | Empty heap
 empty :: forall a. Heap a
-empty = { memory: HashMap.empty, next: wrap 1 }
+empty = { memory: HashMap.empty, next: baseptr }
 
 -- | Allocate memory for a node and return the `Address`.
 alloc :: forall a s m. MonadState { heap :: Heap a | s } m => a -> m Address
 alloc node = modifyHeap \{ memory, next } -> Tuple next
   { memory: HashMap.insert next node memory
-  , next: next + wrap 1
+  , next: offset 1 next
   }
 
 -- | Reserve an `Address` for a node without actually writing it.
 reserve :: forall a s m. MonadState { heap :: Heap a | s } m => m Address
 reserve = modifyHeap \{ memory, next } -> Tuple next
   { memory
-  , next: next + wrap 1
+  , next: offset 1 next
   }
 
 -- | Dereference an `Address` or crash.
@@ -73,7 +73,6 @@ gc
   -> (a -> Array Address)
   -> m Unit
 gc roots children = do
-  {memory, next} <- gets _.heap
   toSpace <- tailRecM go
     { queue: Queue.fromFoldable roots
     , toSpace: HashMap.empty
@@ -81,7 +80,7 @@ gc roots children = do
   modify_ _
     { heap =
       { memory: toSpace
-      , next: wrap 1 + fromMaybe (wrap 0) (maximum $ HashMap.keys toSpace)
+      , next: offset 1 $ fromMaybe nullptr $ maximum $ HashMap.keys toSpace
       }
     }
  where

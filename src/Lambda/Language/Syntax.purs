@@ -19,14 +19,12 @@ data Statement
   = Define Definition
   | Eval Expression
 
+-- | Warning - not alpha-equivalence; names matter here
+derive instance eqStatement :: Eq Statement
 derive instance genericStatement :: Generic Statement _
 
 instance showStatement :: Show Statement where
   show x = genericShow x
-
--- | Warning - not alpha-equivalence; names matter here
-instance eqStatement :: Eq Statement where
-  eq x = genericEq x
 
 instance prettyStatement :: Pretty Statement where
   pretty rep = case _ of
@@ -40,11 +38,10 @@ newtype Definition = Definition
   , expr :: Expression
   }
 
-derive instance newtypeDefinition :: Newtype Definition _
-derive newtype instance showDefinition :: Show Definition
-
 -- | Warning - not alpha-equivalence; names matter here
 derive newtype instance eqDefinition :: Eq Definition
+derive newtype instance showDefinition :: Show Definition
+derive instance newtypeDefinition :: Newtype Definition _
 
 instance prettyDefinition :: Pretty Definition where
   pretty rep (Definition {name, args, expr}) =
@@ -77,14 +74,12 @@ unHighlight = case _ of
   Highlight e -> e
   Cycle -> Cycle
 
+-- | Warning - not alpha-equivalence; names matter here
+derive instance eqExpression :: Eq Expression
 derive instance genericExpression :: Generic Expression _
 
 instance showExpression :: Show Expression where
   show x = genericShow x
-
--- | Warning - not alpha-equivalence; names matter here
-instance eqExpression :: Eq Expression where
-  eq x = genericEq x
 
 instance prettyExpression :: Pretty Expression where
   pretty rep = loop false

@@ -1,11 +1,11 @@
 module Lambda.Language.Name
-  ( isSubscriptChar
-  , intToSubscript
-  , subscriptToInt
-  , Name()
+  ( Name
   , name
   , name_
   , next
+  , isSubscriptChar
+  , intToSubscript
+  , subscriptToInt
   ) where
 
 import Lambda.Prelude
@@ -19,6 +19,15 @@ import Partial.Unsafe (unsafePartial)
 -- | Source-level name with an optional subscript.
 data Name = Name String (Maybe Int)
 
+derive instance eqName :: Eq Name
+derive instance ordName :: Ord Name
+
+instance showName :: Show Name where
+  show (Name n ms) = n <> maybe "" intToSubscript ms
+
+instance hashableName :: Hashable Name where
+  hash (Name n ms) = hash $ Tuple n ms
+
 -- | Construct a `Name` with an optional subscript.
 name :: String -> Maybe Int -> Name
 name n ms = Name n ms
@@ -30,20 +39,6 @@ name_ n = Name n Nothing
 -- | Append or increment a `Name`'s subscript.
 next :: Name -> Name
 next (Name n ms) = Name n $ (_ + 1) <$> ms <|> pure 0
-
-derive instance genericName :: Generic Name _
-
-instance showName :: Show Name where
-  show (Name n ms) = n <> maybe "" intToSubscript ms
-
-instance eqName :: Eq Name where
-  eq = genericEq
-
-instance hashableName :: Hashable Name where
-  hash (Name n ms) = hash $ Tuple n ms
-
-instance ordName :: Ord Name where
-  compare = genericCompare
 
 -- | Convert `Int` subscript to textual subscript.
 intToSubscript :: Int -> String

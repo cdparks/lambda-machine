@@ -3,6 +3,7 @@ module Lambda.Language.Nameless
   , from
   , syntax
   , freeVars
+  , alpha
   ) where
 
 import Lambda.Prelude
@@ -115,7 +116,7 @@ syntax =
       Syntax.Apply (loop env f) (loop env a)
 
 instance prettyExpression :: Pretty Expression where
-  pretty rep =
+  pretty _ =
     walk false
    where
     walk inApp = case _ of

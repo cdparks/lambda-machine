@@ -33,13 +33,8 @@ data Dependency
   = Global Name
   | Root
 
-derive instance genericDependency :: Generic Dependency _
-
-instance eqDependency :: Eq Dependency where
-  eq x = genericEq x
-
-instance ordDependency :: Ord Dependency where
-  compare x = genericCompare x
+derive instance eqDependency :: Eq Dependency
+derive instance ordDependency :: Ord Dependency
 
 instance showDependency :: Show Dependency where
   show = case _ of
@@ -52,13 +47,8 @@ data ConsistencyError
   = Undefined (Set Name)
   | CannotDelete Name (Set Dependency)
 
-derive instance genericConsistencyError :: Generic ConsistencyError _
-
-instance eqConsistencyError :: Eq ConsistencyError where
-  eq x = genericEq x
-
-instance ordConsistencyError :: Ord ConsistencyError where
-  compare x = genericCompare x
+derive instance eqConsistencyError :: Eq ConsistencyError
+derive instance ordConsistencyError :: Ord ConsistencyError
 
 instance showConsistencyError :: Show ConsistencyError where
   show = case _ of

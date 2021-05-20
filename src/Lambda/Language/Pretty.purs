@@ -20,7 +20,6 @@ import React.Basic.DOM as R
 
 data Rep = Raw | Sugar
 
-derive instance genericRep :: Generic Rep _
 derive instance eqRep :: Eq Rep
 
 -- | Pretty-print some structure to a Builder
