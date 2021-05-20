@@ -39,6 +39,7 @@ select rep {sugar, raw} = case rep of
   Sugar -> sugar
   Raw -> raw
 
+-- | Toggle 'Rep'
 toggle :: Rep -> Rep
 toggle = case _ of
   Sugar -> Raw
@@ -47,25 +48,37 @@ toggle = case _ of
 -- | (<>) for JSX is really slow if you have lots of text fragments.
 -- | By combining adjacent text, and _then_ going to JSX, we create
 -- | way fewer DOM nodes.
-data Builder
-  = Empty
-  | Text String
-  | Style String Builder
-  | Append Builder Builder
+newtype Builder = Builder (Node -> Node)
 
 instance semigroupBuilder :: Semigroup Builder where
-  append = Append
+  append (Builder lhs) (Builder rhs) = Builder $ lhs <<< rhs
 
 instance monoidBuilder :: Monoid Builder where
-  mempty = Empty
+  mempty  = Builder identity
 
--- | Text node
+-- | Appends are right-associated by construction since
+-- | Nodes cannot appear as their left operand
+data Node
+  = Leaf Leaf
+  | Append Leaf Node
+
+-- | Technically Style is a "node", but it acts like a leaf for Append
+data Leaf
+  = Empty
+  | Text String
+  | Style String Node
+
+-- | Text node automatically coalesces adjacent text
 text :: String -> Builder
-text = Text
+text s = Builder $ case _ of
+  Leaf Empty -> Leaf $ Text s
+  Leaf (Text t) -> Leaf $ Text $ s <> t
+  Append (Text t) rhs -> Append (Text $ s <> t) rhs
+  node -> Append (Text s) node
 
 -- | Style node using CSS classname
 style :: String -> Builder -> Builder
-style = Style
+style cls (Builder f) = Builder $ Append $ Style cls $ f $ Leaf Empty
 
 -- | Render builder to JSX
 toJSX :: Builder -> JSX
@@ -78,7 +91,7 @@ toJSX = buildWith R.text \className node -> R.span
 toString :: Builder -> String
 toString = buildWith identity \_ -> identity
 
--- | Reassociate appends to the right and pre-concatentate strings
+-- | Convert Builder to actual representation
 buildWith
   :: forall r
    . Monoid r
@@ -88,20 +101,13 @@ buildWith
   -- ^ Generate styled representation
   -> Builder
   -> r
-buildWith fromText fromStyle = search
+buildWith onText onStyle (Builder f) = onNode $ f $ Leaf Empty
  where
-  -- Look for text and reassociate appends
-  search = case _ of
-    Text s -> fromText s
-    Style cls node -> fromStyle cls $ search node
-    Append (Text s) rhs -> collect s rhs
-    Append (Append s t) u -> search $ Append s $ Append t u
-    Append s t -> search s <> search t
-    Empty -> mempty
+  onNode = case _ of
+    Leaf leaf -> onLeaf leaf
+    Append leaf node -> onLeaf leaf <> onNode node
 
-  -- Accumulate text and reassociate appends
-  collect acc = case _ of
-    Text s -> fromText $ acc <> s
-    Append (Text s) rhs -> collect (acc <> s) rhs
-    Append (Append s t) u -> collect acc $ Append s $ Append t u
-    node -> fromText acc <> search node
+  onLeaf = case _ of
+    Empty -> mempty
+    Text t -> onText t
+    Style className node -> onStyle className $ onNode node
