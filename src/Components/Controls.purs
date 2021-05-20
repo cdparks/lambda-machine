@@ -4,7 +4,7 @@ module Components.Controls
 
 import Lambda.Prelude
 
-import Lambda.Language.Display (Rep, select)
+import Lambda.Language.Pretty (Rep, select)
 import Lambda.Machine (Machine)
 import React.Basic (JSX)
 import React.Basic.DOM as R

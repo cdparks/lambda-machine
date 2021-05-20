@@ -5,9 +5,9 @@ module Components.Expressions
 import Lambda.Prelude
 
 import Data.Array as Array
-import Lambda.Language.Display (Rep)
 import Lambda.Language.History (History)
 import Lambda.Language.History as History
+import Lambda.Language.Pretty (Rep)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 

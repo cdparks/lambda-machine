@@ -9,8 +9,8 @@ module Lambda.Language.History
 
 import Lambda.Prelude hiding (add)
 
-import Lambda.Language.Display (class Pretty, pretty, select, Rep(..))
-import Lambda.Language.Display as D
+import Lambda.Language.Pretty (class Pretty, pretty, select, Rep(..))
+import Lambda.Language.Pretty as P
 import React.Basic (JSX)
 
 -- | Cache pretty-printed JSX and text with and without syntactic sugar
@@ -55,8 +55,8 @@ toListWith f rep = map f <<< select rep <<< un History
 -- | Pretty print and bundle JSX and text representations
 bundle :: forall a. Pretty a => Rep -> a -> Bundle
 bundle rep a =
-  { jsx: D.toJSX node
-  , text: D.toString node
+  { jsx: P.toJSX node
+  , text: P.toString node
   }
  where
   node = pretty rep a

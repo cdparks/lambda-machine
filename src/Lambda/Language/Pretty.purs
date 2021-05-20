@@ -1,4 +1,4 @@
-module Lambda.Language.Display
+module Lambda.Language.Pretty
   ( class Pretty
   , pretty
   , Rep(..)

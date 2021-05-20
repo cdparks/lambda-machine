@@ -18,12 +18,12 @@ import Data.Array as Array
 import Data.Foldable (intercalate)
 import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
-import Lambda.Language.Display (Rep(..), toggle, pretty, toString)
 import Lambda.Language.History (History)
 import Lambda.Language.History as History
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Language.Parse (parseAll, parseDefinition, parseStatement, unsafeParse)
+import Lambda.Language.Pretty (Rep(..), toggle, pretty, toString)
 import Lambda.Language.Syntax (Statement(..), Definition(..), fromDef)
 import Lambda.Language.Syntax as Syntax
 import Lambda.Language.World (World)

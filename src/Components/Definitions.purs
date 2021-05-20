@@ -4,8 +4,8 @@ module Components.Definitions
 
 import Lambda.Prelude
 
-import Lambda.Language.Display (pretty, Rep, toJSX)
 import Lambda.Language.Name (Name)
+import Lambda.Language.Pretty (pretty, Rep, toJSX)
 import Lambda.Language.Syntax (Definition(..))
 import React.Basic (JSX)
 import React.Basic.DOM as R

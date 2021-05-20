@@ -10,8 +10,8 @@ import Lambda.Prelude
 
 import Data.Foldable (intercalate)
 import Data.List as List
-import Lambda.Language.Display(Rep(..), class Pretty, pretty, parensIf, Builder, text, style)
 import Lambda.Language.Name (Name)
+import Lambda.Language.Pretty (Rep(..), class Pretty, pretty, parensIf, Builder, text, style)
 
 -- | A `Statement` is either a top-level `Definition` or an
 -- | `Expression` to be evaluated
