@@ -59,9 +59,9 @@ import Partial.Unsafe (unsafeCrashWith)
 -- | 6. We break up evaluation into separate unwind and eval steps.
 -- |    Unwinding is the process of finding a redex, and eval reduces
 -- |    that redex. When we can't find a redex, we're done. This also
--- |    makes it easy to highlight highlight the redex in the UI. Note
--- |    that we call the redex "the focus" since it might also be a
--- |    lone global identifier (not applied to anything).
+-- |    makes it easy to highlight the redex in the UI. Note that we
+-- |    call the redex "the focus" since it might also be a lone global
+-- |    identifier (not applied to anything).
 -- |
 type Machine =
   { root :: Address

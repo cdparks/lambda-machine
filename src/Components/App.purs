@@ -19,6 +19,8 @@ import Data.Foldable (intercalate)
 import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
 import Lambda.Language.Display (Rep(..), toggle, pretty)
+import Lambda.Language.History (History)
+import Lambda.Language.History as History
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Language.Parse (parseAll, parseDefinition, parseStatement, unsafeParse)
@@ -41,7 +43,7 @@ type State =
   , defs :: Array Definition
   , world :: World
   , machine :: Maybe Machine
-  , history :: List Syntax.Expression
+  , history :: History
   , rep :: Rep
   , alert :: Maybe (Tuple Level JSX)
   }
@@ -163,7 +165,7 @@ initialState =
   , defs: prelude
   , world: World.new $ defsToGlobals prelude
   , machine: Nothing
-  , history: Nil
+  , history: History.empty
   , rep: Raw
   , alert: Nothing
   }
@@ -282,7 +284,7 @@ setExpr syntax s =
         { text = ""
         , world = world
         , machine = pure machine
-        , history = pure snapshot
+        , history = History.new snapshot
         , alert = Nothing
         }
  where
@@ -304,14 +306,14 @@ step m0 s =  s
  where
   m = Machine.step m0
   snapshot = Machine.snapshot m
-  history = snapshot : s.history
+  history = History.add snapshot s.history
 
 -- | Unload the `Machine` and unset the main expression
 clear :: State -> State
 clear s = s
   { world = World.unfocus s.world
   , machine = Nothing
-  , history = Nil
+  , history = History.empty
   }
 
 -- | Toggle syntactic sugar for Church numerals and lists.
@@ -326,7 +328,7 @@ save {rep, defs, history} =
   text = intercalate "\n" $ fold
     [ pretty rep <$> defs
     , pure ""
-    , pretty rep <$> Array.fromFoldable (List.reverse history)
+    , Array.fromFoldable $ List.reverse $ History.toStrings rep history
     ]
 
 -- | Create an alert element with the specified message.

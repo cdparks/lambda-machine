@@ -47,16 +47,10 @@ derive newtype instance showDefinition :: Show Definition
 derive newtype instance eqDefinition :: Eq Definition
 
 instance prettyDefinition :: Pretty Definition where
-  pretty rep (Definition {name, args, expr}) = fold
-    [ text prefix
-    , pretty rep expr
-    ]
+  pretty rep (Definition {name, args, expr}) =
+    text prefix <> pretty rep expr
    where
-    prefix = fold
-      [ show name
-      , " "
-      , intercalate " " $ (show <$> args) <> ["= "]
-      ]
+    prefix = show name <> " " <> intercalate " " ((show <$> args) <> ["= "])
 
 -- | Convert a `Definition` to an `Expression` returning the `Name`
 fromDef :: Definition -> {name :: Name, expr :: Expression}
@@ -95,33 +89,35 @@ instance eqExpression :: Eq Expression where
 instance prettyExpression :: Pretty Expression where
   pretty rep = loop false
    where
+    loop :: forall r. Display r => Boolean -> Expression -> r
     loop inApp = case _ of
       Var v ->
         text $ show v
-      lam@(Lambda name body) ->
-        let
-          raw = parensIf inApp $ fold
-            [ text $ "λ" <> show name <> ". "
-            , loop false body
-            ]
-        in case rep of
-          Sugar | Just lit <- asNatural lam <|> asList lam -> lit
-          _ -> raw
+      Lambda name body
+        | rep == Sugar -> tryLiteral inApp name body
+        | otherwise -> prettyLambda inApp name body
       Apply f a ->
-        parensIf inApp $ fold
-          [ loop (isLambda f) f
-          , text " "
-          , loop (isComposite a) a
-          ]
+        parensIf inApp
+          $ loop (isLambda f) f
+          <> text " "
+          <> loop (isComposite a) a
       Highlight (Apply f a) ->
-        parensIf inApp $ fold
-          [ highlight Function $ loop (isLambda f) f
-          , text " "
-          , highlight Argument $ loop (isComposite a) a
-          ]
+        parensIf inApp
+          $ highlight Function (loop (isLambda f) f)
+          <> text " "
+          <> highlight Argument (loop (isComposite a) a)
       Highlight x ->
         highlight Global $ loop inApp x
       Cycle -> text "…"
+
+    tryLiteral :: forall r. Display r => Boolean -> Name -> Expression -> r
+    tryLiteral inApp name body = fromMaybe' (\_ -> prettyLambda inApp name body) $ do
+      head <- literalHead $ Lambda name body
+      asNatural head <|> asList head
+
+    prettyLambda :: forall r. Display r => Boolean -> Name -> Expression -> r
+    prettyLambda inApp name body =
+      parensIf inApp $ text ("λ" <> show name <> ". ") <> loop false body
 
 -- | What's being highlighted in an expression
 data Highlight
@@ -149,32 +145,34 @@ isLambda = case _ of
   Lambda _ _ -> true
   _ -> false
 
--- | Attempt to interpret syntax as a Church natural.
-asNatural :: forall r. Display r => Expression -> Maybe r
-asNatural = case _ of
-  Lambda s (Highlight (Lambda z body)) -> asNatural $ Lambda s $ Lambda z body
-  Lambda s (Lambda z body) -> text <<< show <$> walk s z 0 body
+type Head = { f :: Name, z :: Name, body :: Expression }
+
+-- | Match head of Church-encoded list or natural number
+literalHead :: Expression -> Maybe Head
+literalHead = case _ of
+  Lambda f (Highlight (Lambda z body)) -> Just { f, z, body }
+  Lambda f (Lambda z body) -> Just { f, z, body }
   _ -> Nothing
+
+-- | Attempt to interpret syntax as a Church natural.
+asNatural :: forall r. Display r => Head -> Maybe r
+asNatural {f, z, body} = text <<< show <$> walk 0 body
  where
-  walk s0 z0 acc (Apply (Var s) arg)
-    | s == s0 = walk s0 z0 (1 + acc) arg
-  walk _ z0 acc (Var z)
-    | z == z0 = pure acc
-  walk _ _ _ _ = Nothing
+  walk acc (Apply (Var s) arg)
+    | s == f = walk (1 + acc) arg
+  walk acc (Var t)
+    | t == z = pure acc
+  walk _ _ = Nothing
 
 -- | Attempt to interpret syntax as a Church-encoded list.
-asList :: forall r. Display r => Expression -> Maybe r
-asList = case _ of
-  Lambda cons (Highlight (Lambda nil body)) -> asList $ Lambda cons $ Lambda nil body
-  Lambda cons (Lambda nil body) -> commaSep <$> walk cons nil Nil body
-  _ -> Nothing
+asList :: forall r. Display r => Head -> Maybe r
+asList {f, z, body} = commaSep <$> walk Nil body
  where
-  walk :: Name -> Name -> List r -> Expression -> Maybe (List r)
-  walk cons0 nil0 acc (Apply (Apply (Var cons) x) xs)
-    | cons == cons0 = walk cons0 nil0 (Cons (pretty Sugar x) acc) xs
-  walk _ nil0 acc (Var nil)
-    | nil == nil0 = pure $ List.reverse acc
-  walk _ _ _ _ = Nothing
+  walk acc (Apply (Apply (Var cons) x) xs)
+    | cons == f = walk (Cons (pretty Sugar x) acc) xs
+  walk acc (Var nil)
+    | nil == z = pure $ List.reverse acc
+  walk _ _ = Nothing
 
 commaSep :: forall r. Display r => List r -> r
 commaSep xs = text "[" <> intercalate (text ", ") xs <> text "]"

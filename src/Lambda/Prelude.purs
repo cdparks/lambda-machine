@@ -20,9 +20,11 @@ import Data.HashSet (HashSet) as X
 import Data.Hashable (class Hashable, hash) as X
 import Data.List (List(..), (:)) as X
 import Data.Map (Map) as X
-import Data.Maybe (Maybe(..), fromMaybe, maybe, isNothing) as X
+import Data.Maybe (Maybe(..), fromMaybe', fromMaybe, maybe, isNothing) as X
+import Data.Monoid (class Monoid, mempty) as X
 import Data.Newtype (class Newtype, un, wrap) as X
 import Data.Set (Set) as X
+import Data.Semigroup (class Semigroup, append, (<>)) as X
 import Data.Traversable (class Traversable, traverse, for) as X
 import Data.Tuple (Tuple(..), uncurry, fst, snd) as X
 import Data.Tuple.Nested ((/\)) as X

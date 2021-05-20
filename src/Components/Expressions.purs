@@ -5,31 +5,32 @@ module Components.Expressions
 import Lambda.Prelude
 
 import Data.Array as Array
-import Lambda.Language.Display (Rep, text, pretty)
-import Lambda.Language.Syntax (Expression)
+import Lambda.Language.Display (Rep, text)
+import Lambda.Language.History (History)
+import Lambda.Language.History as History
 import React.Basic (JSX)
 import React.Basic.DOM as R
 
 type Props =
-  { history :: List Expression
+  { history :: History
   , rep :: Rep
   }
 
 component :: Props -> JSX
 component {history, rep} = R.ul
   { className: "unstyled scroll-overflow"
-  , children: truncate rep history
+  , children: truncate $ History.toJSX rep history
   }
 
-truncate :: Rep -> List Expression -> Array JSX
-truncate rep = Array.fromFoldable <<< loop 20
+truncate :: List JSX -> Array JSX
+truncate = Array.fromFoldable <<< loop 20
  where
-  loop :: Int -> List Expression -> List JSX
+  loop :: Int -> List JSX -> List JSX
   loop n = case _ of
     Nil -> Nil
     Cons e es
       | n <= 0 -> item (text" …") : Nil
-      | otherwise -> item (pretty rep e) : loop (n - 1) es
+      | otherwise -> item e : loop (n - 1) es
 
   item :: JSX -> JSX
   item body = R.li

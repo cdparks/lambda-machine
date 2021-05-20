@@ -22,6 +22,9 @@ class Monoid r <= Display r where
 
 data Rep = Raw | Sugar
 
+derive instance genericRep :: Generic Rep _
+derive instance eqRep :: Eq Rep
+
 class Pretty a where
   pretty :: forall r. Display r => Rep -> a -> r
 
