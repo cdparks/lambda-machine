@@ -5,21 +5,21 @@
   "repository": "https://github.com/cdparks/lambda-machine",
   "license": "MIT",
   "dependencies": {
-    "file-saver": "^2.0.2",
-    "react": "^16.13.1",
-    "react-dom": "^16.13.1"
+    "file-saver": "^2.0.5",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
   },
   "devDependencies": {
-    "parcel": "^1.12.4",
-    "purescript-psa": "^0.8.0",
-    "purescript": "^0.13.8",
-    "spago": "^0.16.0"
+    "parcel": "^2.0.0-beta.2",
+    "purescript-psa": "^0.8.2",
+    "purescript": "^0.14.1",
+    "spago": "^0.20.3"
   },
   "scripts": {
     "setup": "yarn install && spago install",
     "start": "yarn build && parcel index.html",
     "bundle": "yarn build && parcel build --public-url='./' index.html",
-    "build": "spago build --purs-args '--stash --strict'",
+    "build": "spago build --purs-args '--stash --censor-lib --strict'",
     "test": "spago test",
     "repl": "spago repl",
     "clean": "rm -rf .cache .spago .psci_modules output dist",

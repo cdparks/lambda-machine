@@ -1,7 +1,8 @@
 .cache
+.parcel-cache
 .psa-stash
-.psc-package
 .psci_modules
+.psc-package
 .purs-repl
 .spago
 dist
