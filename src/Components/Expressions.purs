@@ -5,7 +5,7 @@ module Components.Expressions
 import Lambda.Prelude
 
 import Data.Array as Array
-import Lambda.Language.Display (Rep, text)
+import Lambda.Language.Display (Rep)
 import Lambda.Language.History (History)
 import Lambda.Language.History as History
 import React.Basic (JSX)
@@ -29,7 +29,7 @@ truncate = Array.fromFoldable <<< loop 20
   loop n = case _ of
     Nil -> Nil
     Cons e es
-      | n <= 0 -> item (text" …") : Nil
+      | n <= 0 -> item (R.text "…") : Nil
       | otherwise -> item e : loop (n - 1) es
 
   item :: JSX -> JSX

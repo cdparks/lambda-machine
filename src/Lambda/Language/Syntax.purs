@@ -10,7 +10,7 @@ import Lambda.Prelude
 
 import Data.Foldable (intercalate)
 import Data.List as List
-import Lambda.Language.Display(Rep(..), class Display, text, style, class Pretty, pretty, parensIf)
+import Lambda.Language.Display(Rep(..), class Pretty, pretty, parensIf, Builder, text, style)
 import Lambda.Language.Name (Name)
 
 -- | A `Statement` is either a top-level `Definition` or an
@@ -89,7 +89,6 @@ instance eqExpression :: Eq Expression where
 instance prettyExpression :: Pretty Expression where
   pretty rep = loop false
    where
-    loop :: forall r. Display r => Boolean -> Expression -> r
     loop inApp = case _ of
       Var v ->
         text $ show v
@@ -110,12 +109,10 @@ instance prettyExpression :: Pretty Expression where
         highlight Global $ loop inApp x
       Cycle -> text "…"
 
-    tryLiteral :: forall r. Display r => Boolean -> Name -> Expression -> r
     tryLiteral inApp name body = fromMaybe' (\_ -> prettyLambda inApp name body) $ do
       head <- literalHead $ Lambda name body
       asNatural head <|> asList head
 
-    prettyLambda :: forall r. Display r => Boolean -> Name -> Expression -> r
     prettyLambda inApp name body =
       parensIf inApp $ text ("λ" <> show name <> ". ") <> loop false body
 
@@ -126,7 +123,7 @@ data Highlight
   | Global
 
 -- | Highlight interesting parts of the redex
-highlight :: forall r. Display r => Highlight -> r -> r
+highlight :: Highlight -> Builder -> Builder
 highlight = style <<< case _ of
   Function -> "highlight-function"
   Argument -> "highlight-argument"
@@ -155,7 +152,7 @@ literalHead = case _ of
   _ -> Nothing
 
 -- | Attempt to interpret syntax as a Church natural.
-asNatural :: forall r. Display r => Head -> Maybe r
+asNatural :: Head -> Maybe Builder
 asNatural {f, z, body} = text <<< show <$> walk 0 body
  where
   walk acc (Apply (Var s) arg)
@@ -165,7 +162,7 @@ asNatural {f, z, body} = text <<< show <$> walk 0 body
   walk _ _ = Nothing
 
 -- | Attempt to interpret syntax as a Church-encoded list.
-asList :: forall r. Display r => Head -> Maybe r
+asList :: Head -> Maybe Builder
 asList {f, z, body} = commaSep <$> walk Nil body
  where
   walk acc (Apply (Apply (Var cons) x) xs)
@@ -174,5 +171,5 @@ asList {f, z, body} = commaSep <$> walk Nil body
     | nil == z = pure $ List.reverse acc
   walk _ _ = Nothing
 
-commaSep :: forall r. Display r => List r -> r
+commaSep :: List Builder -> Builder
 commaSep xs = text "[" <> intercalate (text ", ") xs <> text "]"

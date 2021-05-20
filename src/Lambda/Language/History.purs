@@ -9,7 +9,8 @@ module Lambda.Language.History
 
 import Lambda.Prelude hiding (add)
 
-import Lambda.Language.Display (class Display, class Pretty, pretty, text, style, select, Rep(..))
+import Lambda.Language.Display (class Pretty, pretty, select, Rep(..))
+import Lambda.Language.Display as D
 import React.Basic (JSX)
 
 -- | Cache pretty-printed JSX and text with and without syntactic sugar
@@ -35,46 +36,32 @@ new a = add a empty
 -- | Add expression
 add :: forall a. Pretty a => a -> History -> History
 add a (History {sugar, raw}) = History
-  { sugar: Cons (pretty Sugar a) sugar
-  , raw: Cons (pretty Raw a) raw
+  { sugar: Cons (bundle Sugar a) sugar
+  , raw: Cons (bundle Raw a) raw
   }
 
 -- | Pretty-printed text format, most-recently evaluated first
 toStrings :: Rep -> History -> List String
-toStrings = toListWith $ _.text <<< un Bundle
+toStrings = toListWith $ _.text
 
 -- | Pretty-printed JSX format, most-recently evaluated first
 toJSX :: Rep -> History -> List JSX
-toJSX = toListWith $ _.jsx <<< un Bundle
+toJSX = toListWith $ _.jsx
 
 -- | Extract one list of pretty-printed elments from the history
 toListWith :: forall r. (Bundle -> r) -> Rep -> History -> List r
 toListWith f rep = map f <<< select rep <<< un History
 
--- | Cache JSX and text representation
-newtype Bundle = Bundle
+-- | Pretty print and bundle JSX and text representations
+bundle :: forall a. Pretty a => Rep -> a -> Bundle
+bundle rep a =
+  { jsx: D.toJSX node
+  , text: D.toString node
+  }
+ where
+  node = pretty rep a
+
+type Bundle =
   { jsx :: JSX
   , text :: String
   }
-
-derive instance newtypeBundle :: Newtype Bundle _
-derive instance genericBundle :: Generic Bundle _
-
-instance semigroupBundle :: Semigroup Bundle where
-  append (Bundle x) (Bundle y) = Bundle $ x <> y
-
-instance monoidBundle :: Monoid Bundle where
-  mempty = Bundle
-    { jsx: mempty
-    , text: mempty
-    }
-
-instance displayBundle :: Display Bundle where
-  text s = Bundle
-    { jsx: text s
-    , text: text s
-    }
-  style className (Bundle {jsx, text}) = Bundle
-    { jsx: style className jsx
-    , text: style className text
-    }

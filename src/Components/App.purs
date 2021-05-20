@@ -18,7 +18,7 @@ import Data.Array as Array
 import Data.Foldable (intercalate)
 import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
-import Lambda.Language.Display (Rep(..), toggle, pretty)
+import Lambda.Language.Display (Rep(..), toggle, pretty, toString)
 import Lambda.Language.History (History)
 import Lambda.Language.History as History
 import Lambda.Language.Name (Name)
@@ -326,7 +326,7 @@ save {rep, defs, history} =
   saveTextAs text $ FileName "evaluation.txt"
  where
   text = intercalate "\n" $ fold
-    [ pretty rep <$> defs
+    [ toString <<< pretty rep <$> defs
     , pure ""
     , Array.fromFoldable $ List.reverse $ History.toStrings rep history
     ]
