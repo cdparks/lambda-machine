@@ -7,7 +7,7 @@ expressions in the untyped lambda calculus. This machine has everything:
 * Lambdas
 * Variables
 * Applications
-* Non-recursive top-level definitions
+* **Recursive** top-level definitions (_I finally caved_)
 * Uh, that's it
 
 ## Really?
@@ -110,7 +110,7 @@ that is typically considered too slow and inflexible for "real"
 language implementations. However, for Lambda Machine, I only care
 about retaining or reconstructing enough syntactic information to
 easily visualize incremental lazy evaluation for humans. Speed is not
-the goal, and the Template Instantiation Machine works just fine.
+the goal, so the Template Instantiation Machine works just fine.
 
 Tweaks:
 1. The Template Instantiation Machine operates on lambda-lifted
@@ -118,7 +118,7 @@ supercombinators. Lambda Machine creates closures at runtime.
 2. The Template Instantiation Machine applies functions to as many
 arguments as are available on the stack. Lambda Machine applies
 functions one argument at a time, like a person working with pen and
-paper would.
+paper might.
 3. The Template Instantiation Machine does not evaluate under lambdas.
 Lambda Machine does. This makes certain functions (e.g. the predecessor
 function on Church numerals) work that would otherwise get stuck too
@@ -128,8 +128,6 @@ early.
 I don't remember why I did this. Maybe I thought "stash" looked nicer
 next to "stack". Maybe I thought "dump" was too ugly of a word to be
 typing so much. Truly, it is a mystery lost to time.
-
-
 
 Anyway, build and run it like this:
 
@@ -143,8 +141,8 @@ yarn start
 
 ## Who?
 
-Me, [Chris Parks][me], hi, hello, how are you? HMU if you have questions, comments, or, like, really
-good sandwich recipes.
+Me, [Chris Parks][me], hi, hello, how are you? Let me know if you have
+questions, comments, or, like, really sandwich recipes.
 
 [screenshot]: https://raw.githubusercontent.com/cdparks/lambda-machine/main/static/images/lambda-machine.png
 [lambda-machine]: https://lambda-machine.com

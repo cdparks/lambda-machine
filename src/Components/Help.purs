@@ -47,7 +47,7 @@ toJSX = case _ of
     Text t ->
       R.text t
     Bold t ->
-      R.b_ [R.text t]
+      R.strong_ [R.text t]
     Link url t ->
       R.a
         { href: "https://" <> url
@@ -282,6 +282,41 @@ tutorial =
   , Code
     [ "[1] -> \\cons. \\nil. cons (\\s. \\z. s z) nil"
     , "[1, 2] -> \\cons. \\nil. cons (\\s. \\z. s z) (cons (\\s. \\z. s (s z)) nil)"
+    ]
+  , Header "Recursion"
+  , Para
+    [ Text "The lambda calculus doesn't have recursive definitions."
+    , Text " After all, how would an anonymous function call itself?"
+    , Text " Instead, there are several well-known "
+    , Bold "fixed-point combinators"
+    , Text " that can "
+    , Bold "pass a copy of a function to itself"
+    , Text ", which it can then apply (effectively giving us the power of recursion)."
+    ]
+  , Para
+    [ Text "You can read about fixed-point combinators "
+    , Link "https://en.wikipedia.org/wiki/Fixed-point_combinator" "here"
+    , Text "."
+    ]
+  , Para
+    [ Text "We used to predefine this one:"
+    ]
+  , Code
+    [ "fix f = (λx. f (x x)) (λy. f (y y))"
+    ]
+  , Para
+    [ Mono "fix"
+    , Text " is powerful enough to define recursive functions,"
+    , Text " but it can be difficult to follow their reduction."
+    , Text " Many steps are spent just duplicating the function"
+    , Text " and passing it to itself."
+    , Text " Therefore, lambda-machine allows top-level definitions to"
+    , Text " be defined using direct recursion."
+    , Text " For examples, see the definitions of "
+    , Mono "iterate"
+    , Text " and "
+    , Mono "repeat"
+    , Text "."
     ]
   , Header "Bye!"
   , Para
