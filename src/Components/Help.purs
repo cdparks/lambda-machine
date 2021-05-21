@@ -295,7 +295,7 @@ tutorial =
     ]
   , Para
     [ Text "You can read about fixed-point combinators "
-    , Link "https://en.wikipedia.org/wiki/Fixed-point_combinator" "here"
+    , Link "en.wikipedia.org/wiki/Fixed-point_combinator" "here"
     , Text "."
     ]
   , Para
