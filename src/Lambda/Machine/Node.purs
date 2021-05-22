@@ -138,7 +138,7 @@ instantiateAt target env = case _ of
     Heap.update target $ Pointer $ deref i env
   Nameless.Free name -> do
     addr <- Globals.get name
-    Heap.update target $ Global name addr
+    Heap.update target $ Pointer addr
 
 -- | Find all addresses embedded in a `Node`. Used for pointer-chasing
 -- | in garbage collection.
