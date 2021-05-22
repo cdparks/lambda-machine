@@ -16,6 +16,7 @@ import Components.Input as Input
 import Components.ParseError as ParseError
 import Data.Array as Array
 import Data.Foldable (intercalate)
+import Data.Grammar (pluralizeWith)
 import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
 import Lambda.Language.History (History)
@@ -46,6 +47,7 @@ type State =
   , history :: History
   , rep :: Rep
   , alert :: Maybe (Tuple Level JSX)
+  , steps :: Maybe Int
   }
 
 mkApp :: Component {}
@@ -82,7 +84,7 @@ mkApp = do
           , onDelete: dispatch <<< DeleteDef
           }
         , split
-          (R.h3_ [R.text "Evaluation"])
+          (stepsHeader state.steps)
           (Controls.component
             { machine: state.machine
             , onStep: dispatch <<< Step
@@ -132,7 +134,7 @@ prelude =
     , "or x y = x true y"
     , "not x = x false true"
     , "succ n s z = s (n s z)"
-    , "pred n f x = n (λg. λh. h (g f)) (λu. x) (λu. u)"
+    , "pred n s z = n (λg. λh. h (g s)) (λu. z) (λu. u)"
     , "add m n s z = m s (n s z)"
     , "mul m n s z = m (n s) z"
     , "zero? n = n (λx. false) true"
@@ -168,6 +170,7 @@ initialState =
   , history: History.empty
   , rep: Raw
   , alert: Nothing
+  , steps: Nothing
   }
 
 -- | Update `State` in response to an `Action`
@@ -286,6 +289,7 @@ setExpr syntax s =
         , machine = pure machine
         , history = History.new snapshot
         , alert = Nothing
+        , steps = Just 0
         }
  where
   expr = Nameless.from syntax
@@ -302,6 +306,7 @@ step :: Machine -> State -> State
 step m0 s =  s
   { machine = pure m
   , history = history
+  , steps = (1 + _) <$> s.steps
   }
  where
   m = Machine.step m0
@@ -314,6 +319,7 @@ clear s = s
   { world = World.unfocus s.world
   , machine = Nothing
   , history = History.empty
+  , steps = Nothing
   }
 
 -- | Toggle syntactic sugar for Church numerals and lists.
@@ -329,4 +335,18 @@ save {rep, defs, history} =
     [ toString <<< pretty rep <$> defs
     , pure ""
     , Array.fromFoldable $ List.reverse $ History.toStrings rep history
+    ]
+
+stepsHeader :: Maybe Int -> JSX
+stepsHeader = case _ of
+  Nothing -> R.h3
+    { className: "text-muted"
+    , children: [R.text "Steps"]
+    }
+  Just n -> R.h3_
+    [ R.text $ fold
+      [ show n
+      , " "
+      , pluralizeWith "s" n "Step"
+      ]
     ]
