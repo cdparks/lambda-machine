@@ -132,6 +132,7 @@ typing so much. Truly, it is a mystery lost to time.
 Anyway, build and run it like this:
 
 ```bash
+cd frontend
 yarn setup
 yarn build
 yarn start
