@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -eu
 
@@ -23,7 +23,7 @@ now=$(date)
 git branch -D gh-pages 2>/dev/null || true
 git branch -D draft 2>/dev/null || true
 git checkout -b draft
-mv ./frontend/dist ./dist
+cp -r ./frontend/dist ./dist
 cp ./frontend/static/CNAME ./dist/CNAME
 echo "$now" > ./dist/deployed.txt
 git add -f ./dist
