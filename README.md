@@ -143,9 +143,9 @@ yarn start
 ## Who?
 
 Me, [Chris Parks][me], hi, hello, how are you? Let me know if you have
-questions, comments, or, like, really sandwich recipes.
+questions, comments, or, like, really good sandwich recipes.
 
-[screenshot]: https://raw.githubusercontent.com/cdparks/lambda-machine/main/static/images/lambda-machine.png
+[screenshot]: https://raw.githubusercontent.com/cdparks/lambda-machine/main/frontend/static/images/lambda-machine.png
 [lambda-machine]: https://lambda-machine.com
 [book]: https://www.amazon.com/dp/0486478831
 [greg]: https://www.macs.hw.ac.uk/~greg
