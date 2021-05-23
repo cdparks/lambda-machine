@@ -15,7 +15,7 @@ if [ ! -d "./dist" ]; then
 fi
 
 git_root=$(git rev-parse --show-toplevel)
-pushd git_root > /dev/null
+pushd "$git_root" > /dev/null
 trap "popd > /dev/null" EXIT
 
 now=$(date)
