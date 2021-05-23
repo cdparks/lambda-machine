@@ -10,9 +10,11 @@
     "react-dom": "^17.0.2"
   },
   "devDependencies": {
+    "@parcel/packager-raw-url": "2.0.0-beta.2",
+    "@parcel/transformer-webmanifest": "2.0.0-beta.2",
     "parcel": "^2.0.0-beta.2",
-    "purescript-psa": "^0.8.2",
     "purescript": "^0.14.1",
+    "purescript-psa": "^0.8.2",
     "spago": "^0.20.3"
   },
   "scripts": {
