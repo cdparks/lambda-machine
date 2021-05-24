@@ -53,7 +53,13 @@ instance semigroupBuilder :: Semigroup Builder where
   append (Builder lhs) (Builder rhs) = Builder $ lhs <<< rhs
 
 instance monoidBuilder :: Monoid Builder where
-  mempty  = Builder identity
+  mempty = Builder identity
+
+instance readForeignBuilder :: ReadForeign Builder where
+  readImpl = map text <<< readImpl
+
+instance writeForeignBuilder :: WriteForeign Builder where
+  writeImpl = writeImpl <<< toString
 
 -- | Appends are right-associated by construction since
 -- | Nodes cannot appear as their left operand

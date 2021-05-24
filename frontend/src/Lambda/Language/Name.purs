@@ -12,7 +12,7 @@ import Data.Array as Array
 import Data.Char (toCharCode)
 import Data.Set as Set
 import Data.String.CodeUnits (fromCharArray, toCharArray)
-import Lambda.Language.Parser (class Parse, Parser, satisfy, string, token)
+import Lambda.Language.Parser (class Parse, Parser, parse, liftF, satisfy, string, token)
 import Partial.Unsafe (unsafePartial)
 
 -- | Source-level name with an optional subscript.
@@ -26,6 +26,12 @@ instance showName :: Show Name where
 
 instance hashableName :: Hashable Name where
   hash (Name n ms) = hash $ Tuple n ms
+
+instance readForeignName :: ReadForeign Name where
+  readImpl = liftF parse <=< readImpl
+
+instance writeForeignName :: WriteForeign Name where
+  writeImpl = writeImpl <<< show
 
 -- | Construct a `Name` with no subscript.
 from :: String -> Name

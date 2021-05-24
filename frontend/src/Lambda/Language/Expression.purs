@@ -14,7 +14,7 @@ import Data.Maybe (fromJust)
 import Data.String.CodeUnits (fromCharArray)
 import Lambda.Language.Name (Name)
 import Lambda.Language.Name as Name
-import Lambda.Language.Parser (class Parse, parse, Parser, brackets, char, fail, parens, satisfy, sepBy, string, token)
+import Lambda.Language.Parser (class Parse, parse, liftF, Parser, brackets, char, fail, parens, satisfy, sepBy, string, token)
 import Lambda.Language.Pretty (Rep(..), class Pretty, pretty, parensIf, Builder, text, style)
 import Partial.Unsafe (unsafePartial)
 
@@ -45,6 +45,12 @@ derive instance genericExpression :: Generic Expression _
 
 instance showExpression :: Show Expression where
   show x = genericShow x
+
+instance readForeignExpression :: ReadForeign Expression where
+  readImpl = liftF parse <=< readImpl
+
+instance writeForeignExpression :: WriteForeign Expression where
+  writeImpl = writeImpl <<< pretty Raw
 
 instance prettyExpression :: Pretty Expression where
   pretty rep = loop false

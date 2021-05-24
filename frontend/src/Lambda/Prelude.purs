@@ -9,6 +9,7 @@ import Control.Alt ((<|>)) as X
 import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM) as X
 import Control.Monad.State (class MonadState, evalState, execState, gets, get, modify_, put) as X
 import Control.MonadZero (guard) as X
+import Data.Bifunctor (class Bifunctor, bimap, lmap, rmap) as X
 import Data.Either (Either(..), either) as X
 import Data.Foldable (class Foldable, fold, foldr, foldl, foldM, foldMap, for_, traverse_) as X
 import Data.Generic.Rep (class Generic) as X
@@ -29,4 +30,6 @@ import Data.Tuple (Tuple(..), uncurry, fst, snd) as X
 import Data.Unfoldable (class Unfoldable) as X
 import Debug (trace, traceM, spy, debugger) as X
 import Effect (Effect) as X
+import Foreign (F, Foreign, ForeignError(..)) as X
 import Safe.Coerce (class Coercible, coerce) as X
+import Simple.JSON (readJSON, writeJSON, class ReadForeign, readImpl, class WriteForeign, writeImpl) as X
