@@ -1,57 +1,22 @@
-module Lambda.Language.Syntax
-  ( Statement(..)
-  , Definition(..)
-  , Expression(..)
-  , fromDef
+module Lambda.Language.Expression
+  ( Expression(..)
   , unHighlight
   ) where
 
 import Lambda.Prelude
 
+import Control.Lazy (fix)
+import Data.Array as Array
 import Data.Foldable (intercalate)
+import Data.Int (fromString)
 import Data.List as List
+import Data.Maybe (fromJust)
+import Data.String.CodeUnits (fromCharArray)
 import Lambda.Language.Name (Name)
+import Lambda.Language.Name as Name
+import Lambda.Language.Parser (class Parse, parse, Parser, brackets, char, fail, parens, satisfy, sepBy, string, token)
 import Lambda.Language.Pretty (Rep(..), class Pretty, pretty, parensIf, Builder, text, style)
-
--- | A `Statement` is either a top-level `Definition` or an
--- | `Expression` to be evaluated
-data Statement
-  = Define Definition
-  | Eval Expression
-
--- | Warning - not alpha-equivalence; names matter here
-derive instance eqStatement :: Eq Statement
-derive instance genericStatement :: Generic Statement _
-
-instance showStatement :: Show Statement where
-  show x = genericShow x
-
-instance prettyStatement :: Pretty Statement where
-  pretty rep = case _ of
-    Define def -> pretty rep def
-    Eval expr -> pretty rep expr
-
--- | A top-level definition
-newtype Definition = Definition
-  { name :: Name
-  , args :: Array Name
-  , expr :: Expression
-  }
-
--- | Warning - not alpha-equivalence; names matter here
-derive newtype instance eqDefinition :: Eq Definition
-derive newtype instance showDefinition :: Show Definition
-derive instance newtypeDefinition :: Newtype Definition _
-
-instance prettyDefinition :: Pretty Definition where
-  pretty rep (Definition {name, args, expr}) =
-    text prefix <> pretty rep expr
-   where
-    prefix = show name <> " " <> intercalate " " ((show <$> args) <> ["= "])
-
--- | Convert a `Definition` to an `Expression` returning the `Name`
-fromDef :: Definition -> {name :: Name, expr :: Expression}
-fromDef (Definition {name, args, expr}) = {name, expr: foldr Lambda expr args}
+import Partial.Unsafe (unsafePartial)
 
 -- | Source-level syntax minus syntactic sugar for lists and natural
 -- | numbers; those are eliminated in the parser. The Highlight
@@ -168,3 +133,92 @@ asList {f, z, body} = commaSep <$> walk Nil body
 
 commaSep :: List Builder -> Builder
 commaSep xs = text "[" <> intercalate (text ", ") xs <> text "]"
+
+-- | Parse an expression
+-- |
+-- | ```ebnf
+-- |
+-- | expression
+-- |   = lambda, name, {name}, ".", expression    (* Lambda abstraction *)
+-- |   | name                                     (* Variable *)
+-- |   | expression, expression                   (* Application *)
+-- |   | "(", expression, ")"                     (* Parentheses *)
+-- |   | {digit}                                  (* Natural number *)
+-- |   | "[", [expressions], "]"                  (* List *)
+-- |   ;
+-- |
+-- | expressions
+-- |   = expression, [",", expressions] ;         (* One or more comma-separated expressions *)
+-- |
+-- | lambda
+-- |   = "\"                                      (* Backslash *)
+-- |   | "λ"                                      (* Greek letter lambda *)
+-- |   ;
+-- | ```
+-- |
+instance parseExpression :: Parse Expression where
+  parse = fix \parseExpr -> foldl Apply
+    <$> parseAtom parseExpr
+    <*> Array.many (parseAtom parseExpr)
+
+parseAtom :: Parser Expression -> Parser Expression
+parseAtom parseExpr =
+  failCycle <|> parseLambda <|> parseNat <|> parseList parseExpr <|> parens parseExpr <|> parseVar
+ where
+  parseLambda :: Parser Expression
+  parseLambda = do
+    void $ token $ string "\\" <|> string "λ"
+    names <- Array.some parse
+    void $ token $ string "."
+    body <- parseExpr
+    pure $ foldr Lambda body names
+
+-- | Convert comma-delimited list to Church-encoded list.
+toList :: List Expression -> Expression
+toList xs =
+  Lambda cons (Lambda nil (loop xs))
+ where
+  cons = Name.from "cons"
+  nil = Name.from "nil"
+  loop Nil = Var nil
+  loop (Cons y ys) = Apply (Apply (Var cons) y) (loop ys)
+
+-- | Convert a natural number to a Church numeral
+toNat :: Int -> Expression
+toNat n =
+  Lambda s (Lambda z (loop n))
+ where
+  s = Name.from "s"
+  z = Name.from "z"
+  loop k
+    | k <= 0 = Var z
+    | otherwise = Apply (Var s) (loop (k - 1))
+
+-- | Fail if the user pastes a cycle's representation (… or ...) back into the input
+failCycle :: Parser Expression
+failCycle = token do
+  ellipsis <- string "…" <|> string "..."
+  fail $ fold
+    [ "We don't know how to parse “"
+    , ellipsis
+    , "”! (Hint: it might indicate cyclic data or truncated output) "
+    ]
+
+-- | Parse a natural number.
+parseNat :: Parser Expression
+parseNat = token do
+  digits <- Array.some $ satisfy isDigit
+  let n = unsafePartial $ fromJust $ fromString $ fromCharArray digits
+  pure $ toNat n
+
+-- | Parse a comma-separated list between brackets.
+parseList :: Parser Expression -> Parser Expression
+parseList p = toList <$> brackets (p `sepBy` token (char ','))
+
+-- | Parse a variable.
+parseVar :: Parser Expression
+parseVar = Var <$> parse
+
+-- | Is a character a decimal digit?
+isDigit :: Char -> Boolean
+isDigit c = '0' <= c && c <= '9'

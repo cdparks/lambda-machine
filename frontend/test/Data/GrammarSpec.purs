@@ -35,5 +35,5 @@ spec = describe "Data.Grammar" do
 -- | Generate positive integers only
 newtype Positive = Positive Int
 
-instance arbitraryPosition :: Arbitrary Positive where
+instance arbitraryPositive :: Arbitrary Positive where
   arbitrary = Positive <$> chooseInt 1 top

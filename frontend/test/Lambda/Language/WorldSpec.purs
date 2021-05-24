@@ -6,6 +6,7 @@ import Test.Prelude
 
 import Data.Map as Map
 import Data.Set as Set
+import Lambda.Language.Name as Name
 import Lambda.Language.World (ConsistencyError(..), Dependency(..))
 import Lambda.Language.World as World
 
@@ -95,7 +96,7 @@ spec = describe "Lambda.Language.World" do
       result `shouldEqual` world
 
 x :: Name
-x = name_ "x"
+x = Name.from "x"
 
 y :: Name
-y = name_ "y"
+y = Name.from "y"

@@ -5,6 +5,7 @@ module Lambda.Language.NamelessSpec
 import Test.Prelude
 
 import Data.Set as Set
+import Lambda.Language.Name as Name
 import Lambda.Language.Nameless (Expression(..))
 import Lambda.Language.Nameless as Nameless
 
@@ -24,15 +25,15 @@ spec = describe "Lambda.Language.Nameless" do
       let
         expr = Nameless.from $ mkAst "λx x. x"
         expected = Lambda x Set.empty
-          $ Lambda (name "x" $ pure 0) Set.empty
+          $ Lambda (Name.withSubscript 0 "x") Set.empty
           $ Bound 0
       expr `shouldEqual` expected
 
 x :: Name
-x = name_ "x"
+x = Name.from "x"
 
 y :: Name
-y = name_ "y"
+y = Name.from "y"
 
 f :: Name
-f = name_ "f"
+f = Name.from "f"

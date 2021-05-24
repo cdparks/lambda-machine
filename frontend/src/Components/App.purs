@@ -19,14 +19,17 @@ import Data.Foldable (intercalate)
 import Data.Grammar (pluralizeWith)
 import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
+import Lambda.Language.Definition (Definition(..))
+import Lambda.Language.Definition as Definition
+import Lambda.Language.Expression as Syntax
 import Lambda.Language.History (History)
 import Lambda.Language.History as History
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless as Nameless
-import Lambda.Language.Parse (parseAll, parseDefinition, parseStatement, unsafeParse)
+import Lambda.Language.Parser (parse)
+import Lambda.Language.Parser as Parser
 import Lambda.Language.Pretty (Rep(..), toggle, pretty, toString)
-import Lambda.Language.Syntax (Statement(..), Definition(..), fromDef)
-import Lambda.Language.Syntax as Syntax
+import Lambda.Language.Statement (Statement(..))
 import Lambda.Language.World (World)
 import Lambda.Language.World as World
 import Lambda.Machine (Machine)
@@ -124,7 +127,7 @@ split lhs rhs =
 -- | Default set of global definitions
 prelude :: Array Definition
 prelude =
-  unsafeParse parseDefinition <$>
+  Parser.unsafeRun parse <$>
     [ "identity x = x"
     , "const x y = x"
     , "fix f = f (fix f)"
@@ -209,7 +212,7 @@ parseText :: State -> State
 parseText s
   | s.text == "" = s
 parseText s =
-  case parseAll parseStatement s.text of
+  case Parser.run parse s.text of
     Left error -> s
       { alert = pure
         $ Tuple Danger
@@ -264,7 +267,7 @@ addDef def s = case World.define name nameless s.world of
     , alert = Nothing
     }
  where
-  { expr, name } = fromDef def
+  { expr, name } = Definition.split def
   nameless = Nameless.from expr
 
 -- | Attempt to set the main expression. If the expression depends on
@@ -298,7 +301,7 @@ setExpr syntax s =
 -- | Convert `Definition`s to pairs of names and expressions.
 defsToGlobals :: Array Definition -> Array (Tuple Name Nameless.Expression)
 defsToGlobals = map \def ->
-  let {expr, name} = fromDef def
+  let {expr, name} = Definition.split def
   in Tuple name $ Nameless.from expr
 
 -- | Do one step of evaluation and update the history.

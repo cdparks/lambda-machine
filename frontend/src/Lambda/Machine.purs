@@ -11,9 +11,9 @@ module Lambda.Machine
 import Lambda.Prelude
 
 import Data.HashSet as HashSet
+import Lambda.Language.Expression as Syntax
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless as Nameless
-import Lambda.Language.Syntax as Syntax
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)
 import Lambda.Machine.Globals as Globals

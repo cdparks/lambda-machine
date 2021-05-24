@@ -11,9 +11,9 @@ import Lambda.Prelude
 import Data.Array (cons, unsafeIndex)
 import Data.Map as Map
 import Data.Set as Set
+import Lambda.Language.Expression as Syntax
 import Lambda.Language.Name (Name, next)
 import Lambda.Language.Pretty (class Pretty, parensIf, text)
-import Lambda.Language.Syntax as Syntax
 import Partial.Unsafe (unsafePartial, unsafeCrashWith)
 
 -- | Locally nameless expression tree using zero-based De-Bruijn

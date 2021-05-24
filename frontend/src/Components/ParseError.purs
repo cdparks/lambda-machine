@@ -4,7 +4,7 @@ module Components.ParseError
 
 import Lambda.Prelude
 
-import Lambda.Language.Parse (ParseError, formatParseError)
+import Lambda.Language.Parser (ParseError, formatParseError)
 import React.Basic (JSX, fragment)
 import React.Basic.DOM as R
 

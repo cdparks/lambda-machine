@@ -5,8 +5,8 @@ module Lambda.MachineSpec
 import Test.Prelude
 
 import Data.Function (applyN)
+import Lambda.Language.Expression as Syntax
 import Lambda.Language.Nameless as Nameless
-import Lambda.Language.Syntax as Syntax
 import Lambda.Machine as Machine
 
 spec :: Spec Unit
