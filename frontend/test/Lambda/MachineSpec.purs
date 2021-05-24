@@ -5,8 +5,9 @@ module Lambda.MachineSpec
 import Test.Prelude
 
 import Data.Function (applyN)
-import Lambda.Language.Expression as Syntax
-import Lambda.Language.Nameless as Nameless
+import Lambda.Language.Expression (Expression)
+import Lambda.Language.Expression as Expression
+import Lambda.Language.Nameless (Nameless)
 import Lambda.Machine as Machine
 
 spec :: Spec Unit
@@ -14,7 +15,7 @@ spec = describe "Lambda.Machine" do
   describe "Lambda.Machine.step" do
     it "is stack-safe with programs that loop" do
       let result = stepN 100_000 [mkBind "f x = x x"] $ mkAnon "f f"
-      Syntax.unHighlight result `shouldEqual` mkAst "f f"
+      Expression.unHighlight result `shouldEqual` mkAst "f f"
 
     it "evaluates addition of church numerals" do
       let result = normalize [mkBind "add m n s z = m s (n s z)"] $ mkAnon "add 2 3"
@@ -37,9 +38,9 @@ spec = describe "Lambda.Machine" do
 -- | Create a new `Machine` and step it N times.
 stepN
   :: Int
-  -> Array (Tuple Name Nameless.Expression)
-  -> Nameless.Expression
-  -> Syntax.Expression
+  -> Array (Tuple Name Nameless)
+  -> Nameless
+  -> Expression
 stepN n globals =
   Machine.snapshot
   <<< applyN Machine.step n
@@ -47,9 +48,9 @@ stepN n globals =
 
 -- | Create a new `Machine` and step it until it halts.
 normalize
-  :: Array (Tuple Name Nameless.Expression)
-  -> Nameless.Expression
-  -> Syntax.Expression
+  :: Array (Tuple Name Nameless)
+  -> Nameless
+  -> Expression
 normalize globals =
   loop <<< Machine.new globals
  where

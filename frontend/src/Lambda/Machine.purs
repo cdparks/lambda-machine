@@ -11,8 +11,10 @@ module Lambda.Machine
 import Lambda.Prelude
 
 import Data.HashSet as HashSet
-import Lambda.Language.Expression as Syntax
+import Lambda.Language.Expression (Expression)
+import Lambda.Language.Expression as Expression
 import Lambda.Language.Name (Name)
+import Lambda.Language.Nameless (Nameless)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)
@@ -78,8 +80,8 @@ type Machine =
 -- | up front to drop globals we won't need.
 new
   :: forall f. Foldable f
-  => f (Tuple Name Nameless.Expression)
-  -> Nameless.Expression -> Machine
+  => f (Tuple Name Nameless)
+  -> Nameless -> Machine
 new rawGlobals expr =
   execState (setFocus =<< unwind)
     { root
@@ -153,7 +155,7 @@ type Redex =
   -- | New environment including the argument
   , env :: Env Address
   -- | Expression to instantiate in the environment
-  , body :: Nameless.Expression
+  , body :: Nameless
   }
 
 -- | Evaluate a global or redex
@@ -273,7 +275,7 @@ formatRoot
   :: forall s m
    . MonadState { focus :: Maybe Focus, heap :: Heap Node | s } m
   => Address
-  -> m Syntax.Expression
+  -> m Expression
 formatRoot = restoreFocus <<< formatNodeWith HashSet.empty
 
 -- | Restore the focus if the argument drops it
@@ -284,15 +286,15 @@ restoreFocus body = do
   modify_ _ { focus = focus }
   pure r
 
--- | Fetch the node and convert it to `Syntax.Expression`.
+-- | Fetch the node and convert it to an `Expression`.
 formatNodeWith
   :: forall s m
    . MonadState { focus :: Maybe Focus, heap :: Heap Node | s } m
   => HashSet Address
   -> Address
-  -> m Syntax.Expression
+  -> m Expression
 formatNodeWith seen0 address
-  | address `HashSet.member` seen0 = pure $ Syntax.Cycle
+  | address `HashSet.member` seen0 = pure $ Expression.Cycle
   | otherwise = do
     let seen = HashSet.insert address seen0
     node <- Heap.fetch address
@@ -300,28 +302,28 @@ formatNodeWith seen0 address
     if map highlight focus == Just address
       then do
         modify_ _ { focus = Nothing }
-        Syntax.Highlight <$> format seen node
+        Expression.Highlight <$> format seen node
       else format seen node
  where
   format seen = case _ of
-    Apply f a -> Syntax.Apply <$> formatNodeWith seen f <*> formatNodeWith seen a
+    Apply f a -> Expression.Apply <$> formatNodeWith seen f <*> formatNodeWith seen a
     Closure {env, name, body} -> do
       formatted <- traverse (formatNodeWith seen) env
-      pure $ Syntax.Lambda name $ toSyntax (Syntax.Var name : formatted) body
+      pure $ Expression.Lambda name $ syntax (Expression.Var name : formatted) body
     Stuck term -> formatStuckWith seen term
     Pointer a -> formatNodeWith seen a
-    Global name _ -> pure $ Syntax.Var name
+    Global name _ -> pure $ Expression.Var name
 
--- | Convert a `Nameless.Expression` in a `Closure` to `Syntax.Expression`
-toSyntax
-  :: List Syntax.Expression
-  -> Nameless.Expression
-  -> Syntax.Expression
-toSyntax env = case _ of
-  Nameless.Lambda n _ e -> Syntax.Lambda n $ toSyntax (Syntax.Var n : env) e
-  Nameless.Apply f a -> Syntax.Apply (toSyntax env f) (toSyntax env a)
+-- | Convert a nameless expression in a `Closure` to an `Expression`
+syntax
+  :: List Expression
+  -> Nameless
+  -> Expression
+syntax env = case _ of
+  Nameless.Lambda n _ e -> Expression.Lambda n $ syntax (Expression.Var n : env) e
+  Nameless.Apply f a -> Expression.Apply (syntax env f) (syntax env a)
   Nameless.Bound i -> Node.deref i env
-  Nameless.Free n -> Syntax.Var n
+  Nameless.Free n -> Expression.Var n
 
 -- | Format a `Stuck` node.
 formatStuckWith
@@ -329,11 +331,11 @@ formatStuckWith
    . MonadState { focus :: Maybe Focus, heap :: Heap Node | s } m
   => HashSet Address
   -> Stuck
-  -> m Syntax.Expression
+  -> m Expression
 formatStuckWith seen = case _ of
-  StuckVar name -> pure $ Syntax.Var name
-  StuckLambda name e  -> Syntax.Lambda name <$> formatNodeWith seen e
-  StuckApply f a -> Syntax.Apply <$> formatNodeWith seen f <*> formatNodeWith seen a
+  StuckVar name -> pure $ Expression.Var name
+  StuckLambda name e  -> Expression.Lambda name <$> formatNodeWith seen e
+  StuckApply f a -> Expression.Apply <$> formatNodeWith seen f <*> formatNodeWith seen a
 
 highlight :: Focus -> Address
 highlight = case _ of
@@ -341,5 +343,5 @@ highlight = case _ of
   Redex { target } -> target
 
 -- | Take a snapshot of a `Machine` by formatting the `root` node
-snapshot :: Machine -> Syntax.Expression
+snapshot :: Machine -> Expression
 snapshot = evalState $ formatRoot =<< gets _.root

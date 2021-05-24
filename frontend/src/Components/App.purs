@@ -21,10 +21,11 @@ import Data.List as List
 import Effect.Save (FileName(..), saveTextAs)
 import Lambda.Language.Definition (Definition(..))
 import Lambda.Language.Definition as Definition
-import Lambda.Language.Expression as Syntax
+import Lambda.Language.Expression (Expression)
 import Lambda.Language.History (History)
 import Lambda.Language.History as History
 import Lambda.Language.Name (Name)
+import Lambda.Language.Nameless (Nameless)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Language.Parser (parse)
 import Lambda.Language.Parser as Parser
@@ -158,7 +159,7 @@ data Action
   | ParseText
   | DeleteDef Name
   | AddDef Definition
-  | SetExpr Syntax.Expression
+  | SetExpr Expression
   | Step Machine
   | Clear
   | ToggleSugar
@@ -272,7 +273,7 @@ addDef def s = case World.define name nameless s.world of
 
 -- | Attempt to set the main expression. If the expression depends on
 -- | undefined names, present an error message.
-setExpr :: Syntax.Expression -> State -> State
+setExpr :: Expression -> State -> State
 setExpr syntax s =
   case World.focus expr s.world of
     Left error -> s
@@ -299,7 +300,7 @@ setExpr syntax s =
   globals = defsToGlobals s.defs
 
 -- | Convert `Definition`s to pairs of names and expressions.
-defsToGlobals :: Array Definition -> Array (Tuple Name Nameless.Expression)
+defsToGlobals :: Array Definition -> Array (Tuple Name Nameless)
 defsToGlobals = map \def ->
   let {expr, name} = Definition.split def
   in Tuple name $ Nameless.from expr

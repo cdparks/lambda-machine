@@ -6,7 +6,7 @@ import Test.Prelude
 
 import Data.Set as Set
 import Lambda.Language.Name as Name
-import Lambda.Language.Nameless (Expression(..))
+import Lambda.Language.Nameless (Nameless(..))
 import Lambda.Language.Nameless as Nameless
 
 spec :: Spec Unit

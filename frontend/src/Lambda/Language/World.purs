@@ -17,7 +17,7 @@ import Data.Grammar as Grammar
 import Data.Map as Map
 import Data.Set as Set
 import Lambda.Language.Name (Name)
-import Lambda.Language.Nameless (Expression, freeVars)
+import Lambda.Language.Nameless (Nameless, freeVars)
 import Partial.Unsafe (unsafeCrashWith)
 
 -- | Representation of dependencies between global definitions and the
@@ -79,7 +79,7 @@ empty =
 
 -- | Create a new `World` given a list of top-level definitions. Crashes
 -- | if any definition depends on `Name`s that did not appear before it.
-new :: Array (Tuple Name Expression) -> World
+new :: Array (Tuple Name Nameless) -> World
 new prelude = case foldM (flip addGlobal) empty prelude of
   Left err -> unsafeCrashWith $ "Malformed prelude: " <> show err
   Right world -> world
@@ -88,7 +88,7 @@ new prelude = case foldM (flip addGlobal) empty prelude of
 
 -- | Attempt to define a new top-level definition. Fails if the
 -- | definition mentions other undefined `Name`s.
-define :: Name -> Expression -> World -> Either ConsistencyError World
+define :: Name -> Nameless -> World -> Either ConsistencyError World
 define name = add $ Global name
 
 -- | Attempt to delete an existing top-level definition. Fails if any
@@ -102,7 +102,7 @@ undefine name world = do
 
 -- | Attempt to focus the `World` on a new root expression. Fails if
 -- | the expression mentions any undefined `Name`s.
-focus :: Expression -> World -> Either ConsistencyError World
+focus :: Nameless -> World -> Either ConsistencyError World
 focus = add Root
 
 -- | Remove root expression.
@@ -110,7 +110,7 @@ unfocus :: World -> World
 unfocus = remove Root
 
 -- | Internal operation for adding a new element to the `World`.
-add :: Dependency -> Expression -> World -> Either ConsistencyError World
+add :: Dependency -> Nameless -> World -> Either ConsistencyError World
 add dep expr world = do
   let
     newWorld = remove dep world

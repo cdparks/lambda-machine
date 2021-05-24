@@ -1,40 +1,39 @@
 module Lambda.Language.Nameless
-  ( Expression(..)
+  ( Nameless(..)
   , from
-  , syntax
   , freeVars
   , alpha
   ) where
 
 import Lambda.Prelude
 
-import Data.Array (cons, unsafeIndex)
 import Data.Map as Map
 import Data.Set as Set
-import Lambda.Language.Expression as Syntax
+import Lambda.Language.Expression (Expression)
+import Lambda.Language.Expression as Expression
 import Lambda.Language.Name (Name, next)
 import Lambda.Language.Pretty (class Pretty, parensIf, text)
-import Partial.Unsafe (unsafePartial, unsafeCrashWith)
+import Partial.Unsafe (unsafeCrashWith)
 
 -- | Locally nameless expression tree using zero-based De-Bruijn
 -- | indexes. That is, `λx. x` is represented by `λx. 0`, and
 -- | `λx. λy. x` is represented by `λx. λy. 1`. Binders are annotated
--- | with their source-level name for quoting back to `Syntax` as well
--- | as the set of free-variables they reference. The latter is used
--- | to avoid garbage-collecting global definitions.
-data Expression
+-- | with their source-level name for quoting back to an `Expression`
+-- | as well as the set of free-variables they reference. The latter
+-- | is used to avoid garbage-collecting global definitions.
+data Nameless
   = Bound Int
   | Free Name
-  | Lambda Name (Set Name) Expression
-  | Apply Expression Expression
+  | Lambda Name (Set Name) Nameless
+  | Apply Nameless Nameless
 
-derive instance genericExpression :: Generic Expression _
+derive instance genericNameless :: Generic Nameless _
 
-instance showExpression :: Show Expression where
+instance showNameless :: Show Nameless where
   show x = genericShow x
 
 -- | Alpha-equivalence
-instance eqExpression :: Eq Expression where
+instance eqNameless :: Eq Nameless where
   eq lhs rhs = case lhs, rhs of
     Bound i, Bound j -> i == j
     Free n, Free m -> n == m
@@ -42,34 +41,34 @@ instance eqExpression :: Eq Expression where
     Apply f a, Apply g b -> f == g && a == b
     _, _ -> false
 
--- | Create a locally-nameless `Expression` from an AST
-from :: Syntax.Expression -> Expression
+-- | Create a locally-nameless expression from an AST
+from :: Expression -> Nameless
 from = alphaInternal <<< go Map.empty
  where
   go env = case _ of
-    Syntax.Var n ->
+    Expression.Var n ->
       case Map.lookup n env of
         Nothing -> {expr: Free n, fvs: Set.singleton n}
         Just i -> {expr: Bound i, fvs: Set.empty}
-    Syntax.Lambda n body ->
+    Expression.Lambda n body ->
       let
         shifted = Map.insert n 0 $ (_ + 1) <$> env
         {expr, fvs} = go shifted body
       in {expr: Lambda n fvs expr, fvs}
-    Syntax.Apply f0 a0 ->
+    Expression.Apply f0 a0 ->
       let
         f = go env f0
         a = go env a0
       in {expr: Apply f.expr a.expr, fvs: f.fvs <> a.fvs}
-    Syntax.Highlight x -> go env x
-    Syntax.Cycle -> unsafeCrashWith "Parser should never produce a cycle"
+    Expression.Highlight x -> go env x
+    Expression.Cycle -> unsafeCrashWith "Parser should never produce a cycle"
 
--- | Alpha-convert an `Expression` such that no names are shadowed.
-alpha :: Expression -> Expression
+-- | Alpha-convert an nameless expression such that no names are shadowed.
+alpha :: Nameless -> Nameless
 alpha expr = alphaInternal { expr, fvs: freeVars expr }
 
--- | Alpha-conversion when we already have an `Expression`'s free variables.
-alphaInternal :: {expr :: Expression, fvs :: Set Name} -> Expression
+-- | Alpha-conversion when we already have an nameless expression's free variables
+alphaInternal :: {expr :: Nameless, fvs :: Set Name} -> Nameless
 alphaInternal x =
   loop x.fvs x.expr
  where
@@ -90,32 +89,15 @@ fresh env n
   | n `Set.member` env = fresh env (next n)
   | otherwise = {used: Set.insert n env, new: n}
 
--- | Access an `Expression`'s precomputed free variables.
-freeVars :: Expression -> Set Name
+-- | Access a nameless expression's precomputed free variables.
+freeVars :: Nameless -> Set Name
 freeVars = case _ of
   Bound _ -> Set.empty
   Free n -> Set.singleton n
   Lambda _ fvs _ -> fvs
   Apply f a -> freeVars f <> freeVars a
 
--- | Quote an `Expression` back to `Syntax.Expression`. `Expression`s
--- | are alpha-converted, so the resulting AST will be equivalent, but
--- | may have slightly different names.
-syntax :: Expression -> Syntax.Expression
-syntax =
-  loop []
- where
-  loop env = case _ of
-    Bound i ->
-      Syntax.Var $ unsafePartial $ env `unsafeIndex` i
-    Free n ->
-      Syntax.Var n
-    Lambda n _ b ->
-      Syntax.Lambda n $ loop (n `cons` env) b
-    Apply f a ->
-      Syntax.Apply (loop env f) (loop env a)
-
-instance prettyExpression :: Pretty Expression where
+instance prettyNameless :: Pretty Nameless where
   pretty _ =
     walk false
    where

@@ -16,7 +16,7 @@ import Lambda.Prelude
 import Data.Array as Array
 import Data.List as List
 import Lambda.Language.Name (Name)
-import Lambda.Language.Nameless (Expression)
+import Lambda.Language.Nameless (Nameless)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Machine.Address (Address)
 import Lambda.Machine.Globals (Globals)
@@ -40,7 +40,7 @@ type Closure =
   { fvs :: Array Address
   , env :: Env Address
   , name :: Name
-  , body :: Expression
+  , body :: Nameless
   }
 
 derive instance eqNode :: Eq Node
@@ -82,7 +82,7 @@ define
   :: forall s m
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
   => Name
-  -> Expression
+  -> Nameless
   -> m Unit
 define name expr = Globals.add name \_ ->
   Global name <$> compile expr
@@ -91,7 +91,7 @@ define name expr = Globals.add name \_ ->
 compile
   :: forall s m
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
-  => Expression
+  => Nameless
   -> m Address
 compile = instantiate Nil
 
@@ -102,7 +102,7 @@ instantiate
   :: forall s m
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
   => Env Address
-  -> Expression
+  -> Nameless
   -> m Address
 instantiate env = case _ of
   Nameless.Lambda name fvs0 body -> do
@@ -124,7 +124,7 @@ instantiateAt
    . MonadState { heap :: Heap Node, globals :: Globals | s } m
   => Address
   -> Env Address
-  -> Expression
+  -> Nameless
   -> m Unit
 instantiateAt target env = case _ of
   Nameless.Lambda name fvs0 body -> do

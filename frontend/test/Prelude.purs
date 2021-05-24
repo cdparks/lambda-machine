@@ -20,25 +20,26 @@ import Test.Spec.Assertions (shouldEqual) as X
 import Test.Spec.QuickCheck (quickCheck) as X
 
 -- Imports for test helpers below
+
 import Lambda.Language.Definition (Definition)
 import Lambda.Language.Definition as Definition
-import Lambda.Language.Expression as Syntax
+import Lambda.Language.Expression (Expression)
 import Lambda.Language.Name (Name)
+import Lambda.Language.Nameless (Nameless)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Language.Parser (parse, unsafeRun)
-
 -- Crashy test helpers for constructing terms
 
-mkAst :: String -> Syntax.Expression
+mkAst :: String -> Expression
 mkAst = unsafeRun parse
 
-mkAnon :: String -> Nameless.Expression
+mkAnon :: String -> Nameless
 mkAnon = Nameless.from <<< mkAst
 
 mkDef :: String -> Definition
 mkDef = unsafeRun parse
 
-mkBind :: String -> Tuple Name Nameless.Expression
+mkBind :: String -> Tuple Name Nameless
 mkBind text = Tuple name nameless
  where
   {name, expr} = Definition.split $ mkDef text
