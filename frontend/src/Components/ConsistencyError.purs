@@ -25,11 +25,17 @@ component { error } = R.p { children }
       , R.text " for "
       , R.span_ $ join missing
       ]
-    CannotDelete name deps ->
+    CannotDelete name entities ->
       [ R.text "Cannot delete "
       , code $ show name
       , R.text " because it's still referenced by "
-      , R.span_ $ join deps
+      , R.span_ $ join entities
+      ]
+    CannotRedefine name entities ->
+      [ R.text "Cannot redefine "
+      , code $ show name
+      , R.text " because it's still referenced by "
+      , R.span_ $ join entities
       ]
 
   join :: forall a f. Show a => Foldable f => f a -> Array JSX

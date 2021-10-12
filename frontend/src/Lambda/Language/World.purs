@@ -1,13 +1,15 @@
 module Lambda.Language.World
-  ( World
+  ( World(..)
+  , Graph
   , ConsistencyError(..)
   , new
+  , empty
   , define
   , undefine
   , focus
   , unfocus
   -- Exposed only for testing
-  , Dependency(..)
+  , Entity(..)
   ) where
 
 import Lambda.Prelude hiding (add)
@@ -22,21 +24,25 @@ import Partial.Unsafe (unsafeCrashWith)
 
 -- | Representation of dependencies between global definitions and the
 -- | main expression.
-type World =
-  { nameToDeps :: Map Name (Set Dependency)
-  , depToNames :: Map Dependency (Set Name)
-  }
+newtype World = World Graph
 
--- | A `Dependency` is either a global `Name`, or the root expression
+derive instance newtypeWorld :: Newtype World _
+derive newtype instance eqWorld :: Eq World
+derive newtype instance showWorld :: Show World
+
+-- | Map an entity to the set of other entities that depend on it
+type Graph = Map Entity (Set Entity)
+
+-- | A `Entity` is either a global `Name`, or the root expression
 -- | under evaluation.
-data Dependency
+data Entity
   = Global Name
   | Root
 
-derive instance eqDependency :: Eq Dependency
-derive instance ordDependency :: Ord Dependency
+derive instance eqEntity :: Eq Entity
+derive instance ordEntity :: Ord Entity
 
-instance showDependency :: Show Dependency where
+instance showEntity :: Show Entity where
   show = case _ of
     Global name -> show name
     Root -> "the input"
@@ -45,7 +51,8 @@ instance showDependency :: Show Dependency where
 -- | if we attempt to delete a `Name` that is depended on by anything else.
 data ConsistencyError
   = Undefined (Set Name)
-  | CannotDelete Name (Set Dependency)
+  | CannotDelete Name (Set Entity)
+  | CannotRedefine Name (Set Entity)
 
 derive instance eqConsistencyError :: Eq ConsistencyError
 derive instance ordConsistencyError :: Ord ConsistencyError
@@ -64,6 +71,12 @@ instance showConsistencyError :: Show ConsistencyError where
       , " because it's still referenced by "
       , join deps
       ]
+    CannotRedefine name deps -> fold
+      [ "Cannot redefine "
+      , show name
+      , " because it's still referenced by "
+      , join deps
+      ]
    where
     join :: forall a f. Show a => Foldable f => f a -> String
     join = Grammar.joinWith {inject: identity, conjunction: "and" }
@@ -72,10 +85,7 @@ instance showConsistencyError :: Show ConsistencyError where
 
 -- | An empty `World` has no definitions
 empty :: World
-empty =
-  { nameToDeps: Map.empty
-  , depToNames: Map.empty
-  }
+empty = World Map.empty
 
 -- | Create a new `World` given a list of top-level definitions. Crashes
 -- | if any definition depends on `Name`s that did not appear before it.
@@ -89,16 +99,24 @@ new prelude = case foldM (flip addGlobal) empty prelude of
 -- | Attempt to define a new top-level definition. Fails if the
 -- | definition mentions other undefined `Name`s.
 define :: Name -> Nameless -> World -> Either ConsistencyError World
-define name = add $ Global name
+define name x world = do
+  let refs = referencing name world
+  if Set.size refs == 0
+    then add (Global name) x world
+    else Left $ CannotRedefine name refs
 
 -- | Attempt to delete an existing top-level definition. Fails if any
 -- | other definition still depends on it.
 undefine :: Name -> World -> Either ConsistencyError World
 undefine name world = do
-  let deps = fromMaybe Set.empty $ Map.lookup name world.nameToDeps
-  if Set.size deps == 0
+  let refs = referencing name world
+  if Set.size refs == 0
     then pure $ remove (Global name) world
-    else Left $ CannotDelete name deps
+    else Left $ CannotDelete name refs
+
+-- | Set of `Entity`s that refer to this name
+referencing :: Name -> World -> Set Entity
+referencing name = fromMaybe Set.empty <<< Map.lookup (Global name) <<< un World
 
 -- | Attempt to focus the `World` on a new root expression. Fails if
 -- | the expression mentions any undefined `Name`s.
@@ -110,57 +128,40 @@ unfocus :: World -> World
 unfocus = remove Root
 
 -- | Internal operation for adding a new element to the `World`.
-add :: Dependency -> Nameless -> World -> Either ConsistencyError World
-add dep expr world = do
+add :: Entity -> Nameless -> World -> Either ConsistencyError World
+add entity expr world = do
   let
-    newWorld = remove dep world
     fvs = freeVars expr
-    missing = fvs `Set.difference` globals newWorld
-    isClosed = case dep of
+    missing = fvs `Set.difference` globals world
+    isClosed = case entity of
       Global name -> Set.size missing == 0 || missing == Set.singleton name
       Root -> Set.size missing == 0
   if isClosed
-    then pure $ combine newWorld $ fromFreeVars dep fvs
+    then pure $ combine world $ fromFreeVars entity fvs
     else Left $ Undefined missing
 
 -- | Internal operation for removing an element from the `World`.
-remove :: Dependency -> World -> World
-remove dep world@{ nameToDeps, depToNames } =
-  case Map.lookup dep depToNames of
-    Nothing -> world
-    Just names ->
-      { depToNames: Map.delete dep depToNames
-      , nameToDeps: foldl eliminate nameToDepsWithoutDep names
-      }
- where
-  eliminate m name = Map.update (pure <<< Set.delete dep) name m
-  nameToDepsWithoutDep = case dep of
-    Global name -> Map.delete name nameToDeps
-    Root -> nameToDeps
+remove :: Entity -> World -> World
+remove entity = World <<< map (Set.delete entity) <<< Map.delete entity <<< un World
 
 -- | Set of top-level `Name`s.
 globals :: World -> Set Name
-globals = Map.keys <<< _.nameToDeps
+globals = Set.mapMaybe name <<< Map.keys <<< un World
+ where
+  name = case _ of
+    Root -> Nothing
+    Global n -> pure n
 
 -- | Create a minimal `World` based on an item's free variables
 -- | assuming nothing else can depend on this item yet.
-fromFreeVars :: Dependency -> Set Name -> World
-fromFreeVars dep fvs =
-  { nameToDeps
-  , depToNames
-  }
+fromFreeVars :: Entity -> Set Name -> World
+fromFreeVars entity fvs = World graph
  where
-  nameToDeps = Map.fromFoldable $ case dep of
-    Root -> others
-    Global name -> Array.snoc others $ Tuple name Set.empty
+  graph = Map.fromFoldable $ Array.snoc others $ Tuple entity Set.empty
   others = do
     name <- Array.fromFoldable fvs
-    pure $ Tuple name $ Set.singleton dep
-  depToNames = Map.singleton dep fvs
+    pure $ Tuple (Global name) $ Set.singleton entity
 
 -- | Monoidally combine `World`s by unioning `Map`s point-wise.
 combine :: World -> World -> World
-combine lhs rhs =
-  { nameToDeps: Map.unionWith Set.union lhs.nameToDeps rhs.nameToDeps
-  , depToNames: Map.unionWith Set.union lhs.depToNames rhs.depToNames
-  }
+combine (World lhs) (World rhs) = World $ Map.unionWith Set.union lhs rhs

@@ -7,7 +7,7 @@ import Test.Prelude
 import Data.Map as Map
 import Data.Set as Set
 import Lambda.Language.Name as Name
-import Lambda.Language.World (ConsistencyError(..), Dependency(..))
+import Lambda.Language.World (World(..), ConsistencyError(..), Entity(..))
 import Lambda.Language.World as World
 
 spec :: Spec Unit
@@ -23,16 +23,17 @@ spec = describe "Lambda.Language.World" do
       let
         world = World.new [mkBind "y = λa. a"]
         result = uncurry World.define (mkBind "x = y") world
-      result `shouldEqual` Right
-        { nameToDeps: Map.fromFoldable
-          [ Tuple y $ Set.fromFoldable [Global x]
-          , Tuple x Set.empty
+        expected = Right $ mkWorld
+          [ Tuple (Global y) [Global x]
+          , Tuple (Global x) []
           ]
-        , depToNames: Map.fromFoldable
-          [ Tuple (Global x) $ Set.fromFoldable [y]
-          , Tuple (Global y) Set.empty
-          ]
-        }
+      result `shouldEqual` expected
+
+    it "disallows redefining names that depend on extant names" do
+      let
+        world = World.new [mkBind "y x = x", mkBind "x = y y"]
+        result = uncurry World.define (mkBind "y = 1") world
+      result `shouldEqual` Left (CannotRedefine y $ Set.singleton $ Global x)
 
   describe "World.undefine" do
     it "disallows deleting definitions that have dependencies" do
@@ -45,14 +46,7 @@ spec = describe "Lambda.Language.World" do
       let
         world = World.new [mkBind "y = λa. a", mkBind "x = y"]
         result = World.undefine x world
-      result `shouldEqual` Right
-        { nameToDeps: Map.fromFoldable
-          [ Tuple y $ Set.empty
-          ]
-        , depToNames: Map.fromFoldable
-          [ Tuple (Global y) Set.empty
-          ]
-        }
+      result `shouldEqual` Right (mkWorld [Tuple (Global y) []])
 
   describe "World.focus" do
     it "disallows root expressions that depend on non-extant names" do
@@ -65,33 +59,22 @@ spec = describe "Lambda.Language.World" do
       let
         world = World.new [mkBind "y = λa. a"]
         result = World.focus (mkAnon "y") world
-      result `shouldEqual` Right
-        { nameToDeps: Map.fromFoldable
-          [ Tuple y $ Set.fromFoldable [Root]
+        expected = Right $ mkWorld
+          [ Tuple (Global y) [Root]
+          , Tuple Root []
           ]
-        , depToNames: Map.fromFoldable
-          [ Tuple Root $ Set.fromFoldable [y]
-          , Tuple (Global y) Set.empty
-          ]
-        }
+      result `shouldEqual` expected
 
   describe "World.unfocus" do
     it "removes root as a dependency" do
       let
         world = World.focus (mkAnon "y") $ World.new [mkBind "y = λa. a"]
         result = World.unfocus <$> world
-      result `shouldEqual` Right
-        { nameToDeps: Map.fromFoldable
-          [ Tuple y $ Set.empty
-          ]
-        , depToNames: Map.fromFoldable
-          [ Tuple (Global y) Set.empty
-          ]
-        }
+      result `shouldEqual` Right (mkWorld [Tuple (Global y) []])
 
     it "has no effect if world has no focus" do
       let
-        world =  World.new [mkBind "y = λa. a"]
+        world = World.new [mkBind "y = λa. a"]
         result = World.unfocus world
       result `shouldEqual` world
 
@@ -100,3 +83,6 @@ x = Name.from "x"
 
 y :: Name
 y = Name.from "y"
+
+mkWorld :: Array (Tuple Entity (Array Entity)) -> World
+mkWorld = World <<< Map.fromFoldable <<< map (map Set.fromFoldable)

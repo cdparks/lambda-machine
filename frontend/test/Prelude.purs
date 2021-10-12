@@ -15,7 +15,7 @@ import Lambda.Language.Name (Name) as X
 import Lambda.Language.Statement (Statement) as X
 import Test.QuickCheck (class Arbitrary, (===)) as X
 import Test.QuickCheck.Gen (chooseInt) as X
-import Test.Spec (Spec, describe, it, itOnly, pending, pending') as X
+import Test.Spec (Spec, describe, describeOnly, it, itOnly, focus, pending, pending') as X
 import Test.Spec.Assertions (shouldEqual) as X
 import Test.Spec.QuickCheck (quickCheck) as X
 
