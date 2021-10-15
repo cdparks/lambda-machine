@@ -13,6 +13,7 @@ import Data.Char (toCharCode)
 import Data.Set as Set
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Lambda.Language.Parser (class Parse, Parser, parse, liftF, satisfy, string, token)
+import Lambda.Language.Pretty (class Pretty, text)
 import Partial.Unsafe (unsafePartial)
 
 -- | Source-level name with an optional subscript.
@@ -32,6 +33,9 @@ instance readForeignName :: ReadForeign Name where
 
 instance writeForeignName :: WriteForeign Name where
   writeImpl = writeImpl <<< show
+
+instance prettyName :: Pretty Name where
+  pretty _ = text <<< show
 
 -- | Construct a `Name` with no subscript.
 from :: String -> Name
