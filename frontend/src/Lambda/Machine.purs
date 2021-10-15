@@ -94,7 +94,7 @@ new rawGlobals expr =
     }
  where
   empty = { heap: Heap.empty, globals: Globals.empty }
-  {root, globals, heap} = flip evalState empty $ do
+  {root, globals, heap} = withState empty $ do
     traverse_ (uncurry Node.define) rawGlobals
     root <- Node.compile expr
     Heap.gc [root] Node.children
