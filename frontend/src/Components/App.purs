@@ -2,7 +2,7 @@ module Components.App
   ( mkApp
   ) where
 
-import Lambda.Prelude
+import Lambda.Prelude hiding (State)
 
 import Components.Alert (Level(..))
 import Components.Alert as Alert

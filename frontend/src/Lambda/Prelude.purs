@@ -1,14 +1,18 @@
 module Lambda.Prelude
   ( module Prelude
   , module X
+  , withReader
+  , withState
   ) where
 
 import Prelude
 
 import Control.Alt ((<|>)) as X
-import Control.Monad.Reader (class MonadAsk, class MonadReader, runReader, ask, asks, local) as X
+import Control.Monad.Reader (class MonadAsk, class MonadReader, Reader, runReader, ask, asks, local) as X
+import Control.Monad.Reader (Reader, runReader)
 import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM) as X
-import Control.Monad.State (class MonadState, evalState, execState, gets, get, modify_, put) as X
+import Control.Monad.State (class MonadState, State, evalState, execState, gets, get, modify_, put) as X
+import Control.Monad.State (State, evalState)
 import Control.MonadZero (guard) as X
 import Data.Bifunctor (class Bifunctor, bimap, lmap, rmap) as X
 import Data.Either (Either(..), either, hush, note) as X

@@ -5,7 +5,6 @@ module Lambda.Language.Prelude
 import Lambda.Prelude
 
 import Lambda.Language.Definition (Definition)
-import Lambda.Language.Definition as Definition
 import Lambda.Language.Parser (parse)
 import Lambda.Language.Parser as Parser
 
