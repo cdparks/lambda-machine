@@ -41,6 +41,14 @@ instance eqNameless :: Eq Nameless where
     Apply f a, Apply g b -> f == g && a == b
     _, _ -> false
 
+-- | Alph-equivalent expressions should have the same hash
+instance hashableNameless :: Hashable Nameless where
+  hash = case _ of
+    Bound i -> hash i
+    Free n -> hash n
+    Lambda _ _ b -> hash b
+    Apply f a -> hash $ Tuple f a
+
 -- | Create a locally-nameless expression from an AST
 from :: Expression -> Nameless
 from = alphaInternal <<< go Map.empty
