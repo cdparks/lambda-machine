@@ -29,7 +29,9 @@ import Lambda.Language.Nameless (Nameless)
 import Lambda.Language.Nameless as Nameless
 import Lambda.Language.Parser (parse)
 import Lambda.Language.Parser as Parser
+import Lambda.Language.Prelude as Prelude
 import Lambda.Language.Pretty (Rep(..), toggle, pretty, toString)
+import Lambda.Language.Snapshot (Snapshot(..))
 import Lambda.Language.Statement (Statement(..))
 import Lambda.Language.World (World)
 import Lambda.Language.World as World
@@ -54,11 +56,11 @@ type State =
   , steps :: Maybe Int
   }
 
-mkApp :: Component {}
-mkApp = do
+mkApp :: Maybe Snapshot -> Component {}
+mkApp mSnapshot = do
   reducer <- mkReducer update
   component "App" \_ -> Hooks.do
-    state /\ dispatch <- useReducer initialState reducer
+    state /\ dispatch <- useReducer (mkState mSnapshot) reducer
     pure $ R.div
       { className: "container"
       , children:
@@ -125,32 +127,6 @@ split lhs rhs =
       ]
     }
 
--- | Default set of global definitions
-prelude :: Array Definition
-prelude =
-  Parser.unsafeRun parse <$>
-    [ "identity x = x"
-    , "const x y = x"
-    , "fix f = f (fix f)"
-    , "true t f = t"
-    , "false t f = f"
-    , "and x y = x y false"
-    , "or x y = x true y"
-    , "not x = x false true"
-    , "succ n s z = s (n s z)"
-    , "pred n s z = n (λg. λh. h (g s)) (λu. z) (λu. u)"
-    , "add m n s z = m s (n s z)"
-    , "mul m n s z = m (n s) z"
-    , "zero? n = n (λx. false) true"
-    , "foldr f z l = l f z"
-    , "any = foldr or false"
-    , "all = foldr and true"
-    , "cons x xs f z = f x (xs f z)"
-    , "nil f z = z"
-    , "iterate f x = cons x (iterate f (f x))"
-    , "repeat x = cons x (repeat x)"
-    ]
-
 -- | Set of user-driven events
 data Action
   = ShowHelp
@@ -165,17 +141,26 @@ data Action
   | ToggleSugar
 
 -- | Empty state with default global definitions
-initialState :: State
-initialState =
-  { text: ""
-  , defs: prelude
-  , world: World.new $ defsToGlobals prelude
-  , machine: Nothing
-  , history: History.empty
-  , rep: Raw
-  , alert: Nothing
-  , steps: Nothing
-  }
+mkState :: Maybe Snapshot -> State
+mkState = maybe default (build <<< un Snapshot)
+ where
+  build { defs, input } = do
+    let s = foldl (flip addDef) empty defs
+    maybe s (flip setExpr s) input
+  empty =
+    { text: ""
+    , defs: []
+    , world: World.empty
+    , machine: Nothing
+    , history: History.empty
+    , rep: Raw
+    , alert: Nothing
+    , steps: Nothing
+    }
+  default = empty
+    { defs = Prelude.defs
+    , world = World.new $ defsToGlobals Prelude.defs
+    }
 
 -- | Update `State` in response to an `Action`
 update :: State -> Action -> State
