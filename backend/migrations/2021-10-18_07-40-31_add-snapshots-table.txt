@@ -1,0 +1,14 @@
+Description: add snapshots table
+Created: 2021-10-18 07:40:32.791827 UTC
+Depends:
+Apply: |
+  CREATE TABLE snapshots (
+    id text not null primary key,
+    created_at timestamptz not null default now(),
+    signature integer not null default 0,
+    names jsonb not null default '[]',
+    state jsonb not null default '[]'
+  );
+  CREATE INDEX ON snapshots (created_at);
+Revert: |
+  DROP TABLE snapshots;
