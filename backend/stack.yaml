@@ -1,0 +1,20 @@
+resolver:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/13.yaml
+
+packages:
+- .
+
+ghc-options:
+  "$locals": >-
+    -fignore-optim-changes
+    -Weverything
+    -Wno-implicit-prelude
+    -Wno-missed-specialisations
+    -Wno-missing-import-lists
+    -Wno-missing-local-signatures
+    -Wno-missing-monadfail-instances
+    -Wno-missing-safe-haskell-mode
+    -Wno-monomorphism-restriction
+    -Wno-prepositive-qualified-module
+    -Wno-safe
+    -Wno-unsafe
