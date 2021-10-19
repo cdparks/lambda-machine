@@ -1,0 +1,111 @@
+name: backend
+version: 0.1.0.0
+license: MIT
+author: "Christopher D. Parks"
+maintainer: "christopher.daniel.parks@gmail.com"
+copyright: "2021 Christopher D. Parks"
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description: Please see the README on GitHub at <https://github.com/cdparks/lambda-machine#readme>
+
+default-extensions:
+- BangPatterns
+- BinaryLiterals
+- ConstraintKinds
+- DataKinds
+- DefaultSignatures
+- DeriveAnyClass
+- DeriveDataTypeable
+- DeriveFoldable
+- DeriveFunctor
+- DeriveGeneric
+- DeriveTraversable
+- DerivingStrategies
+- DerivingVia
+- EmptyDataDecls
+- ExistentialQuantification
+- FlexibleContexts
+- FlexibleInstances
+- FunctionalDependencies
+- GADTs
+- GeneralizedNewtypeDeriving
+- InstanceSigs
+- KindSignatures
+- LambdaCase
+- MultiParamTypeClasses
+- MultiWayIf
+- NamedFieldPuns
+- NoImplicitPrelude
+- NoMonomorphismRestriction
+- OverloadedStrings
+- PartialTypeSignatures
+- PatternGuards
+- PolyKinds
+- RankNTypes
+- RecordWildCards
+- ScopedTypeVariables
+- StandaloneDeriving
+- TupleSections
+- TypeApplications
+- TypeFamilies
+- TypeFamilyDependencies
+- TypeOperators
+- TypeSynonymInstances
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - attoparsec
+  - base >= 4.7 && < 5
+  - envparse
+  - errors
+  - esqueleto
+  - http-api-data
+  - http-types
+  - monad-logger
+  - mtl
+  - mwc-random
+  - path-pieces
+  - persistent
+  - persistent-postgresql
+  - postgresql-simple
+  - random
+  - rio
+  - rio-orphans
+  - text
+  - vector
+  - wai
+  - wai-cors
+  - wai-extra
+  - warp
+
+executables:
+  serve:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - base
+    - backend
+
+tests:
+  backend:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - base
+    - backend
+    - hspec
+    - hspec-wai
+    - hspec-wai-json
+    - aeson
