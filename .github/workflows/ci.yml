@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ci.yml
+      - backend/**
+
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/ci.yml
+      - backend/**
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: lambda_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: freckle/stack-cache-action@main
+        with:
+          working-directory: backend
+      - run: stack install --no-terminal --copy-compiler-tool dbmigrations-postgresql
+      - run: db/upgrade test
+      - uses: freckle/stack-action@main
+        with:
+          fast: ${{ github.ref != 'refs/heads/main' }}
+          hlint: false
+          weeder: false
+          working-directory: backend
