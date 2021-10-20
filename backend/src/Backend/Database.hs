@@ -1,21 +1,19 @@
 module Backend.Database
-  ( HasSqlPool(..)
+  ( module X
+  , HasSqlPool(..)
   , SqlPool
   , PostgresConf(..)
   , ConnectionString
   , newSqlPool
   , runDB
-  , insert
-  , insertKey
   , tryInsertKey
-  , get
   , get404
   ) where
 
 import Backend.Prelude
 
 import Backend.Micro (notFound)
-import Database.Persist (get, insert, insertKey)
+import Database.Persist as X
 import Database.Persist.Postgresql
   (ConnectionString, PostgresConf(..), createPostgresqlPool)
 import Database.Persist.Sql (runSqlPool)

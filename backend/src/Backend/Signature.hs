@@ -11,4 +11,4 @@ import Backend.Prelude
 -- so we can use an 'Int32' here and integer in Postgres.
 --
 newtype Signature = Signature Int32
-  deriving newtype (Eq, Show, Ord, Hashable, FromJSON, ToJSON, PersistField, PersistFieldSql)
+  deriving newtype (Eq, Show, Ord, Hashable, FromJSON, ToJSON, PersistField, PersistFieldSql, Default)

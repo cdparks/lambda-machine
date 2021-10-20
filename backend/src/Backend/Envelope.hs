@@ -20,6 +20,10 @@ instance (KnownSymbol field, ToJSON a) => ToJSON (Envelope field a) where
   toEncoding = pairs . mconcat . toPairs
   toJSON = object . toPairs
 
+instance (KnownSymbol field, FromJSON a) => FromJSON (Envelope field a) where
+  parseJSON = withObject "Envelope" $ fmap Envelope . (.: key)
+    where key = pack $ symbolVal $ Proxy @field
+
 toPairs
   :: forall field a kv
    . (KeyValue kv, KnownSymbol field, ToJSON a)

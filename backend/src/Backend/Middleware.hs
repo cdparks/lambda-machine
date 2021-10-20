@@ -8,7 +8,7 @@ import Backend.Settings (Settings(..))
 import Backend.Wai (Error(..), errorResponse)
 import Network.Wai.Middleware.Autohead (autohead)
 import Network.Wai.Middleware.Cors (CorsResourcePolicy(..), cors, simpleMethods)
-import Network.Wai.Middleware.Gzip (def, gzip)
+import Network.Wai.Middleware.Gzip (gzip)
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Network.Wai.Middleware.RequestSizeLimit
   ( defaultRequestSizeLimitSettings
