@@ -1,0 +1,26 @@
+#!/bin/sh
+# Run migrations in specified environment, defaulting to dev and test
+set -e
+
+case "$1" in
+  dev)
+    export DBM_DATABASE=postgres://postgres:password@localhost/lambda
+    ;;
+  test)
+    export DBM_DATABASE=postgres://postgres:password@localhost/lambda_test
+    ;;
+  prod)
+    export DBM_DATABASE=$(heroku config:get DATABASE_URL --app lambda-machine)
+    ;;
+  *)
+    echo "usage: db/upgrade [dev | test | prod]"
+    exit 2
+    ;;
+esac
+shift
+
+export DBM_MIGRATION_STORE=$(cd "$(dirname "$0")" && pwd)/migrations
+export DBM_LINEAR_MIGRATIONS=on
+export DBM_TIMESTAMP_FILENAMES=on
+
+exec stack exec -- moo-postgresql upgrade
