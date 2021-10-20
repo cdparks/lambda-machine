@@ -16,9 +16,9 @@ build-type:     Simple
 library
   exposed-modules:
       Backend.Api
-      Backend.App
       Backend.Code
       Backend.Database
+      Backend.Env
       Backend.Envelope
       Backend.Main
       Backend.Micro

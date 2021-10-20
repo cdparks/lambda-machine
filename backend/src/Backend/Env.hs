@@ -1,6 +1,6 @@
-module Backend.App
-  ( run
-  , App(..)
+module Backend.Env
+  ( new
+  , Env(..)
   ) where
 
 import Backend.Prelude
@@ -10,31 +10,34 @@ import Backend.Random (HasRandom(..), Random)
 import qualified Backend.Random as Random
 import Backend.Settings (HasSettings(..), Settings(..))
 
-run :: Settings -> (App -> IO a) -> IO a
-run settings@Settings {..} act = do
+new :: Settings -> IO Env
+new settings@Settings {..} = do
   sqlPool <- runNoLoggingT $ newSqlPool postgresConf
   random <- Random.new
   options <- setLogMinLevel logLevel <$> logOptionsHandle stdout False
-  withLogFunc options $ \logger -> act App { .. }
+  (logger, shutdown) <- newLogFunc options
+  pure Env{..}
 
-data App = App
+data Env = Env
   { random :: Random
   , sqlPool :: SqlPool
   , settings :: Settings
   , logger :: LogFunc
+  , shutdown :: IO ()
   }
 
-instance HasRandom App where
+instance HasRandom Env where
   randomLens = lens random $ \env r -> env { random = r }
   {-# INLINE randomLens #-}
 
-instance HasSqlPool App where
+instance HasSqlPool Env where
   sqlPoolLens = lens sqlPool $ \env x -> env { sqlPool = x }
   {-# INLINE sqlPoolLens #-}
 
-instance HasSettings App where
+instance HasSettings Env where
   settingsLens = lens settings $ \env x -> env { settings = x }
   {-# INLINE settingsLens #-}
 
-instance HasLogFunc App where
+instance HasLogFunc Env where
   logFuncL = lens logger $ \env x -> env { logger = x }
+  {-# INLINE logFuncL #-}

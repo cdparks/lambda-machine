@@ -7,8 +7,8 @@ module Backend.ApiSpec
 import Backend.Test.Prelude
 
 import Backend.Api (api)
-import qualified Backend.App as App
-import Backend.App (App)
+import qualified Backend.Env as Env
+import Backend.Env (Env)
 import Backend.Database (deleteWhere, insertKey, runDB)
 import qualified Backend.Database as DB
 import Backend.Middleware (middleware)
@@ -17,7 +17,7 @@ import Backend.Snapshot (Key(SnapshotKey), Snapshot)
 import LoadEnv (loadEnvFrom)
 
 spec :: Spec
-spec = withState app $ do
+spec = withState testApp $ do
   describe "GET /snapshots/:code" $ do
     it "rejects a code that's too short" $ do
       get "/snapshots/ABCDEFG" `shouldRespondWith` status
@@ -99,15 +99,17 @@ spec = withState app $ do
       snapshot <- liftEnv $ runDB $ DB.get $ SnapshotKey code
       liftIO $ snapshot `shouldBe` Just def
 
-app :: IO (App, Application)
-app = do
+testApp :: IO (Env, Application)
+testApp = do
   loadEnvFrom ".env.test"
   settings <- Settings.load
-  App.run settings $ \env -> runRIO env $ do
+  env <- Env.new settings
+  runRIO env $ do
     runDB $ do
       deleteWhere @_ @_ @Snapshot []
       insertKey (SnapshotKey "SNAPSH0T") def
-    (env, ) . middleware settings <$> api
+    app <- middleware settings <$> api
+    pure (env, app)
 
 status :: Int -> ResponseMatcher -> ResponseMatcher
 status n m = m { matchStatus = n }
