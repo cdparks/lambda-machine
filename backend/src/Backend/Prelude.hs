@@ -16,7 +16,8 @@ import Control.Monad.Logger as X
 import Control.Monad.State as X
   (MonadState, State, evalState, execState, modify, runState)
 import Data.Aeson as X
-  ( (.=)
+  ( (.:)
+  , (.=)
   , FromJSON(..)
   , KeyValue
   , ToJSON(..)
@@ -25,9 +26,11 @@ import Data.Aeson as X
   , encode
   , object
   , pairs
+  , withObject
   , withText
   )
 import Data.Coerce as X (Coercible, coerce)
+import Data.Default as X
 import Data.Kind as X (Constraint, Type)
 import Data.Text as X (pack, unpack)
 import Data.Text.Encoding as X (decodeUtf8)

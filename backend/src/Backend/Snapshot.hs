@@ -3,8 +3,11 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Backend.Snapshot
-  ( Snapshot(..)
-  , ApiSnapshot(..)
+  ( ApiSnapshot(..)
+  , Snapshot(..)
+  , SnapshotId
+  , EntityField(..)
+  , Key(SnapshotKey)
   , fetch
   , store
   ) where
@@ -27,7 +30,7 @@ data ApiSnapshot = ApiSnapshot
   , state :: [Int32]
   }
   deriving stock (Eq, Show, Generic)
-  deriving anyclass (ToJSON, FromJSON)
+  deriving anyclass (ToJSON, FromJSON, Default)
 
 mkPersist sqlSettings [persistLowerCase|
 Snapshot sql=snapshots
@@ -35,7 +38,11 @@ Snapshot sql=snapshots
   signature Signature
   names (JSONB [Name])
   state (JSONB [Int32])
+  deriving Eq Show
 |]
+
+instance Default Snapshot where
+  def = Snapshot def (JSONB []) (JSONB [])
 
 -- | Fetch 'ApiSnapshot' by 'Code'
 fetch :: MonadUnliftIO m => Code -> SqlPersistT m ApiSnapshot

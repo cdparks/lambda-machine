@@ -60,6 +60,7 @@ library:
   - aeson
   - attoparsec
   - base >= 4.7 && < 5
+  - data-default
   - envparse
   - errors
   - esqueleto
@@ -107,7 +108,10 @@ tests:
     - backend
     - base
     - hspec
+    - hspec-expectations-lifted
     - hspec-wai
     - hspec-wai-json
+    - HUnit
+    - lens-aeson
     - load-env
     - wai-extra

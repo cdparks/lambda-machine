@@ -22,6 +22,10 @@ import Text.Read (Read(..))
 newtype Code = Code Text
   deriving newtype (Eq, Show, Ord, Hashable, ToJSON, ToHttpApiData, PersistField, PersistFieldSql)
 
+-- | Throws on invalid 'Code's; used only for testing
+instance IsString Code where
+  fromString = either (error . unpack . textDisplay) id . parse . fromString
+
 -- | Errors encountered during parsing
 data ParseError
   = -- | Code must be 8 characters long
