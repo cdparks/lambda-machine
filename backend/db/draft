@@ -1,0 +1,23 @@
+#!/bin/sh
+# Create and open new migration in editor
+set -e
+
+if [ -z "$1" ]; then
+  echo 'usage: db/draft name'
+  exit 2
+fi
+
+export DBM_MIGRATION_STORE=$(cd "$(dirname "$0")" && pwd)/migrations
+export DBM_DATABASE=postgres://postgres:password@localhost/lambda
+export DBM_LINEAR_MIGRATIONS=on
+export DBM_TIMESTAMP_FILENAMES=on
+
+path=$(yes | stack exec -- moo-postgresql new "$1" | grep -o '".*"' | sed 's/"//g')
+
+# Local version of moo-postgresql generates .txt files instead of .yml
+if [ "${path##*.}" = "txt" ]; then
+  mv "$path" "${path%.txt}.yml"
+  path="${path%.txt}.yml"
+fi
+
+"$EDITOR" "$path"
