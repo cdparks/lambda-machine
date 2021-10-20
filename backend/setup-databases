@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# See http://petereisentraut.blogspot.com/2010/03/running-sql-scripts-with-psql.html
+psql_options='-X -q -a -1 -v ON_ERROR_STOP=1 --pset pager=off --pset tuples_only --pset format=unaligned'
+
+# Create database if it doesn't exist and run migrations
+function setupdb {
+  name=$1
+  createdb "$name" > /dev/null 2>&1 || echo "Database '$name' already exists"
+  DBM_DATABASE=postgresql://postgres:password@localhost:5432/$name stack exec moo-postgresql upgrade
+}
+
+setupdb lambda
+setupdb test_lambda
+
+printf '\nReset test database fixtures:\n'
+psql $psql_options -d test_lambda <<EOF
+DELETE FROM snapshots;
+INSERT INTO snapshots (id, created_at, signature, names, state)
+VALUES ('SNAPSH0T', now(), 0, '[]', '[]');
+EOF
