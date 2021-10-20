@@ -10,4 +10,4 @@ cradle:
       component: "backend:exe:serve"
 
     - path: "./test"
-      component: "backend:test:backend"
+      component: "backend:test:spec"

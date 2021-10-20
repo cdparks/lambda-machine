@@ -91,11 +91,11 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - base
     - backend
+    - base
 
 tests:
-  backend:
+  spec:
     main: Spec.hs
     source-dirs: test
     ghc-options:
@@ -103,9 +103,11 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - base
+    - aeson
     - backend
+    - base
     - hspec
     - hspec-wai
     - hspec-wai-json
-    - aeson
+    - load-env
+    - wai-extra
