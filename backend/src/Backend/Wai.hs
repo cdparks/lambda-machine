@@ -3,6 +3,7 @@ module Backend.Wai
   , jsonResponse
   , jsonResponseWith
   , errorResponse
+  , exceptionResponse
   ) where
 
 import Backend.Prelude
@@ -21,6 +22,12 @@ jsonResponseWith status = responseLBS status headers . encode
 errorResponse :: Error -> Response
 errorResponse err@Error {..} =
   mapResponseHeaders (<> errHeaders) $ jsonResponseWith errStatus err
+
+-- | Try to convert 'SomeException' to 'Error' or generate a 500
+exceptionResponse :: SomeException -> Response
+exceptionResponse e@SomeException{}
+  | Just err <- fromException e = errorResponse err
+  | otherwise = errorResponse $ Error [] status500 $ pure $ tshow e
 
 -- | Generic server error
 data Error = Error

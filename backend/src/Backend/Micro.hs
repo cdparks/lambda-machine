@@ -19,7 +19,7 @@ module Backend.Micro
 
 import Backend.Prelude hiding (handle)
 
-import Backend.Wai (Error(..), errorResponse, jsonResponse)
+import Backend.Wai (Error(..), exceptionResponse, jsonResponse)
 import qualified Data.Text as T
 import Network.Wai
 import qualified RIO.ByteString as BS
@@ -123,9 +123,7 @@ run routes = do
       BadParse err -> badRequest err
       Match act -> io $ act req
     respond $ case result of
-      Left e@SomeException{}
-        | Just err <- fromException e -> errorResponse err
-        | otherwise -> errorResponse $ Error [] status500 $ pure $ tshow e
+      Left e -> exceptionResponse e
       Right response -> response
 
 -- | Parse JSON from request body
