@@ -13,11 +13,4 @@ export DBM_LINEAR_MIGRATIONS=on
 export DBM_TIMESTAMP_FILENAMES=on
 
 path=$(yes | stack exec -- moo-postgresql new "$1" | grep -o '".*"' | sed 's/"//g')
-
-# Local version of moo-postgresql generates .txt files instead of .yml
-if [ "${path##*.}" = "txt" ]; then
-  mv "$path" "${path%.txt}.yml"
-  path="${path%.txt}.yml"
-fi
-
 "$EDITOR" "$path"
