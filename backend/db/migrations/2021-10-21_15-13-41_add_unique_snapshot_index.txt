@@ -1,0 +1,7 @@
+Description: |
+  Add unique index to hopefully avoid some duplication. We only ever
+  need equality, so default btree indexes should be fine, even on jsonb
+Created: 2021-10-21 15:13:41.083509 UTC
+Depends: 2021-10-18_07-40-31_add-snapshots-table
+Apply: |
+  CREATE UNIQUE INDEX ON snapshots (signature, names, state);
