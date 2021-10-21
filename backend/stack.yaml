@@ -10,6 +10,7 @@ ghc-options:
     -Weverything
     -Wno-implicit-prelude
     -Wno-missed-specialisations
+    -Wno-all-missed-specialisations
     -Wno-missing-import-lists
     -Wno-missing-local-signatures
     -Wno-missing-monadfail-instances

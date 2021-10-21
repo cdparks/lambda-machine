@@ -1,0 +1,8 @@
+*.cabal
+.dockerignore
+.env*
+.gitignore
+.stack-work
+Dockerfile
+db
+test

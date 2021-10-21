@@ -13,11 +13,6 @@ on:
       - .github/workflows/ci.yml
       - backend/**
 
-defaults:
-  run:
-    shell: bash
-    working-directory: backend
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,8 +40,10 @@ jobs:
           working-directory: backend
 
       - run: stack install --no-terminal --copy-compiler-tool dbmigrations-postgresql
+        working-directory: backend
 
       - run: db/upgrade test
+        working-directory: backend
 
       - uses: freckle/stack-action@main
         with:
@@ -62,11 +59,9 @@ jobs:
       image: ${{ steps.prep.outputs.image }}
 
     steps:
-      - uses: actions/checkout@v2
-
       - id: prep
         run: |
-          image=${{ secrets.DOCKERHUB_USERNAME }}/lambda-machine:$(echo "${{ github.sha }}" | head -c7)
+          image=cdparks7/lambda-machine:$(echo "${{ github.sha }}" | head -c7)
           echo "::set-output name=image::${image}"
 
       - id: buildx
@@ -81,12 +76,12 @@ jobs:
 
       - uses: docker/login-action@v1
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: cdparks7
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - uses: docker/build-push-action@v2
         with:
-          context: backend
+          context: "https://github.com/${{ github.repository }}.git#${{ github.sha }}:backend"
           builder: ${{ steps.buildx.outputs.name }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
@@ -104,6 +99,11 @@ jobs:
     needs: [build, image]
 
     steps:
+      - uses: docker/login-action@v1
+        with:
+          username: cdparks7
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
       - run: |
           cat >Dockerfile.web <<'EOM'
           FROM ${{ needs.image.outputs.image }}
