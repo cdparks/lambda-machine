@@ -1,10 +1,20 @@
 #!/bin/sh
 # Create local DB if it doesn't already exist
-set -e
 
 if [ -z "$1" ]; then
   echo 'usage: db/boot name'
   exit 2
 fi
 
-createdb "$1" > /dev/null 2>&1 || echo "Skipping, database $1 already exists"
+tmp=$(mktemp)
+trap 'rm -f -- "$tmp"' EXIT
+createdb -O postgres --encoding UTF8 "$1" > "$tmp" 2>&1
+result=$?
+
+if [ "$result" -ne 0 ] && grep -Fq 'already exists' "$tmp"; then
+  echo "Skipping, database $1 already exists"
+  exit 0
+fi
+
+cat "$tmp"
+exit "$result"

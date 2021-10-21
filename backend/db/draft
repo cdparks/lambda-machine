@@ -7,10 +7,19 @@ if [ -z "$1" ]; then
   exit 2
 fi
 
-export DBM_MIGRATION_STORE=$(cd "$(dirname "$0")" && pwd)/migrations
-export DBM_DATABASE=postgres://postgres:password@localhost/lambda
+DBM_MIGRATION_STORE=$(cd "$(dirname "$0")" && pwd)/migrations
+DBM_DATABASE=postgres://postgres:password@localhost:5432/lambda
+
+export DBM_MIGRATION_STORE
+export DBM_DATABASE
 export DBM_LINEAR_MIGRATIONS=on
 export DBM_TIMESTAMP_FILENAMES=on
 
 path=$(yes | stack exec -- moo-postgresql new "$1" | grep -o '".*"' | sed 's/"//g')
+
+# Break up modeline so this script doesn't confuse vim
+tmp=$(mktemp)
+trap 'rm -f -- "$tmp"' EXIT
+printf '# %s: ft=yaml\n' vim | cat - "$path" > "$tmp" && mv "$tmp" "$path"
+
 "$EDITOR" "$path"

@@ -1,3 +1,4 @@
+# vim: ft=yaml
 Description: |
   Add unique index to hopefully avoid some duplication. We only ever
   need equality, so default btree indexes should be fine, even on jsonb
