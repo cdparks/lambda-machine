@@ -98,6 +98,7 @@ library
     , rio
     , rio-orphans
     , text
+    , transformers
     , vector
     , wai
     , wai-cors

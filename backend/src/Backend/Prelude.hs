@@ -1,5 +1,6 @@
 module Backend.Prelude
   ( module X
+  , (<$$>)
   ) where
 
 import RIO as X hiding (Handler, timeout)
@@ -49,3 +50,7 @@ import RIO.Orphans as X ()
 import RIO.Seq as X ((<|), (|>))
 import Web.HttpApiData as X (FromHttpApiData(..), ToHttpApiData(..))
 import Web.PathPieces as X (PathPiece(..))
+
+(<$$>) :: (Functor m, Functor n) => (a -> b) -> m (n a) -> m (n b)
+f <$$> m = fmap f <$> m
+{-# INLINE (<$$>) #-}

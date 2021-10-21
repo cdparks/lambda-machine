@@ -13,7 +13,8 @@ import Backend.Database (deleteWhere, insertKey, runDB)
 import qualified Backend.Database as DB
 import Backend.Middleware (middleware)
 import qualified Backend.Settings as Settings
-import Backend.Snapshot (Key(SnapshotKey), Snapshot)
+import Backend.Snapshot (Key(SnapshotKey), Snapshot(..))
+import Backend.Signature (Signature(..))
 import LoadEnv (loadEnvFrom)
 
 spec :: Spec
@@ -88,7 +89,7 @@ spec = withState testApp $ do
           }
         |]
 
-    it "accepts and stores a valid snapshot" $ do
+    it "accepts and returns an extant snapshot" $ do
       SResponse {..} <- post "/snapshots" [json|
         { sig: 0
         , state: []
@@ -96,8 +97,21 @@ spec = withState testApp $ do
         }
       |]
       code <- shouldBeJust $ simpleBody ^? key "code" . _JSON
-      snapshot <- liftEnv $ runDB $ DB.get $ SnapshotKey code
+      code `shouldBe` SnapshotKey "SNAPSH0T"
+      snapshot <- liftEnv $ runDB $ DB.get code
       liftIO $ snapshot `shouldBe` Just def
+
+    it "accepts and stores a valid snapshot" $ do
+      SResponse {..} <- post "/snapshots" [json|
+        { sig: 1
+        , state: []
+        , names: []
+        }
+      |]
+      code <- shouldBeJust $ simpleBody ^? key "code" . _JSON
+      code `shouldNotBe` SnapshotKey "SNAPSH0T"
+      snapshot <- liftEnv $ runDB $ DB.get code
+      liftIO $ snapshot `shouldBe` Just def { snapshotSignature = Signature 1 }
 
 testApp :: IO (Env, Application)
 testApp = do
