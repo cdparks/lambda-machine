@@ -55,7 +55,7 @@ jobs:
           weeder: false
           working-directory: backend
 
-  images:
+  image:
     runs-on: ubuntu-latest
 
     outputs:
@@ -96,3 +96,24 @@ jobs:
       - run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+
+    needs: [build, image]
+
+    steps:
+      - run: |
+          cat >Dockerfile.web <<'EOM'
+          FROM ${{ needs.image.outputs.image }}
+          ENV ORIGIN=https://lambda-machine.com
+          CMD ["/app/serve"]
+          EOM
+
+      - uses: gonuit/heroku-docker-deploy@v1.3.3
+        with:
+          email: ${{ secrets.HEROKU_EMAIL }}
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: lambda-machine
+          dockerfile_name: Dockerfile.web
