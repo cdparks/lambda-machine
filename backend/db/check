@@ -1,0 +1,16 @@
+#!/bin/sh
+# Fail if there are any migrations that haven't been run in prod yet
+set -e
+
+export DBM_DATABASE=$(heroku config:get DATABASE_URL --app lambda-machine)
+export DBM_MIGRATION_STORE=$(cd "$(dirname "$0")" && pwd)/migrations
+export DBM_LINEAR_MIGRATIONS=on
+export DBM_TIMESTAMP_FILENAMES=on
+
+tmp=$(mktemp)
+trap 'rm -f -- "$tmp"' EXIT
+exec stack exec -- moo-postgresql upgrade-list 2>&1 | tee "$tmp"
+
+if ! grep -Fqx 'Database is up to date.' "$tmp"; then
+  exit 1
+fi

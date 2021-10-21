@@ -52,6 +52,11 @@ jobs:
           weeder: false
           working-directory: backend
 
+      - run: db/check
+        working-directory: backend
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+
   image:
     runs-on: ubuntu-latest
 
