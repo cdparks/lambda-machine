@@ -9,9 +9,10 @@ import Lambda.Prelude
 
 import Data.Map as Map
 import Data.Set as Set
-import Lambda.Language.Expression (Expression)
+import Lambda.Language.Expression (Expression, encodeNat, encodeList)
 import Lambda.Language.Expression as Expression
 import Lambda.Language.Name (Name, next)
+import Lambda.Language.Name as Name
 import Lambda.Language.Pretty (class Pretty, parensIf, text)
 import Partial.Unsafe (unsafeCrashWith)
 
@@ -50,6 +51,7 @@ instance hashableNameless :: Hashable Nameless where
     Apply f a -> hash $ Tuple f a
 
 -- | Create a locally-nameless expression from an AST
+-- | Also eliminates literals
 from :: Expression -> Nameless
 from = alphaInternal <<< go Map.empty
  where
@@ -58,6 +60,12 @@ from = alphaInternal <<< go Map.empty
       case Map.lookup n env of
         Nothing -> {expr: Free n, fvs: Set.singleton n}
         Just i -> {expr: Bound i, fvs: Set.empty}
+    Expression.Nat i -> go env $ encodeNat i
+    Expression.List xs -> go env $  do
+      let names = Map.keys env
+      let {new: cons} = fresh names $ Name.from "cons"
+      let {new: nil} = fresh names $ Name.from "nil"
+      encodeList cons nil xs
     Expression.Lambda n body ->
       let
         shifted = Map.insert n 0 $ (_ + 1) <$> env

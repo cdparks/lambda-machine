@@ -19,11 +19,11 @@ import Data.Array as Array
 import Data.String.CodeUnits (fromCharArray)
 import Foreign as Foreign
 import Partial.Unsafe (unsafeCrashWith)
+import Text.Parsing.Parser (ParseError, parseErrorMessage, parseErrorPosition, runParser)
+import Text.Parsing.Parser (fail, ParseError) as X
 import Text.Parsing.Parser as Parser
 import Text.Parsing.Parser.Combinators (between)
 import Text.Parsing.Parser.Combinators (between, option, optionMaybe, optional, sepBy, sepBy1, try) as X
-import Text.Parsing.Parser (fail, ParseError) as X
-import Text.Parsing.Parser (ParseError, parseErrorMessage, parseErrorPosition, runParser)
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, eof, skipSpaces)
 import Text.Parsing.Parser.String (char, satisfy, skipSpaces, string) as X

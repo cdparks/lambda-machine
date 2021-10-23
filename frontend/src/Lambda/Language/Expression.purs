@@ -1,6 +1,8 @@
 module Lambda.Language.Expression
   ( Expression(..)
   , unHighlight
+  , encodeNat
+  , encodeList
   ) where
 
 import Lambda.Prelude
@@ -14,17 +16,18 @@ import Data.Maybe (fromJust)
 import Data.String.CodeUnits (fromCharArray)
 import Lambda.Language.Name (Name)
 import Lambda.Language.Name as Name
-import Lambda.Language.Parser (class Parse, parse, liftF, Parser, brackets, char, fail, parens, satisfy, sepBy, string, token)
-import Lambda.Language.Pretty (Rep(..), class Pretty, pretty, parensIf, Builder, text, style)
+import Lambda.Language.Parser (class Parse, parse, Parser, brackets, char, fail, parens, satisfy, sepBy, string, token)
+import Lambda.Language.Pretty (class Pretty, select, parensIf, Builder, text, style)
 import Partial.Unsafe (unsafePartial)
 
--- | Source-level syntax minus syntactic sugar for lists and natural
--- | numbers; those are eliminated in the parser. The Highlight
--- | constructor is for marking interesting nodes. Cycles are rare
--- | but can technically be created by evaluating recursively defined
--- | fix with no argument.
+-- | Source-level syntax. Source-level literals are removed during
+-- | conversion to 'Nameless'. The Highlight constructor is for marking
+-- | interesting nodes. Cycles are rare but can technically be created
+-- | by evaluating recursively defined fix with no argument.
 data Expression
   = Var Name
+  | Nat Int
+  | List (List Expression)
   | Lambda Name Expression
   | Apply Expression Expression
   | Highlight Expression
@@ -34,6 +37,8 @@ data Expression
 unHighlight :: Expression -> Expression
 unHighlight = case _ of
   e@(Var _) -> e
+  e@(Nat _) -> e
+  List es -> List $ unHighlight <$> es
   Lambda n e -> Lambda n $ unHighlight e
   Apply f a -> Apply (unHighlight f) (unHighlight a)
   Highlight e -> e
@@ -46,21 +51,15 @@ derive instance genericExpression :: Generic Expression _
 instance showExpression :: Show Expression where
   show x = genericShow x
 
-instance readForeignExpression :: ReadForeign Expression where
-  readImpl = liftF parse <=< readImpl
-
-instance writeForeignExpression :: WriteForeign Expression where
-  writeImpl = writeImpl <<< pretty Raw
-
 instance prettyExpression :: Pretty Expression where
-  pretty rep = loop false
+  pretty rep = loop false <<< select rep { sugar: quote, raw: identity }
    where
     loop inApp = case _ of
-      Var v ->
-        text $ show v
-      Lambda name body
-        | rep == Sugar -> tryLiteral inApp name body
-        | otherwise -> prettyLambda inApp name body
+      Var v -> text $ show v
+      Nat i -> text $ show i
+      List es -> commaSep $ loop false <$> es
+      Lambda name body ->
+        parensIf inApp $ text ("λ" <> show name <> ". ") <> loop false body
       Apply f a ->
         parensIf inApp
           $ loop (isLambda f) f
@@ -75,12 +74,17 @@ instance prettyExpression :: Pretty Expression where
         highlight Global $ loop inApp x
       Cycle -> text "…"
 
-    tryLiteral inApp name body = fromMaybe' (\_ -> prettyLambda inApp name body) $ do
-      head <- literalHead $ Lambda name body
-      asNatural head <|> asList head
-
-    prettyLambda inApp name body =
-      parensIf inApp $ text ("λ" <> show name <> ". ") <> loop false body
+quote :: Expression -> Expression
+quote = case _ of
+  e@(Var _) -> e
+  e@(Nat _) -> e
+  List es -> List $ quote <$> es
+  Lambda n e -> fromMaybe' (\_ -> Lambda n $ quote e) $ do
+    head <- literalHead $ Lambda n e
+    asNat head <|> asList head
+  Apply f a -> Apply (quote f) (quote a)
+  Highlight e -> Highlight $ quote e
+  Cycle -> Cycle
 
 -- | What's being highlighted in an expression
 data Highlight
@@ -118,23 +122,23 @@ literalHead = case _ of
   _ -> Nothing
 
 -- | Attempt to interpret syntax as a Church natural.
-asNatural :: Head -> Maybe Builder
-asNatural {f, z, body} = text <<< show <$> walk 0 body
+asNat :: Head -> Maybe Expression
+asNat {f, z, body} = walk 0 body
  where
   walk acc (Apply (Var s) arg)
     | s == f = walk (1 + acc) arg
   walk acc (Var t)
-    | t == z = pure acc
+    | t == z = pure $ Nat acc
   walk _ _ = Nothing
 
 -- | Attempt to interpret syntax as a Church-encoded list.
-asList :: Head -> Maybe Builder
-asList {f, z, body} = commaSep <$> walk Nil body
+asList :: Head -> Maybe Expression
+asList {f, z, body} = walk Nil body
  where
   walk acc (Apply (Apply (Var cons) x) xs)
-    | cons == f = walk (Cons (pretty Sugar x) acc) xs
+    | cons == f = walk (Cons (quote x) acc) xs
   walk acc (Var nil)
-    | nil == z = pure $ List.reverse acc
+    | nil == z = pure $ List $ List.reverse acc
   walk _ _ = Nothing
 
 commaSep :: List Builder -> Builder
@@ -179,27 +183,6 @@ parseAtom parseExpr =
     body <- parseExpr
     pure $ foldr Lambda body names
 
--- | Convert comma-delimited list to Church-encoded list.
-toList :: List Expression -> Expression
-toList xs =
-  Lambda cons (Lambda nil (loop xs))
- where
-  cons = Name.from "cons"
-  nil = Name.from "nil"
-  loop Nil = Var nil
-  loop (Cons y ys) = Apply (Apply (Var cons) y) (loop ys)
-
--- | Convert a natural number to a Church numeral
-toNat :: Int -> Expression
-toNat n =
-  Lambda s (Lambda z (loop n))
- where
-  s = Name.from "s"
-  z = Name.from "z"
-  loop k
-    | k <= 0 = Var z
-    | otherwise = Apply (Var s) (loop (k - 1))
-
 -- | Fail if the user pastes a cycle's representation (… or ...) back into the input
 failCycle :: Parser Expression
 failCycle = token do
@@ -215,11 +198,11 @@ parseNat :: Parser Expression
 parseNat = token do
   digits <- Array.some $ satisfy isDigit
   let n = unsafePartial $ fromJust $ fromString $ fromCharArray digits
-  pure $ toNat n
+  pure $ Nat n
 
 -- | Parse a comma-separated list between brackets.
 parseList :: Parser Expression -> Parser Expression
-parseList p = toList <$> brackets (p `sepBy` token (char ','))
+parseList p = List <$> brackets (p `sepBy` token (char ','))
 
 -- | Parse a variable.
 parseVar :: Parser Expression
@@ -228,3 +211,29 @@ parseVar = Var <$> parse
 -- | Is a character a decimal digit?
 isDigit :: Char -> Boolean
 isDigit c = '0' <= c && c <= '9'
+
+-- | Convert literal int to church-encoded nat
+-- | We can always use names s and z without clobbering anything
+-- | because literal ints don't embed other expressions
+encodeNat :: Int -> Expression
+encodeNat n = Lambda s (Lambda z (loop n))
+ where
+  s = Name.from "s"
+  z = Name.from "z"
+  loop k
+    | k <= 0 = Var z
+    | otherwise = Apply (Var s) (loop (k - 1))
+
+-- | Convert literal list to church-encoded list
+-- | Literal lists can embed other expressions, so we must pass in fresh
+-- | names.
+encodeList
+  :: Name
+  -> Name
+  -> List Expression
+  -> Expression
+encodeList cons nil xs = Lambda cons $ Lambda nil $ loop xs
+ where
+  loop = case _ of
+    Nil -> Var nil
+    Cons y ys -> Apply (Apply (Var cons) y) (loop ys)

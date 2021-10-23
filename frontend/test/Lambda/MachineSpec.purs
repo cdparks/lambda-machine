@@ -5,7 +5,7 @@ module Lambda.MachineSpec
 import Test.Prelude
 
 import Data.Function (applyN)
-import Lambda.Language.Expression (Expression)
+import Lambda.Language.Expression (Expression, encodeNat)
 import Lambda.Language.Expression as Expression
 import Lambda.Language.Nameless (Nameless)
 import Lambda.Machine as Machine
@@ -19,7 +19,7 @@ spec = describe "Lambda.Machine" do
 
     it "evaluates addition of church numerals" do
       let result = normalize [mkBind "add m n s z = m s (n s z)"] $ mkAnon "add 2 3"
-      result `shouldEqual` mkAst "5"
+      result `shouldEqual` encodeNat 5
 
     it "lazily consumes an infinite list" do
       let
