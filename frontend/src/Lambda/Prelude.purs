@@ -3,16 +3,21 @@ module Lambda.Prelude
   , module X
   , withReader
   , withState
+  , runIdentity
   ) where
 
 import Prelude
 
 import Control.Alt ((<|>)) as X
-import Control.Monad.Reader (class MonadAsk, class MonadReader, Reader, runReader, ask, asks, local) as X
-import Control.Monad.Reader (Reader, runReader)
+import Control.Monad.Error.Class (class MonadThrow, class MonadError, throwError, catchError) as X
+import Control.Monad.Except.Trans (ExceptT, runExceptT) as X
+import Control.Monad.Reader (Reader, runReader) as X
+import Control.Monad.Reader.Trans (ReaderT, runReaderT) as X
+import Control.Monad.Reader.Class (class MonadAsk, class MonadReader, ask, asks, local) as X
 import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM) as X
-import Control.Monad.State (class MonadState, State, evalState, execState, gets, get, modify_, put) as X
-import Control.Monad.State (State, evalState)
+import Control.Monad.State (State, evalState, execState, runState) as X
+import Control.Monad.State.Trans (StateT, evalStateT, execStateT, runStateT) as X
+import Control.Monad.State.Class (class MonadState, gets, get, modify_, put) as X
 import Control.MonadZero (guard) as X
 import Data.Bifunctor (class Bifunctor, bimap, lmap, rmap) as X
 import Data.Either (Either(..), either, hush, note) as X
@@ -21,11 +26,12 @@ import Data.Generic.Rep (class Generic) as X
 import Data.HashMap (HashMap) as X
 import Data.HashSet (HashSet) as X
 import Data.Hashable (class Hashable, hash) as X
+import Data.Identity (Identity(..)) as X
 import Data.List (List(..), (:)) as X
 import Data.Map (Map) as X
 import Data.Maybe (Maybe(..), fromMaybe', fromMaybe, maybe, isNothing) as X
 import Data.Monoid (class Monoid, mempty) as X
-import Data.Newtype (class Newtype, un, wrap) as X
+import Data.Newtype (class Newtype, un, wrap, unwrap) as X
 import Data.Semigroup (class Semigroup, append, (<>)) as X
 import Data.Set (Set) as X
 import Data.Show.Generic (genericShow) as X
@@ -39,10 +45,14 @@ import Foreign (F, Foreign, ForeignError(..)) as X
 import Safe.Coerce (class Coercible, coerce) as X
 import Simple.JSON (readJSON, writeJSON, class ReadForeign, readImpl, class WriteForeign, writeImpl) as X
 
--- | Flipped runReader
-withReader :: forall a r. r -> Reader r a -> a
-withReader = flip runReader
+--- | Flipped runReader
+withReader :: forall a r. r -> X.Reader r a -> a
+withReader = flip X.runReader
 
--- | Flipped evalState
-withState :: forall a s. s -> State s a -> a
-withState = flip evalState
+--- | Flipped evalState
+withState :: forall a s. s -> X.State s a -> a
+withState = flip X.evalState
+
+-- | Not included in Data.Identity anymore
+runIdentity :: forall a. X.Identity a -> a
+runIdentity = X.unwrap

@@ -14,6 +14,7 @@ You can edit this file as you like.
   , "exceptions"
   , "foldable-traversable"
   , "foreign"
+  , "identity"
   , "integers"
   , "lists"
   , "maybe"
