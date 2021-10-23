@@ -18,6 +18,7 @@ import Data.Array as Array
 import Data.Foldable (intercalate)
 import Data.Grammar (pluralizeWith)
 import Data.List as List
+import Effect.Console as Console
 import Effect.Save (FileName(..), saveTextAs)
 import Lambda.Language.Definition (Definition(..))
 import Lambda.Language.Definition as Definition
@@ -31,7 +32,8 @@ import Lambda.Language.Parser (parse)
 import Lambda.Language.Parser as Parser
 import Lambda.Language.Prelude as Prelude
 import Lambda.Language.Pretty (Rep(..), toggle, pretty, toString)
-import Lambda.Language.Snapshot (Snapshot(..))
+import Lambda.Language.Snapshot (Snapshot)
+import Lambda.Language.Snapshot as Snapshot
 import Lambda.Language.Statement (Statement(..))
 import Lambda.Language.World (World)
 import Lambda.Language.World as World
@@ -48,6 +50,7 @@ import React.Basic.Hooks as Hooks
 type State =
   { text :: String
   , defs :: Array Definition
+  , expr :: Maybe Expression
   , world :: World
   , machine :: Maybe Machine
   , history :: History
@@ -59,8 +62,9 @@ type State =
 mkApp :: Maybe Snapshot -> Component {}
 mkApp mSnapshot = do
   reducer <- mkReducer update
+  initialState <- mkState mSnapshot
   component "App" \_ -> Hooks.do
-    state /\ dispatch <- useReducer (mkState mSnapshot) reducer
+    state /\ dispatch <- useReducer initialState reducer
     pure $ R.div
       { className: "container"
       , children:
@@ -141,15 +145,20 @@ data Action
   | ToggleSugar
 
 -- | Empty state with default global definitions
-mkState :: Maybe Snapshot -> State
-mkState = maybe default (build <<< un Snapshot)
+mkState :: Maybe Snapshot -> Effect State
+mkState = maybe (pure default) (build <<< Snapshot.to)
  where
-  build { defs, input } = do
-    let s = foldl (flip addDef) empty defs
-    maybe s (flip setExpr s) input
+  build = case _ of
+    Left err -> do
+      Console.log $ toString $ pretty Raw err
+      pure default
+    Right { defs, input } -> do
+      let s = foldl (flip addDef) empty defs
+      pure $ maybe s (flip setExpr s) input
   empty =
     { text: ""
     , defs: []
+    , expr: Nothing
     , world: World.empty
     , machine: Nothing
     , history: History.empty
@@ -274,6 +283,7 @@ setExpr syntax s =
         snapshot = Machine.snapshot machine
       in s
         { text = ""
+        , expr = Just syntax
         , world = world
         , machine = pure machine
         , history = History.new snapshot
@@ -306,6 +316,7 @@ step m0 s =  s
 clear :: State -> State
 clear s = s
   { world = World.unfocus s.world
+  , expr = Nothing
   , machine = Nothing
   , history = History.empty
   , steps = Nothing

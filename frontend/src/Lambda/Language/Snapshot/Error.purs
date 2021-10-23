@@ -8,6 +8,7 @@ import Data.Array as Array
 import Lambda.Language.Name (Name)
 import Lambda.Language.Pretty (class Pretty, text, pretty)
 import Lambda.Language.Snapshot.Tag (Tag)
+import Data.Grammar (pluralizeWith)
 
 -- | Errors that can occur while creating or loading a `Snapshot`
 data Error
@@ -51,7 +52,8 @@ instance Pretty Error where
       , text op
       , text "; wanted "
       , text $ show wanted
-      , text " item(s), saw "
+      , text $ pluralizeWith "s" wanted "item"
+      , text ", saw "
       , text $ show saw
       ]
     IndexOutOfRange i names -> fold
