@@ -9,5 +9,5 @@ import React.Render (renderTo)
 
 main :: Effect Unit
 main = do
-  app <- mkApp Nothing
-  renderTo "root" $ app {}
+  app <- mkApp
+  renderTo "root" $ app { code: Nothing }

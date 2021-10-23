@@ -14,13 +14,14 @@ type Props =
   { machine :: Maybe Machine
   , onStep :: Machine -> Effect Unit
   , onClear :: Effect Unit
+  , onShare :: Effect Unit
   , onSave :: Effect Unit
   , onSugar :: Effect Unit
   , rep :: Rep
   }
 
 component :: Props -> JSX
-component {machine, onStep, onClear, onSave, onSugar, rep} =
+component {machine, onStep, onClear, onShare, onSave, onSugar, rep} =
   R.div
     { className: "add-margin-medium btn-group pull-right"
     , children:
@@ -33,6 +34,11 @@ component {machine, onStep, onClear, onSave, onSugar, rep} =
         { className: "btn btn-default"
         , onClick: const onClear
         , label: "Clear"
+        }
+      , button (Just unit)
+        { className: "btn btn-default"
+        , onClick: const onShare
+        , label: "Share"
         }
       , button machine
         { className: "btn btn-default"

@@ -14,12 +14,12 @@ import Control.Alt ((<|>)) as X
 import Control.Monad.Error.Class (class MonadThrow, class MonadError, throwError, catchError) as X
 import Control.Monad.Except.Trans (ExceptT, runExceptT) as X
 import Control.Monad.Reader (Reader, runReader) as X
-import Control.Monad.Reader.Trans (ReaderT, runReaderT) as X
 import Control.Monad.Reader.Class (class MonadAsk, class MonadReader, ask, asks, local) as X
+import Control.Monad.Reader.Trans (ReaderT, runReaderT) as X
 import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM) as X
 import Control.Monad.State (State, evalState, execState, runState) as X
-import Control.Monad.State.Trans (StateT, evalStateT, execStateT, runStateT) as X
 import Control.Monad.State.Class (class MonadState, gets, get, modify_, put) as X
+import Control.Monad.State.Trans (StateT, evalStateT, execStateT, runStateT) as X
 import Control.MonadZero (guard) as X
 import Data.Bifunctor (class Bifunctor, bimap, lmap, rmap) as X
 import Data.Either (Either(..), either, hush, note) as X

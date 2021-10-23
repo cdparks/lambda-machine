@@ -18,8 +18,10 @@ import Data.Array as Array
 import Data.Foldable (intercalate)
 import Data.Grammar (pluralizeWith)
 import Data.List as List
-import Effect.Console as Console
+import Effect.Class (liftEffect)
 import Effect.Save (FileName(..), saveTextAs)
+import Lambda.Api as Api
+import Lambda.Env as Env
 import Lambda.Language.Definition (Definition(..))
 import Lambda.Language.Definition as Definition
 import Lambda.Language.Expression (Expression)
@@ -32,8 +34,8 @@ import Lambda.Language.Parser (parse)
 import Lambda.Language.Parser as Parser
 import Lambda.Language.Prelude as Prelude
 import Lambda.Language.Pretty (Rep(..), toggle, pretty, toString)
-import Lambda.Language.Snapshot (Snapshot)
-import Lambda.Language.Snapshot as Snapshot
+import Lambda.Language.Program (Program)
+import Lambda.Language.Snapshot.Code (Code)
 import Lambda.Language.Statement (Statement(..))
 import Lambda.Language.World (World)
 import Lambda.Language.World as World
@@ -44,6 +46,11 @@ import React.Basic as React
 import React.Basic.DOM as R
 import React.Basic.Hooks (Component, component, mkReducer, useReducer)
 import React.Basic.Hooks as Hooks
+import React.Basic.Hooks.Aff (useAff)
+
+type Props =
+  { code :: Maybe Code
+  }
 
 -- | Manages text-input, global definitions, semantic consistency
 -- | (world field), and machine state, if any.
@@ -57,14 +64,34 @@ type State =
   , rep :: Rep
   , alert :: Maybe (Tuple Level JSX)
   , steps :: Maybe Int
+  , request :: Maybe Request
   }
 
-mkApp :: Maybe Snapshot -> Component {}
-mkApp mSnapshot = do
+data Request
+  = Fetch Code
+  | Store Program
+
+derive instance eqRequest :: Eq Request
+
+mkApp :: Component Props
+mkApp = do
   reducer <- mkReducer update
-  initialState <- mkState mSnapshot
-  component "App" \_ -> Hooks.do
-    state /\ dispatch <- useReducer initialState reducer
+  component "App" \{ code: mCode }  -> Hooks.do
+    state /\ dispatch <- useReducer (mkState mCode) reducer
+    _ <- useAff state.request $ case state.request of
+      Nothing -> pure unit
+      Just (Store program) -> do
+        result <- Api.store program
+        liftEffect $ do
+          dispatch $ case result of
+            Left err -> ShowError err
+            Right code -> ShowCode code
+      Just (Fetch code) -> do
+        result <- Api.fetch code
+        liftEffect $ dispatch $ case result of
+          Left err -> ShowError err
+          Right program -> Load program
+
     pure $ R.div
       { className: "container"
       , children:
@@ -99,6 +126,7 @@ mkApp mSnapshot = do
             { machine: state.machine
             , onStep: dispatch <<< Step
             , onClear: dispatch Clear
+            , onShare: dispatch Share
             , onSave: save state
             , onSugar: dispatch ToggleSugar
             , rep: state.rep
@@ -143,33 +171,49 @@ data Action
   | Step Machine
   | Clear
   | ToggleSugar
+  | ShowError Api.Error
+  | ShowCode Code
+  | Load Program
+  | Share
 
 -- | Empty state with default global definitions
-mkState :: Maybe Snapshot -> Effect State
-mkState = maybe (pure default) (build <<< Snapshot.to)
+mkState :: Maybe Code -> State
+mkState code = empty
+  { defs = Prelude.defs
+  , world = World.new $ defsToGlobals Prelude.defs
+  , request = Fetch <$> code
+  }
+
+empty :: State
+empty =
+  { text: ""
+  , expr: Nothing
+  , defs: []
+  , world: World.empty
+  , machine: Nothing
+  , history: History.empty
+  , rep: Raw
+  , alert: Nothing
+  , steps: Nothing
+  , request: Nothing
+  }
+
+load :: Program -> State -> State
+load { defs, expr } old =
+  case result of
+    Left alert -> old { alert = Just alert, request = Nothing }
+    Right state -> state { request = Nothing }
  where
-  build = case _ of
-    Left err -> do
-      Console.log $ toString $ pretty Raw err
-      pure default
-    Right { defs, input } -> do
-      let s = foldl (flip addDef) empty defs
-      pure $ maybe s (flip setExpr s) input
-  empty =
-    { text: ""
-    , defs: []
-    , expr: Nothing
-    , world: World.empty
-    , machine: Nothing
-    , history: History.empty
-    , rep: Raw
-    , alert: Nothing
-    , steps: Nothing
-    }
-  default = empty
-    { defs = Prelude.defs
-    , world = World.new $ defsToGlobals Prelude.defs
-    }
+  define state = alertFail <<< flip addDef state
+  focus state = alertFail <<< flip setExpr state
+  result = do
+    state <- foldM define empty defs
+    maybe (pure state) (focus state) expr
+
+alertFail :: State -> Either (Tuple Level JSX) State
+alertFail state = case state.alert of
+  Just alert -> Left alert
+  Nothing -> Right state
 
 -- | Update `State` in response to an `Action`
 update :: State -> Action -> State
@@ -183,22 +227,52 @@ update s = case _ of
   SetExpr expr -> setExpr expr s
   Step machine -> step machine s
   Clear -> clear s
+  Share -> share s
   ToggleSugar -> toggleSugar s
+  ShowError err -> showError err s
+  ShowCode code -> showCode code s
+  Load program -> load program s
 
 -- | Present the tutorial alert
 showHelp :: State -> State
-showHelp =
-  _ {alert = pure $ Tuple Info $ Help.component {} }
+showHelp = _
+  { alert = pure $ Tuple Info $ Help.component {}
+  }
+
+-- | Show Api error
+showError :: Api.Error -> State -> State
+showError err = _
+  { alert = pure $ Tuple Info $ R.p
+    { children:
+      [ R.text $ toString $ pretty Sugar err
+      ]
+    }
+  , request = Nothing
+  }
+
+-- | Show link to machine that loads snapshot
+showCode :: Code -> State -> State
+showCode code = _
+  { alert = pure $ Tuple Info $ R.p
+    { children:
+      [ R.text $ Env.host <> "/" <> unwrap code
+      ]
+    }
+  , request = Nothing
+  }
 
 -- | Dismiss any alert
 dismissAlert :: State -> State
-dismissAlert =
-  _ {alert = Nothing}
+dismissAlert = _
+  { alert = Nothing
+  }
 
 -- | Update input text
 updateText :: String -> State -> State
-updateText text =
-  _ {alert = Nothing, text = text}
+updateText text = _
+  { alert = Nothing
+  , text = text
+  }
 
 -- | Attempt to parse the input. Input may be a definition, an
 -- | expression, or malformed, in which case, we'll surface a
@@ -325,6 +399,12 @@ clear s = s
 -- | Toggle syntactic sugar for Church numerals and lists.
 toggleSugar :: State -> State
 toggleSugar s = s {rep = toggle s.rep}
+
+-- | Store program
+share :: State -> State
+share s = s { request = Just $ Store { defs, expr } }
+ where
+  { defs, expr } = s
 
 -- | Download the state as a text file.
 save :: State -> Effect Unit
