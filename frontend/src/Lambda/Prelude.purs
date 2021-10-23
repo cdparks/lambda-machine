@@ -4,6 +4,8 @@ module Lambda.Prelude
   , withReader
   , withState
   , runIdentity
+  , map2
+  , (<$$>)
   ) where
 
 import Prelude
@@ -56,3 +58,7 @@ withState = flip X.evalState
 -- | Not included in Data.Identity anymore
 runIdentity :: forall a. X.Identity a -> a
 runIdentity = X.unwrap
+
+map2 :: forall a b f g. Functor f => Functor g => (a -> b) -> f (g a) -> f (g b)
+map2 f = map (map f)
+infixl 4 map2 as <$$>

@@ -1,8 +1,8 @@
 module Lambda.Language.Snapshot
   ( Snapshot(..)
   , module Error
-  , from
-  , to
+  , new
+  , load
   ) where
 
 import Lambda.Prelude
@@ -14,6 +14,7 @@ import Lambda.Language.Definition as Definition
 import Lambda.Language.Expression (Expression)
 import Lambda.Language.Expression as Expression
 import Lambda.Language.Name (Name)
+import Lambda.Language.Program (Program)
 import Lambda.Language.Snapshot.Error (Error(..))
 import Lambda.Language.Snapshot.Error (Error(..)) as Error
 import Lambda.Language.Snapshot.RPN (RPN(..))
@@ -35,32 +36,31 @@ derive newtype instance readForeignSnapshot :: ReadForeign Snapshot
 derive newtype instance writeForeignSnapshot :: WriteForeign Snapshot
 
 -- | Convert definitions and input to `Snapshot`
-from :: Array Definition -> Maybe Expression -> Either Error Snapshot
-from defs input = runIdentity $ runExceptT $ do
+new :: Program -> Either Error Snapshot
+new {defs, expr} = runIdentity $ runExceptT $ do
     state <- RPN.encode rpn
     pure $ Snapshot { sig, names, state }
  where
   sig = Signature.deflate defs
-  Tuple names rpn = flatten defs input
+  Tuple names rpn = flatten defs expr
 
 -- | Attempt to load definitions and input from `Snapshot`
-to :: Snapshot -> Either Error { defs :: Array Definition, input :: Maybe Expression }
-to (Snapshot { sig, names, state }) = do
-  case runIdentity $ runExceptT $ evalStateT act start of
-    Left err -> Left err
-    Right (Tuple userDefs input) -> do
-      let defs = Signature.inflate sig <> userDefs
-      pure { defs, input }
+load :: Snapshot -> Either Error Program
+load (Snapshot { sig, names, state }) =
+  withPrelude <$> runIdentity (runExceptT $ evalStateT act start)
  where
   start = { stack: Nil, defs: [], names }
   act = replay =<< RPN.decode state
+  withPrelude program = program
+    { defs = Signature.inflate sig <> program.defs
+    }
 
 -- | Collect names and program to a sequence of RPN instructions
 flatten :: Array Definition -> Maybe Expression -> Tuple (Array Name) (Array RPN)
-flatten defs input = collect do
+flatten defs expr = collect do
   flatDefs <- traverse flattenDef defs
-  flatInput <- traverse flattenExpr input
-  pure $ Array.concat flatDefs <> fromMaybe [] flatInput
+  flatExpr <- traverse flattenExpr expr
+  pure $ Array.concat flatDefs <> fromMaybe [] flatExpr
 
 -- | Flatten definition to a sequence of RPN instructions
 flattenDef :: forall m. MonadState Dictionary m => Definition -> m (Array RPN)
@@ -127,13 +127,13 @@ save name = do
       pure i
 
 -- | Create definitions and input from sequence of encoded RPN instructions
-replay :: forall m. MonadThrow Error m => MonadState Store m => Array RPN -> m (Tuple (Array Definition) (Maybe Expression))
+replay :: forall m. MonadThrow Error m => MonadState Store m => Array RPN -> m Program
 replay ops = do
   traverse_ step ops
   { defs, stack } <- get
   case stack of
-    Nil ->  pure $ Tuple defs Nothing
-    Cons e Nil -> pure $ Tuple defs $ Just e
+    Nil -> pure { defs, expr: Nothing }
+    Cons expr Nil -> pure { defs, expr: Just expr }
     _ -> throwError $ ExtraStackValues $ Array.length $ Array.fromFoldable stack
  where
   step = case _ of
