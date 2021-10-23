@@ -16,5 +16,7 @@ main :: IO ()
 main = do
   settings <- Settings.load
   env <- Env.new settings
-  app <- runRIO env $ middleware settings <$> api
+  app <- runRIO env $ do
+    logDebug $ "running with " <> display settings
+    middleware settings <$> api
   Warp.run (port settings) app `finally` shutdown env

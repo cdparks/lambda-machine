@@ -90,6 +90,7 @@ library
     , monad-logger
     , mtl
     , mwc-random
+    , network-uri
     , path-pieces
     , persistent
     , persistent-postgresql

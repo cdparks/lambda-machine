@@ -10,6 +10,7 @@ import Backend.Prelude
 
 import Backend.Database (ConnectionString, PostgresConf(..))
 import Env (Error, Parser, header, parse)
+import Network.URI (parseURI)
 import qualified Env
 
 data Settings = Settings
@@ -20,7 +21,34 @@ data Settings = Settings
   , timeout :: Int
   , postgresConf :: PostgresConf
   }
-  deriving stock Show
+
+instance Display Settings where
+  display Settings{..} = mconcat
+    [ "Settings {"
+    , "\n  PORT="
+    , display port
+    , ",\n  ROOT="
+    , display root
+    , ",\n  ORIGIN="
+    , display origin
+    , ",\n  LOG_LEVEL="
+    , displayShow logLevel
+    , ",\n  TIMEOUT="
+    , display timeout
+    , ",\n  DATABASE_URL="
+    --- Show instance for URI automatically redacts passwords
+    , maybe "…" displayShow uri
+    , ",\n  PGPOOLSTRIPES="
+    , display pgPoolStripes
+    , ",\n  PGPOOLIDLETIMEOUT="
+    , display pgPoolIdleTimeout
+    , ",\n  PGPOOLSIZE="
+    , display pgPoolSize
+    , "\n}"
+    ]
+   where
+    PostgresConf{..} = postgresConf
+    uri = parseURI $ unpack $ decodeUtf8 pgConnStr
 
 class HasSettings env where
   settingsLens :: Lens' env Settings
