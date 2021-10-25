@@ -1,6 +1,5 @@
 module Components.Alert
-  ( Level(..)
-  , component
+  ( component
   ) where
 
 import Lambda.Prelude
@@ -8,19 +7,7 @@ import Lambda.Prelude
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)
-
--- | Style an alert based on its importance
-data Level
-  = Info
-  | Success
-  | Warning
-  | Danger
-
-instance showLevel :: Show Level where
-  show Info = "info"
-  show Success = "success"
-  show Warning = "warning"
-  show Danger  = "danger"
+import Components.Level (Level)
 
 type Props =
   { level :: Level
@@ -29,20 +16,19 @@ type Props =
   }
 
 component :: Props -> JSX
-component {level, child, dismiss} =
-  R.div
-    { className: "alert alert-dismissable alert-" <> show level
-    , children:
-      [ R.button
-        { "type": "button"
-        , onClick: handler_ dismiss
-        , className: "close"
-        , children:
-          [ R.span
-            { className: "cursor-pointer glyphicon glyphicon-remove pull-right"
-            }
-          ]
-        }
-      , child
-      ]
-    }
+component { level, dismiss, child } = R.div
+  { className: "alert alert-dismissable alert-" <> show level
+  , children:
+    [ R.button
+      { "type": "button"
+      , onClick: handler_ dismiss
+      , className: "close"
+      , children:
+        [ R.span
+          { className: "cursor-pointer glyphicon glyphicon-remove pull-right"
+          }
+        ]
+      }
+    , child
+    ]
+  }
