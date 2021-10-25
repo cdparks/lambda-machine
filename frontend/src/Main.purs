@@ -4,10 +4,12 @@ module Main
 
 import Lambda.Prelude
 
-import Components.App (mkApp)
-import React.Render (renderTo)
+import Components.App as App
+import React.Basic.DOM (render)
+import Effect.DOM (getRoot)
 
 main :: Effect Unit
 main = do
-  app <- mkApp
-  renderTo "root" $ app { code: Nothing }
+  app <- App.new
+  let node = app { code: Nothing }
+  render node =<< getRoot
