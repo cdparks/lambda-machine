@@ -23,7 +23,7 @@ import Control.Monad.State.Trans (StateT, evalStateT, execStateT, runStateT) as 
 import Control.MonadZero (guard) as X
 import Data.Bifunctor (class Bifunctor, bimap, lmap, rmap) as X
 import Data.Either (Either(..), either, hush, note) as X
-import Data.Foldable (class Foldable, fold, foldr, foldl, foldM, foldMap, for_, traverse_) as X
+import Data.Foldable (class Foldable, fold, foldr, foldl, foldM, foldMap, for_, traverse_, sequence_) as X
 import Data.Generic.Rep (class Generic) as X
 import Data.HashMap (HashMap) as X
 import Data.HashSet (HashSet) as X
@@ -31,7 +31,7 @@ import Data.Hashable (class Hashable, hash) as X
 import Data.Identity (Identity(..)) as X
 import Data.List (List(..), (:)) as X
 import Data.Map (Map) as X
-import Data.Maybe (Maybe(..), fromMaybe', fromMaybe, maybe, isNothing) as X
+import Data.Maybe (Maybe(..), fromMaybe', fromMaybe, maybe, maybe', isJust, isNothing) as X
 import Data.Monoid (class Monoid, mempty) as X
 import Data.Newtype (class Newtype, un, wrap, unwrap) as X
 import Data.Semigroup (class Semigroup, append, (<>)) as X
@@ -43,6 +43,8 @@ import Data.Tuple.Nested ((/\)) as X
 import Data.Unfoldable (class Unfoldable) as X
 import Debug (trace, traceM, spy, debugger) as X
 import Effect (Effect) as X
+import Effect.Aff (Aff) as X
+import Effect.Class (liftEffect) as X
 import Foreign (F, Foreign, ForeignError(..)) as X
 import Safe.Coerce (class Coercible, coerce) as X
 import Simple.JSON (readJSON, writeJSON, class ReadForeign, readImpl, class WriteForeign, writeImpl) as X

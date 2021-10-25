@@ -6,8 +6,6 @@ module Lambda.Api
 
 import Lambda.Prelude
 
-import Effect.Aff (Aff)
-import Effect.Class (liftEffect)
 import Effect.Console as Console
 import Lambda.Env as Env
 import Lambda.Language.Pretty (class Pretty, text, pretty)
