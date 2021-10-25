@@ -35,17 +35,17 @@ component {machine, onStep, onClear, onShare, onSave, onSugar, rep} =
         , onClick: const onClear
         , label: "Clear"
         }
-      , button (Just unit)
+      , button enabled
         { className: "btn btn-default"
         , onClick: const onShare
         , label: "Share"
         }
-      , button machine
+      , button enabled
         { className: "btn btn-default"
         , onClick: const onSave
         , label: "Save"
         }
-      , button (pure unit)
+      , button enabled
         { className: select rep
           { sugar: "btn btn-danger"
           , raw: "btn btn-success"
@@ -58,6 +58,8 @@ component {machine, onStep, onClear, onShare, onSave, onSugar, rep} =
         }
       ]
     }
+ where
+  enabled = pure unit
 
 -- | Create a button element enabled based on the presence of the first
 -- | argument.
