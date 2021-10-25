@@ -1,11 +1,13 @@
 module Components.App
-  ( mkApp
+  ( new
   ) where
 
 import Lambda.Prelude hiding (State)
 
-import Components.Alert (Level(..))
 import Components.Alert as Alert
+import Components.Modal as Modal
+import Components.Spinner as Spinner
+import Components.Level as Level
 import Components.ConsistencyError as ConsistencyError
 import Components.Controls as Controls
 import Components.Definitions as Definitions
@@ -13,12 +15,12 @@ import Components.Expressions as Expressions
 import Components.Footer as Footer
 import Components.Help as Help
 import Components.Input as Input
+import Components.Copy as Copy
 import Components.ParseError as ParseError
 import Data.Array as Array
 import Data.Foldable (intercalate)
 import Data.Grammar (pluralizeWith)
 import Data.List as List
-import Effect.Class (liftEffect)
 import Effect.Save (FileName(..), saveTextAs)
 import Lambda.Api as Api
 import Lambda.Env as Env
@@ -30,23 +32,25 @@ import Lambda.Language.History as History
 import Lambda.Language.Name (Name)
 import Lambda.Language.Nameless (Nameless)
 import Lambda.Language.Nameless as Nameless
-import Lambda.Language.Parser (parse)
+import Lambda.Language.Parser (ParseError, parse)
 import Lambda.Language.Parser as Parser
 import Lambda.Language.Prelude as Prelude
 import Lambda.Language.Pretty (Rep(..), toggle, pretty, toString)
 import Lambda.Language.Program (Program)
 import Lambda.Language.Snapshot.Code (Code)
 import Lambda.Language.Statement (Statement(..))
-import Lambda.Language.World (World)
+import Lambda.Language.World (World, ConsistencyError)
 import Lambda.Language.World as World
 import Lambda.Machine (Machine)
 import Lambda.Machine as Machine
-import React.Basic (JSX)
+import React.Basic (fragment, JSX)
 import React.Basic as React
 import React.Basic.DOM as R
 import React.Basic.Hooks (Component, component, mkReducer, useReducer)
 import React.Basic.Hooks as Hooks
 import React.Basic.Hooks.Aff (useAff)
+import Effect.Aff as Aff
+import Effect.Aff (Milliseconds(..))
 
 type Props =
   { code :: Maybe Code
@@ -62,10 +66,17 @@ type State =
   , machine :: Maybe Machine
   , history :: History
   , rep :: Rep
-  , alert :: Maybe (Tuple Level JSX)
+  , alert :: Maybe Alert
   , steps :: Maybe Int
   , request :: Maybe Request
   }
+
+data Alert
+  = Help
+  | ApiError String
+  | ParseError String ParseError
+  | Inconsistent ConsistencyError
+  | Link Code
 
 data Request
   = Fetch Code
@@ -73,72 +84,102 @@ data Request
 
 derive instance eqRequest :: Eq Request
 
-mkApp :: Component Props
-mkApp = do
+new :: Component Props
+new = do
   reducer <- mkReducer update
+  copy <- Copy.new
+  modal <- Modal.new
+  spinner <- Spinner.new
   component "App" \{ code: mCode }  -> Hooks.do
     state /\ dispatch <- useReducer (mkState mCode) reducer
     _ <- useAff state.request $ case state.request of
       Nothing -> pure unit
       Just (Store program) -> do
         result <- Api.store program
-        liftEffect $ do
-          dispatch $ case result of
-            Left err -> ShowError err
-            Right code -> ShowCode code
+        liftEffect $ dispatch $ either ShowError ShowCode result
       Just (Fetch code) -> do
-        result <- Api.fetch code
-        liftEffect $ dispatch $ case result of
-          Left err -> ShowError err
-          Right program -> Load program
+          result <- Api.fetch code
+          liftEffect $ dispatch $ either ShowError Load result
 
-    pure $ R.div
-      { className: "container"
-      , children:
-        [ row $ R.h2
-          { className: "page-header"
-          , children: [R.text "Lambda Machine"]
+    let
+      alert = case state.alert of
+        Just Help -> row $ Alert.component
+          { level: Level.Info
+          , dismiss: dispatch DismissAlert
+          , child: Help.component {}
           }
-        , row $ case state.alert of
-            Nothing ->
-              React.empty
-            Just (Tuple level body) ->
-              Alert.component
-                { level
-                , child: body
-                , dismiss: dispatch DismissAlert
-                }
-        , row $ Input.component
-          { text: state.text
-          , onChange: dispatch <<< UpdateText
-          , onSubmit: dispatch ParseText
-          , onHelp: dispatch ShowHelp
+        Just (ApiError error) -> row $ Alert.component
+          { level: Level.Danger
+          , dismiss: dispatch DismissAlert
+          , child: R.text error
           }
-        , row $ R.h3_ [R.text "Definitions"]
-        , row $ Definitions.component
-          { defs: state.defs
-          , rep: state.rep
-          , onDelete: dispatch <<< DeleteDef
+        Just (ParseError input error) -> row $ Alert.component
+          { level: Level.Danger
+          , dismiss: dispatch DismissAlert
+          , child: ParseError.component
+            { input
+            , error
+            }
           }
-        , split
-          (stepsHeader state.steps)
-          (Controls.component
-            { machine: state.machine
-            , onStep: dispatch <<< Step
-            , onClear: dispatch Clear
-            , onShare: dispatch Share
-            , onSave: save state
-            , onSugar: dispatch ToggleSugar
+        Just (Inconsistent error) -> row $ Alert.component
+          { level: Level.Danger
+          , child: ConsistencyError.component { error }
+          , dismiss: dispatch DismissAlert
+          }
+        Just (Link code) -> modal
+          { level: Level.Info
+          , title: "Copy Link To This Machine"
+          , dismiss: dispatch DismissAlert
+          , children:
+            [ copy
+              { text: Env.host <> "/" <> unwrap code
+              }
+            ]
+          }
+        Nothing -> React.empty
+
+    pure $ fragment
+      [ R.div
+        { className: "container"
+        , children:
+          [ row $ R.h2
+            { className: "page-header"
+            , children: [R.text "Lambda Machine"]
+            }
+          , alert
+          , row $ Input.component
+            { text: state.text
+            , onChange: dispatch <<< UpdateText
+            , onSubmit: dispatch ParseText
+            , onHelp: dispatch ShowHelp
+            }
+          , row $ R.h3_ [R.text "Definitions"]
+          , row $ Definitions.component
+            { defs: state.defs
+            , rep: state.rep
+            , onDelete: dispatch <<< DeleteDef
+            }
+          , split
+            (stepsHeader state.steps)
+            (Controls.component
+              { machine: state.machine
+              , onStep: dispatch <<< Step
+              , onClear: dispatch Clear
+              , onShare: dispatch Share
+              , onSave: save state
+              , onSugar: dispatch ToggleSugar
+              , rep: state.rep
+              }
+            )
+          , row $ Expressions.component
+            { history: state.history
             , rep: state.rep
             }
-          )
-        , row $ Expressions.component
-          { history: state.history
-          , rep: state.rep
-          }
-        , row $ Footer.component {}
-        ]
-      }
+          , row $ Footer.component {}
+          ]
+        }
+        , maybe React.empty (\_ -> spinner {}) state.request
+      ]
 
 -- | Row containing a single full-width element
 row :: JSX -> JSX
@@ -210,7 +251,7 @@ load { defs, expr } old =
     state <- foldM define empty defs
     maybe (pure state) (focus state) expr
 
-alertFail :: State -> Either (Tuple Level JSX) State
+alertFail :: State -> Either Alert State
 alertFail state = case state.alert of
   Just alert -> Left alert
   Nothing -> Right state
@@ -235,29 +276,19 @@ update s = case _ of
 
 -- | Present the tutorial alert
 showHelp :: State -> State
-showHelp = _
-  { alert = pure $ Tuple Info $ Help.component {}
-  }
+showHelp = _ { alert = pure Help }
 
 -- | Show Api error
 showError :: Api.Error -> State -> State
 showError err = _
-  { alert = pure $ Tuple Info $ R.p
-    { children:
-      [ R.text $ toString $ pretty Sugar err
-      ]
-    }
+  { alert = pure $ ApiError $ toString $ pretty Sugar err
   , request = Nothing
   }
 
 -- | Show link to machine that loads snapshot
 showCode :: Code -> State -> State
 showCode code = _
-  { alert = pure $ Tuple Info $ R.p
-    { children:
-      [ R.text $ Env.host <> "/" <> unwrap code
-      ]
-    }
+  { alert = pure $ Link code
   , request = Nothing
   }
 
@@ -283,12 +314,7 @@ parseText s
 parseText s =
   case Parser.run parse s.text of
     Left error -> s
-      { alert = pure
-        $ Tuple Danger
-        $ ParseError.component
-          { input: s.text
-          , error
-          }
+      { alert = pure $ ParseError s.text error
       }
     Right (Define def) ->
       addDef def s
@@ -301,11 +327,7 @@ parseText s =
 deleteDef :: Name -> State -> State
 deleteDef name s = case World.undefine name s.world of
   Left error -> s
-    { alert = pure
-      $ Tuple Danger
-      $ ConsistencyError.component
-        { error
-        }
+    { alert = pure $ Inconsistent error
     }
   Right world -> s
     { defs = deleteByName name s.defs
@@ -323,11 +345,7 @@ deleteByName name = Array.filter $ (_ /= name) <<< _.name <<< un Definition
 addDef :: Definition -> State -> State
 addDef def s = case World.define name nameless s.world of
   Left error -> s
-    { alert = pure
-      $ Tuple Danger
-      $ ConsistencyError.component
-        { error
-        }
+    { alert = pure $ Inconsistent error
     }
   Right world -> s
     { text = ""
@@ -345,11 +363,7 @@ setExpr :: Expression -> State -> State
 setExpr syntax s =
   case World.focus expr s.world of
     Left error -> s
-      { alert = pure
-        $ Tuple Danger
-        $ ConsistencyError.component
-          { error
-          }
+      { alert = pure $ Inconsistent error
       }
     Right world ->
       let
@@ -411,11 +425,12 @@ save :: State -> Effect Unit
 save {rep, defs, history} =
   saveTextAs text $ FileName "evaluation.txt"
  where
-  text = intercalate "\n" $ fold
-    [ toString <<< pretty rep <$> defs
-    , pure ""
-    , Array.fromFoldable $ List.reverse $ History.toStrings rep history
-    ]
+  layout [] rhs = intercalate "\n" rhs
+  layout lhs [] = intercalate "\n" lhs
+  layout lhs rhs = intercalate "\n" $ fold [lhs, pure "", rhs]
+  text = layout
+    (toString <<< pretty rep <$> defs)
+    (Array.fromFoldable $ List.reverse $ History.toStrings rep history)
 
 stepsHeader :: Maybe Int -> JSX
 stepsHeader = case _ of
