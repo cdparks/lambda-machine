@@ -7,4 +7,4 @@ module Lambda.Env
 foreign import api :: String
 
 -- | Get app host from environment or default to the real thing
-foreign import host:: String
+foreign import host :: String

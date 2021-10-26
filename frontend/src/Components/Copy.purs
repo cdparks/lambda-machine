@@ -4,14 +4,14 @@ module Components.Copy
 
 import Lambda.Prelude
 
+import Effect.Aff (delay, Milliseconds(..))
+import Effect.Copy as Copy
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (preventDefault)
 import React.Basic.Events (handler, handler_)
 import React.Basic.Hooks (Component, component, useState)
-import React.Basic.Hooks.Aff (useAff)
 import React.Basic.Hooks as Hooks
-import Effect.Aff (delay, Milliseconds(..))
-import Effect.Copy as Copy
+import React.Basic.Hooks.Aff (useAff)
 
 type Props =
   { text :: String

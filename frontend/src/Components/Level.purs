@@ -4,6 +4,7 @@ module Components.Level
 
 import Lambda.Prelude
 
+-- | Bootstrap theme color suffixes
 data Level
   = Default
   | Primary

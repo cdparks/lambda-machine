@@ -1,5 +1,5 @@
 // module Effect.Copy
-"use strict";
+"use strict"
 
 exports.hasClipboard = navigator && 'clipboard' in navigator
 

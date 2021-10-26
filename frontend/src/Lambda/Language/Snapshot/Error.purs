@@ -5,10 +5,10 @@ module Lambda.Language.Snapshot.Error
 import Lambda.Prelude
 
 import Data.Array as Array
+import Data.Grammar (pluralizeWith)
 import Lambda.Language.Name (Name)
 import Lambda.Language.Pretty (class Pretty, text, pretty)
 import Lambda.Language.Snapshot.Tag (Tag)
-import Data.Grammar (pluralizeWith)
 
 -- | Errors that can occur while creating or loading a `Snapshot`
 data Error

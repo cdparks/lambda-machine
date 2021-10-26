@@ -4,9 +4,9 @@ module Components.Spinner
 
 import Lambda.Prelude
 
+import Components.Overlay as Overlay
 import React.Basic.DOM as R
 import React.Basic.Hooks (Component, component)
-import Components.Overlay as Overlay
 
 new :: Component {}
 new = do

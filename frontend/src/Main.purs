@@ -5,8 +5,8 @@ module Main
 import Lambda.Prelude
 
 import Components.App as App
-import React.Basic.DOM (render)
 import Effect.DOM (getRoot)
+import React.Basic.DOM (render)
 
 main :: Effect Unit
 main = do

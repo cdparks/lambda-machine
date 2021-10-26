@@ -1,10 +1,8 @@
 // module React.Portal
-"use strict";
-
-var ReactDOM = require('react-dom')
+"use strict"
 
 exports.createPortal = function(jsx) {
   return function(element) {
-    return ReactDOM.createPortal(jsx, element)
+    return require('react-dom').createPortal(jsx, element)
   }
 }

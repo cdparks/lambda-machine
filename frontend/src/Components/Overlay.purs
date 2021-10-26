@@ -6,10 +6,10 @@ import Lambda.Prelude
 
 import React.Basic (JSX)
 import React.Basic.DOM as R
+import React.Basic.DOM.Events (stopPropagation)
+import React.Basic.Events (handler)
 import React.Basic.Hooks (Component, component)
 import React.Portal as Portal
-import React.Basic.Events (handler)
-import React.Basic.DOM.Events (stopPropagation)
 
 type Props =
   { dismiss :: Maybe (Effect Unit)

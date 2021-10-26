@@ -4,8 +4,8 @@ module Components.Modal
 
 import Lambda.Prelude
 
-import Components.Overlay as Overlay
 import Components.Level (Level)
+import Components.Overlay as Overlay
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (stopPropagation)

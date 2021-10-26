@@ -4,10 +4,10 @@ module Components.Alert
 
 import Lambda.Prelude
 
+import Components.Level (Level)
 import React.Basic (JSX)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)
-import Components.Level (Level)
 
 type Props =
   { level :: Level

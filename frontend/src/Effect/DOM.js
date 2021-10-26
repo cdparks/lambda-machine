@@ -1,5 +1,5 @@
 // module Effect.DOM
-"use strict";
+"use strict"
 
 exports.getBody = function() {
   return assertDefined(
