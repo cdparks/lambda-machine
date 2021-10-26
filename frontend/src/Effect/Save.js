@@ -1,13 +1,20 @@
 // module Effect.Save
-"use strict";
+"use strict"
 
-exports.saveTextAs = function(text) {
-  return function(filename) {
-    return function() {
-      var blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
-      require('file-saver').saveAs(blob, filename);
-      return {};
+exports.saveImpl = function(Left) {
+  return function(Right) {
+    return function(text) {
+      return function(filename) {
+        return function() {
+          var blob = new Blob([text], {type: 'text/plain;charset=utf-8'})
+          try {
+            require('file-saver').saveAs(blob, filename)
+            return Right({})
+          } catch (e) {
+            return Left(e.toString())
+          }
+        }
+      }
     }
   }
 }
-
