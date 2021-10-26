@@ -3,7 +3,7 @@ module Lambda.Language.Parser
   , parse
   , Parser
   , run
-  , liftF
+  , liftJson
   , unsafeRun
   , formatParseError
   , token
@@ -17,7 +17,6 @@ import Lambda.Prelude hiding (between)
 
 import Data.Array as Array
 import Data.String.CodeUnits (fromCharArray)
-import Foreign as Foreign
 import Partial.Unsafe (unsafeCrashWith)
 import Text.Parsing.Parser (ParseError, parseErrorMessage, parseErrorPosition, runParser)
 import Text.Parsing.Parser (fail, ParseError) as X
@@ -39,11 +38,9 @@ class Parse a where
 run :: forall a. Parser a -> String -> Either ParseError a
 run p s = runParser s (skipSpaces *> p <* eof)
 
--- | Parse structured data from a JSON string in the F monad
-liftF :: forall a. Parser a -> String -> F a
-liftF p = either err pure <<< simpleRun p
- where
-  err = Foreign.fail <<< ForeignError
+-- | Parse structured data from a JSON string in Either
+liftJson :: forall a. Parser a -> String -> Either JsonDecodeError a
+liftJson p = lmap TypeMismatch <<< simpleRun p
 
 -- | Run a parser, formatting the parse error as a String
 simpleRun :: forall a. Parser a -> String -> Either String a

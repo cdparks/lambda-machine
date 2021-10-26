@@ -32,8 +32,8 @@ newtype Snapshot = Snapshot
 derive instance newtypeSnapshot :: Newtype Snapshot _
 derive newtype instance eqSnapshot :: Eq Snapshot
 derive newtype instance showSnapshot :: Show Snapshot
-derive newtype instance readForeignSnapshot :: ReadForeign Snapshot
-derive newtype instance writeForeignSnapshot :: WriteForeign Snapshot
+derive newtype instance decodeJsonSnapshot :: DecodeJson Snapshot
+derive newtype instance encodeJsonSnapshot :: EncodeJson Snapshot
 
 -- | Convert definitions and input to `Snapshot`
 new :: Program -> Either Error Snapshot

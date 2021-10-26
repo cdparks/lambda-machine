@@ -21,7 +21,7 @@ store program = liftEffect do
     Left err -> pure $ Left $ SnapshotError err
     Right snapshot -> do
       Console.log $ "POST " <> Env.api <> "/snapshots"
-      Console.log $ "  => " <> writeJSON snapshot
+      Console.log $ "  => " <> stringify (encodeJson snapshot)
       pure $ Right $ Code "SNAPSH0T"
 
 -- | TODO: actually fetch from api

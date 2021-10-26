@@ -5,6 +5,8 @@ You can edit this file as you like.
 { name = "lambda-machine"
 , dependencies =
   [ "aff"
+  , "argonaut-codecs"
+  , "argonaut-core"
   , "arrays"
   , "bifunctors"
   , "console"
@@ -12,9 +14,7 @@ You can edit this file as you like.
   , "debug"
   , "effect"
   , "either"
-  , "exceptions"
   , "foldable-traversable"
-  , "foreign"
   , "identity"
   , "integers"
   , "lists"
@@ -30,7 +30,6 @@ You can edit this file as you like.
   , "react-basic-dom"
   , "react-basic-hooks"
   , "safe-coerce"
-  , "simple-json"
   , "spec"
   , "spec-discovery"
   , "spec-quickcheck"
@@ -41,7 +40,6 @@ You can edit this file as you like.
   , "unfoldable"
   , "unordered-collections"
   , "web-dom"
-  , "web-html"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

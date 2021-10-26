@@ -1,6 +1,5 @@
 module Lambda.Language.Definition
   ( Definition(..)
-  , Def
   , split
   , join
   ) where
@@ -15,14 +14,11 @@ import Lambda.Language.Parser (class Parse, parse, token, string)
 import Lambda.Language.Pretty (class Pretty, pretty, text)
 
 -- | A top-level definition
-newtype Definition = Definition (Def Expression)
-
--- | Split out for ReadForeign type annotation
-type Def expr =
+newtype Definition = Definition
   { id :: Int
   , name :: Name
   , args :: Array Name
-  , expr :: expr
+  , expr :: Expression
   }
 
 -- | Warning - not alpha-equivalence; names matter here

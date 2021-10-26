@@ -21,6 +21,9 @@ import Control.Monad.State (State, evalState, execState, runState) as X
 import Control.Monad.State.Class (class MonadState, gets, get, modify_, put) as X
 import Control.Monad.State.Trans (StateT, evalStateT, execStateT, runStateT) as X
 import Control.MonadZero (guard) as X
+import Data.Argonaut.Core (stringify) as X
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, JsonDecodeError(..)) as X
+import Data.Argonaut.Encode (class EncodeJson, encodeJson) as X
 import Data.Bifunctor (class Bifunctor, bimap, lmap, rmap) as X
 import Data.Either (Either(..), either, hush, note) as X
 import Data.Foldable (class Foldable, fold, foldr, foldl, foldM, foldMap, for_, traverse_, sequence_) as X
@@ -45,9 +48,7 @@ import Debug (trace, traceM, spy, debugger) as X
 import Effect (Effect) as X
 import Effect.Aff (Aff) as X
 import Effect.Class (liftEffect) as X
-import Foreign (F, Foreign, ForeignError(..)) as X
 import Safe.Coerce (class Coercible, coerce) as X
-import Simple.JSON (readJSON, writeJSON, class ReadForeign, readImpl, class WriteForeign, writeImpl) as X
 
 --- | Flipped runReader
 withReader :: forall a r. r -> X.Reader r a -> a

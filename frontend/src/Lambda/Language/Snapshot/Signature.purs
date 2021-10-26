@@ -17,8 +17,8 @@ newtype Signature = Signature Int
 
 derive newtype instance eqSignature :: Eq Signature
 derive newtype instance showSignature :: Show Signature
-derive newtype instance readForeignSignature :: ReadForeign Signature
-derive newtype instance writeForeignSignature :: WriteForeign Signature
+derive newtype instance encodeJsonSignature :: EncodeJson Signature
+derive newtype instance decodeJsonSignature :: DecodeJson Signature
 
 -- | Empty Signature uses no prelude definitions
 nil :: Signature
