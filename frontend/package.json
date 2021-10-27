@@ -7,7 +7,9 @@
   "dependencies": {
     "file-saver": "^2.0.5",
     "react": "^17.0.2",
-    "react-dom": "^17.0.2"
+    "react-dom": "^17.0.2",
+    "url-search-params-polyfill": "^8.1.1",
+    "xhr2": "^0.2.1"
   },
   "devDependencies": {
     "@parcel/packager-raw-url": "2.0.0",
