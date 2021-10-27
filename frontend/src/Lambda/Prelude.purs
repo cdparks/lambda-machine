@@ -22,7 +22,7 @@ import Control.Monad.State.Class (class MonadState, gets, get, modify_, put) as 
 import Control.Monad.State.Trans (StateT, evalStateT, execStateT, runStateT) as X
 import Control.MonadZero (guard) as X
 import Data.Argonaut.Core (stringify) as X
-import Data.Argonaut.Decode (class DecodeJson, decodeJson, JsonDecodeError(..)) as X
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, JsonDecodeError(..), printJsonDecodeError) as X
 import Data.Argonaut.Encode (class EncodeJson, encodeJson) as X
 import Data.Bifunctor (class Bifunctor, bimap, lmap, rmap) as X
 import Data.Either (Either(..), either, hush, note) as X
@@ -43,7 +43,7 @@ import Data.Show.Generic (genericShow) as X
 import Data.Traversable (class Traversable, traverse, for) as X
 import Data.Tuple (Tuple(..), uncurry, fst, snd) as X
 import Data.Tuple.Nested ((/\)) as X
-import Data.Unfoldable (class Unfoldable) as X
+import Data.Unfoldable (class Unfoldable, replicate, replicateA) as X
 import Debug (trace, traceM, spy, debugger) as X
 import Effect (Effect) as X
 import Effect.Aff (Aff) as X

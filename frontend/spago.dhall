@@ -30,6 +30,7 @@ You can edit this file as you like.
   , "react-basic-dom"
   , "react-basic-hooks"
   , "safe-coerce"
+  , "simple-ajax"
   , "spec"
   , "spec-discovery"
   , "spec-quickcheck"
@@ -39,6 +40,7 @@ You can edit this file as you like.
   , "tuples"
   , "unfoldable"
   , "unordered-collections"
+  , "variant"
   , "web-dom"
   ]
 , packages = ./packages.dhall

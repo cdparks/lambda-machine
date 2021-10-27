@@ -6,45 +6,52 @@ module Lambda.Api
 
 import Lambda.Prelude
 
-import Effect.Console as Console
+import Data.Variant (match)
 import Lambda.Env as Env
-import Lambda.Language.Pretty (class Pretty, text, pretty)
 import Lambda.Language.Program (Program)
 import Lambda.Language.Snapshot as Snapshot
-import Lambda.Language.Snapshot.Code (Code(..))
+import Lambda.Language.Snapshot.Code (Code)
+import Simple.Ajax as Ajax
+import Simple.Ajax (AjaxError)
 
--- | TODO: actually post to api
+-- | Store `Program` and generate `Code`
 store :: Program -> Aff (Either Error Code)
-store program = liftEffect do
-  Console.log $ "Env.api: " <> Env.api
-  case Snapshot.new program of
-    Left err -> pure $ Left $ SnapshotError err
-    Right snapshot -> do
-      Console.log $ "POST " <> Env.api <> "/snapshots"
-      Console.log $ "  => " <> stringify (encodeJson snapshot)
-      pure $ Right $ Code "SNAPSH0T"
+store program = case Snapshot.new program of
+  Left err -> pure $ Left $ BadSnapshot err
+  Right snapshot -> convert <$> Ajax.post url (Just snapshot)
+ where
+  url = Env.api <> "/snapshots"
+  convert = bimap
+    (fromAjaxError Nothing)
+    (_.code :: { code :: Code } -> Code)
 
--- | TODO: actually fetch from api
-fetch
-  :: Code
-  -> Aff (Either Error Program)
-fetch code = liftEffect do
-  Console.log $ "Env.api: " <> Env.api
-  Console.log $ "GET " <> Env.api <> "/snapshots/" <> unwrap code
-  pure $ Right { defs: [], expr: Nothing }
+-- | Fetch `Program` by `Code`
+fetch :: Code -> Aff (Either Error Program)
+fetch code = convert <$> Ajax.get url
+ where
+  url = Env.api <> "/snapshots/" <> unwrap code
+  convert = either
+    (Left <<< fromAjaxError (Just code))
+    (lmap BadSnapshot <<< Snapshot.load)
 
--- | Http or Snapshot errors
+-- | Logic and simplified Ajax errors
 data Error
-  = HttpError -- temporary
-  | SnapshotError Snapshot.Error
+  = BadSnapshot Snapshot.Error
+  | ParseError String
+  | Missing Code
+  | HttpError (Maybe String)
 
-derive instance eqError :: Eq Error
-derive instance genericError :: Generic Error _
-
-instance showError :: Show Error where
-  show x = genericShow x
-
-instance Pretty Error where
-  pretty rep = case _ of
-    HttpError -> text "http error"
-    SnapshotError err -> pretty rep err
+-- | Convert `Ajax.Error` to application-specific `Error`
+fromAjaxError :: Maybe Code -> AjaxError -> Error
+fromAjaxError code = match
+  { parseError: ParseError <<< printJsonDecodeError
+  , badRequest: HttpError <<< Just
+  , unAuthorized: const ignore
+  , forbidden: const ignore
+  , notFound: const $ maybe ignore Missing code
+  , methodNotAllowed: const ignore
+  , serverError: const ignore
+  , affjaxError: const ignore
+  }
+ where
+  ignore = HttpError Nothing
