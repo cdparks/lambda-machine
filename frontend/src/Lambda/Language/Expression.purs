@@ -57,7 +57,7 @@ instance prettyExpression :: Pretty Expression where
     loop inApp = case _ of
       Var v -> text $ show v
       Nat i -> text $ show i
-      List es -> commaSep $ loop false <$> es
+      List es -> formatList $ loop false <$> es
       Lambda name body ->
         parensIf inApp $ text ("λ" <> show name <> ". ") <> loop false body
       Apply f a ->
@@ -74,14 +74,19 @@ instance prettyExpression :: Pretty Expression where
         highlight Global $ loop inApp x
       Cycle -> text "…"
 
+-- | Pretty-print list of builders as a list
+formatList :: List Builder -> Builder
+formatList xs = text "[" <> intercalate (text ", ") xs <> text "]"
+
+-- | Attempt to reconstruct literals by rewriting `Expression`
 quote :: Expression -> Expression
 quote = case _ of
   e@(Var _) -> e
   e@(Nat _) -> e
   List es -> List $ quote <$> es
   Lambda n e -> fromMaybe' (\_ -> Lambda n $ quote e) $ do
-    head <- literalHead $ Lambda n e
-    asNat head <|> asList head
+    head <- check =<< match (Lambda n e)
+    either asList asNat head
   Apply f a -> Apply (quote f) (quote a)
   Highlight e -> Highlight $ quote e
   Cycle -> Cycle
@@ -115,11 +120,24 @@ isLambda = case _ of
 type Head = { f :: Name, z :: Name, body :: Expression }
 
 -- | Match head of Church-encoded list or natural number
-literalHead :: Expression -> Maybe Head
-literalHead = case _ of
+match :: Expression -> Maybe Head
+match = case _ of
   Lambda f (Highlight (Lambda z body)) -> Just { f, z, body }
   Lambda f (Lambda z body) -> Just { f, z, body }
   _ -> Nothing
+
+-- | Heuristic - literals that descend from the surface syntax are
+-- | always generated with the same base names. Check them avoid, e.g.
+-- | Accidentally identifying `false t f = f` as `zero s z = z`
+-- | Left -> List, Right -> Natural
+check :: Head -> Maybe (Either Head Head)
+check head = case unit of
+  _ | f == "s" && z == "z" -> Just $ Right head
+    | f == "cons" && z == "nil" -> Just $ Left head
+    | otherwise -> Nothing
+ where
+  f = Name.base head.f
+  z = Name.base head.z
 
 -- | Attempt to interpret syntax as a Church natural.
 asNat :: Head -> Maybe Expression
@@ -140,9 +158,6 @@ asList {f, z, body} = walk Nil body
   walk acc (Var nil)
     | nil == z = pure $ List $ List.reverse acc
   walk _ _ = Nothing
-
-commaSep :: List Builder -> Builder
-commaSep xs = text "[" <> intercalate (text ", ") xs <> text "]"
 
 -- | Parse an expression
 -- |
