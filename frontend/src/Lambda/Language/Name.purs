@@ -2,6 +2,7 @@ module Lambda.Language.Name
   ( Name
   , from
   , withSubscript
+  , base
   , next
   ) where
 
@@ -10,8 +11,7 @@ import Lambda.Prelude
 import Data.Array (unsafeIndex)
 import Data.Array as Array
 import Data.Char (toCharCode)
-import Data.Set as Set
-import Data.String.CodeUnits (fromCharArray, toCharArray)
+import Data.String.CodeUnits (fromCharArray)
 import Lambda.Language.Parser (class Parse, Parser, parse, liftJson, satisfy, string, token)
 import Lambda.Language.Pretty (class Pretty, text)
 import Partial.Unsafe (unsafePartial)
@@ -49,6 +49,10 @@ withSubscript n s = Name s $ Just n
 next :: Name -> Name
 next (Name n ms) = Name n $ (_ + 1) <$> ms <|> pure 0
 
+-- | Extract a `Name`'s textual component
+base :: Name -> String
+base (Name s _) = s
+
 -- | Parse a `Name`
 -- |
 -- | ```ebnf
@@ -85,7 +89,7 @@ instance parseName :: Parse Name where
 
 -- | Parse subscripts for a `Name`
 parseSubscript :: Parser Int
-parseSubscript = subscriptToInt <<< fromCharArray <$> Array.some (satisfy isSubscriptChar)
+parseSubscript = subscriptToInt <$> Array.some anyDigit
 
 -- | Parse the first character of a `Name`
 firstChar :: Char -> Boolean
@@ -102,36 +106,32 @@ isLower c = 'a' <= c && c <= 'z'
 
 -- | Convert `Int` subscript to textual subscript.
 intToSubscript :: Int -> String
-intToSubscript = fromCharArray <<< map (unsafePartial (subscriptTable `unsafeIndex` _)) <<< digits
+intToSubscript = fromCharArray <<< map (unsafePartial (subscriptTable `unsafeIndex` _)) <<< toDigits
 
 -- | Convert textual subscript to `Int` subscript.
-subscriptToInt :: String -> Int
-subscriptToInt =
-  foldl step 0 <<< toCharArray
+subscriptToInt :: Array Int -> Int
+subscriptToInt = foldl step 0
  where
-  step n c = 10 * n + toDigit c
-  toDigit c
-    | '0' <= c && c <= '9' = toCharCode c - toCharCode '0'
-    | '₀' <= c && c <= '₉' = toCharCode c - toCharCode '₀'
-    | otherwise            = 0
+  step acc d = 10 * acc + d
 
--- | Subscripts are digits or subscript digits
-subscriptChars :: Set.Set Char
-subscriptChars =
-  Set.fromFoldable ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-    `Set.union`
-        Set.fromFoldable subscriptTable
+-- | Parse a digit as its numeric value
+anyDigit :: Parser Int
+anyDigit = offsetFrom '0' '9' <|> offsetFrom '₀' '₉'
 
--- | Can input be parsed as a subscript?
-isSubscriptChar :: Char -> Boolean
-isSubscriptChar = (_ `Set.member` subscriptChars)
+-- | Find charcter's offset from the lo end of the range
+offsetFrom :: Char -> Char -> Parser Int
+offsetFrom lo hi = do
+  c <- satisfy inRange
+  pure $ toCharCode c - toCharCode lo
+ where
+  inRange c = lo <= c && c <= hi
 
 -- | Fixed array of actual subscript characters.
 subscriptTable :: Array Char
 subscriptTable = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
 
 -- | Split decimal integer into its constituent digits.
-digits :: Int -> Array Int
-digits n
+toDigits :: Int -> Array Int
+toDigits n
   | n < 10 = [n]
-  | otherwise = digits (n `div` 10) <> [n `mod` 10]
+  | otherwise = toDigits (n `div` 10) <> [n `mod` 10]
