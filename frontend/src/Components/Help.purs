@@ -2,326 +2,256 @@ module Components.Help
   ( component
   ) where
 
-import Lambda.Prelude
-
-import React.Basic (JSX, fragment)
-import React.Basic.DOM as R
+import Components.Markup
 
 component :: {} -> JSX
-component _ = fragment $ toJSX <$> tutorial
-
-data Markup
-  = Header String
-  | Para (Array Leaf)
-  | Code (Array String)
-  | Comments (Array Comment)
-
-data Leaf
-  = Text String
-  | Bold String
-  | Mono String
-  | Link String String
-
-data Comment
-  = Comment String (Array Leaf)
-
--- | Convert `Markup` to styled `JSX`
-toJSX :: Markup -> JSX
-toJSX = case _ of
-  Header t ->
-    R.h3_ [R.text t]
-  Para ls ->
-    R.p
-      { children: formatLeaf <$> ls
-      }
-  Code cs ->
-    R.p
-      { className: "preformatted"
-      , children: formatCode <$> cs
-      }
-  Comments as ->
-    R.table_ [R.tbody_ $ formatComment <$> as]
- where
-  formatLeaf :: Leaf -> JSX
-  formatLeaf = case _ of
-    Text t ->
-      R.text t
-    Bold t ->
-      R.strong_ [R.text t]
-    Link url t ->
-      R.a
-        { href: "https://" <> url
-        , children: [R.text t]
-        }
-    Mono t ->
-      R.span
-        { className: "monospace-font"
-        , children: [R.text t]
-        }
-
-  formatCode :: String -> JSX
-  formatCode code = R.text $ "  " <> code <> "\n"
-
-  formatComment :: Comment -> JSX
-  formatComment (Comment t cs) =
-    R.tr_
-      [ R.td_
-        [ R.span
-          { className: "preformatted"
-          , children: [formatCode t]
-          }
-        ]
-      , R.td
-        { className: "comment"
-        , children: formatLeaf <$> cs
-        }
-      ]
-
-tutorial :: Array Markup
-tutorial =
-  [ Header "Hello!"
-  , Para
-    [ Text "Welcome to Lambda Machine, a tool for stepping through expressions in the untyped lambda calculus."
+component _ = markup
+  [ title "Hello!"
+  , para
+    [ text "Welcome to Lambda Machine, a tool for stepping through expressions in the untyped lambda calculus."
     ]
-  , Header "Expressions"
-  , Para
-    [ Text "Lambda Machine accepts "
-    , Bold "expressions"
-    , Text " and "
-    , Bold "definitions"
-    , Text ". An "
-    , Bold "expression"
-    , Text " consists of variables, applications, and lambdas. Lambdas can be written with a backslash "
-    , Bold "\\"
-    , Text " or the Greek letter "
-    , Bold "λ"
-    , Text ". We'll use "
-    , Bold "\\"
-    , Text " since it's easier to type. Here's an expression that represents a function that accepts one argument and returns it immediately."
+  , title "Expressions"
+  , para
+    [ text "Lambda Machine accepts "
+    , bold "expressions"
+    , text " and "
+    , bold "definitions"
+    , text ". An "
+    , bold "expression"
+    , text " consists of variables, applications, and lambdas. Lambdas can be written with a backslash "
+    , bold "\\"
+    , text " or the Greek letter "
+    , bold "λ"
+    , text ". We'll use "
+    , bold "\\"
+    , text " since it's easier to type. Here's an expression that represents a function that accepts one argument and returns it immediately."
     ]
-  , Code
+  , code
     [ "\\x. x"
     ]
-  , Para
-    [ Text "We call this function "
-    , Bold "identity"
-    , Text "."
+  , para
+    [ text "We call this function "
+    , bold "identity"
+    , text "."
     ]
-  , Para
-    [ Text "Here's a function that returns its first argument after throwing away its second argument."
+  , para
+    [ text "Here's a function that returns its first argument after throwing away its second argument."
     ]
-  , Code
+  , code
     [ "\\x. \\y. x"
     ]
-  , Para
-    [ Text "We usually call this function "
-    , Bold "const"
-    , Text "."
+  , para
+    [ text "We usually call this function "
+    , bold "const"
+    , text "."
     ]
-  , Para
-    [ Text "Note that the expression above is a function that returns another function."
-    , Text " For convenience we can write it as a single lambda with two arguments."
+  , para
+    [ text "Note that the expression above is a function that returns another function."
+    , text " For convenience we can write it as a single lambda with two arguments."
     ]
-  , Code
+  , code
     [ "\\x y. x"
     ]
-  , Para
-    [ Text "We'll use the multi-argument form instead of manually nesting lambdas from now on."
+  , para
+    [ text "We'll use the multi-argument form instead of manually nesting lambdas from now on."
     ]
-  , Para
-    [ Text "We can apply "
-    , Bold "const"
-    , Text " to "
-    , Bold "identity"
-    , Text " twice using "
-    , Bold "juxtaposition"
-    , Text ", which is a fancy word for \"putting things next to one another\"."
+  , para
+    [ text "We can apply "
+    , bold "const"
+    , text " to "
+    , bold "identity"
+    , text " twice using "
+    , bold "juxtaposition"
+    , text ", which is a fancy word for \"putting things next to one another\"."
     ]
-  , Code
+  , code
     [ "(\\x y. x) (\\x. x) (\\x. x)"
     ]
-  , Para
-    [ Text "Even if we rename the arguments to our "
-    , Bold "identity"
-    , Text " functions, they still do the same thing."
+  , para
+    [ text "Even if we rename the arguments to our "
+    , bold "identity"
+    , text " functions, they still do the same thing."
     ]
-  , Code
+  , code
     [ "(\\x y. x) (\\a. a) (\\b. b)"
     ]
-  , Para
-    [ Text "Specifically, this expression reduces as follows."
+  , para
+    [ text "Specifically, this expression reduces as follows."
     ]
-  , Comments
-    [ Comment
-      "(\\x y. x) (\\a. a) (\\b. b)"
-      [ Text "Replace "
-      , Mono "x"
-      , Text " with "
-      , Mono "(\\a. a)"
-      , Text " in "
-      , Mono "(\\x y. x)"
+  , notes
+    [ "(\\x y. x) (\\a. a) (\\b. b)" ?~
+      [ text "Replace "
+      , mono "x"
+      , text " with "
+      , mono "(\\a. a)"
+      , text " in "
+      , mono "(\\x y. x)"
       ]
-    , Comment
-      "(\\y. \\a. a) (\\b. b)"
-      [ Text "Replace "
-      , Mono "y"
-      , Text " with "
-      , Mono "(\\b. b)"
-      , Text " in "
-      , Mono "(\\y. \\a. a)"
+    , "(\\y. \\a. a) (\\b. b)" ?~
+      [ text "Replace "
+      , mono "y"
+      , text " with "
+      , mono "(\\b. b)"
+      , text " in "
+      , mono "(\\y. \\a. a)"
       ]
-    , Comment "\\a. a" []
+    , "\\a. a" ?~ []
     ]
-  , Header "Definitions"
-  , Para
-    [ Text "To avoid repeating ourselves, we can enter a "
-    , Bold "definition"
-    , Text ". A "
-    , Bold "definition"
-    , Text " consists of a name, zero or more arguments, an equals sign, and an "
-    , Bold "expression"
-    , Text ". Let's make definitions for "
-    , Bold "identity"
-    , Text " and "
-    , Bold "const"
-    , Text "."
+  , title "Definitions"
+  , para
+    [ text "To avoid repeating ourselves, we can enter a "
+    , bold "definition"
+    , text ". A "
+    , bold "definition"
+    , text " consists of a name, zero or more arguments, an equals sign, and an "
+    , bold "expression"
+    , text ". Let's make definitions for "
+    , bold "identity"
+    , text " and "
+    , bold "const"
+    , text "."
     ]
-  , Code
+  , code
     [ "identity = \\x. x"
     , "const = \\x y. x"
     ]
-  , Para
-    [ Text "We can also write these like so."
+  , para
+    [ text "We can also write these like so."
     ]
-  , Code
+  , code
     [ "identity x = x"
     , "const x y = x"
     ]
-  , Para
-    [ Text "Now we can refer to them by name."
+  , para
+    [ text "Now we can refer to them by name."
     ]
-  , Code
+  , code
     [ "const identity identity"
     ]
-  , Para
-    [ Text "A name is reduced by replacing it with the expression on the right-hand-side of its definition."
+  , para
+    [ text "A name is reduced by replacing it with the expression on the right-hand-side of its definition."
     ]
-  , Comments
-    [ Comment
-      "const identity identity"
-      [ Text "Replace "
-      , Mono "const"
-      , Text " with "
-      , Mono "\\x. \\y. x"
+  , notes
+    [ "const identity identity" ?~
+      [ text "Replace "
+      , mono "const"
+      , text " with "
+      , mono "\\x. \\y. x"
       ]
-    , Comment
-      "(\\x. \\y. x) identity identity"
-      [ Text "Replace "
-      , Mono "x"
-      , Text " with "
-      , Mono "identity"
-      , Text " in "
-      , Mono "(\\x. \\y. x)"
+    , "(\\x. \\y. x) identity identity" ?~
+      [ text "Replace "
+      , mono "x"
+      , text " with "
+      , mono "identity"
+      , text " in "
+      , mono "(\\x. \\y. x)"
       ]
-    , Comment
-      "(\\y. identity) identity"
-      [ Text "Replace "
-      , Mono "y"
-      , Text " with "
-      , Mono "identity"
-      , Text " in "
-      , Mono "(\\y. identity)"
+    , "(\\y. identity) identity" ?~
+      [ text "Replace "
+      , mono "y"
+      , text " with "
+      , mono "identity"
+      , text " in "
+      , mono "(\\y. identity)"
       ]
-    , Comment
-      "identity"
-      [ Text "Replace "
-      , Mono "identity"
-      , Text " with "
-      , Mono "\\x. x"
+    , "identity" ?~
+      [ text "Replace "
+      , mono "identity"
+      , text " with "
+      , mono "\\x. x"
       ]
-    , Comment "\\x. x" []
+    , "\\x. x" ?~ []
     ]
-  , Header "Syntactic Sugar"
-  , Para
-    [ Text "Lambda Machine can parse natural numbers. A natural number "
-    , Bold "n"
-    , Text " is parsed as a function that applies "
-    , Bold "s"
-    , Text " to "
-    , Bold "z n"
-    , Text " times."
+  , title "Syntactic Sugar"
+  , para
+    [ text "Lambda Machine can parse natural numbers. A natural number "
+    , bold "n"
+    , text " is parsed as a function that applies "
+    , bold "s"
+    , text " to "
+    , bold "z n"
+    , text " times."
     ]
-  , Code
+  , code
     [ "0 -> \\s. \\z. z"
     , "1 -> \\s. \\z. s z"
     , "2 -> \\s. \\z. s (s z)"
     , "3 -> \\s. \\z. s (s (s z))"
     , "4 -> \\s. \\z. s (s (s (s z)))"
     ]
-  , Para
-    [ Text "You can read more about this encoding "
-    , Link "en.wikipedia.org/wiki/Church_encoding" "here"
-    , Text "."
+  , para
+    [ text "You can read more about this encoding "
+    , link
+      { this: "here"
+      , to: "en.wikipedia.org/wiki/Church_encoding"
+      }
+    , text "."
     ]
-  , Para
-    [ Text "Lambda Machine can also parse lists."
-    , Text " A list is parsed as a right fold over the elements using "
-    , Bold "cons"
-    , Text " and "
-    , Bold "nil"
-    , Text "."
+  , para
+    [ text "Lambda Machine can also parse lists."
+    , text " A list is parsed as a right fold over the elements using "
+    , bold "cons"
+    , text " and "
+    , bold "nil"
+    , text "."
     ]
-  , Code
+  , code
     [ "[a] -> \\cons. \\nil. cons a nil"
     , "[a, b] -> \\cons. \\nil. cons a (cons b nil)"
     , "[a, b, c] -> \\cons. \\nil. cons a (cons b (cons c nil))"
     ]
-  , Para
-    [ Text "This works with natural numbers as well."
+  , para
+    [ text "This works with natural numbers as well."
     ]
-  , Code
+  , code
     [ "[1] -> \\cons. \\nil. cons (\\s. \\z. s z) nil"
     , "[1, 2] -> \\cons. \\nil. cons (\\s. \\z. s z) (cons (\\s. \\z. s (s z)) nil)"
     ]
-  , Header "Recursion"
-  , Para
-    [ Text "The lambda calculus doesn't have recursive definitions."
-    , Text " After all, how would an anonymous function call itself?"
-    , Text " Instead, there are several well-known "
-    , Bold "fixed-point combinators"
-    , Text " that can "
-    , Bold "pass a copy of a function to itself"
-    , Text ", which it can then apply (effectively giving us the power of recursion)."
+  , title "Recursion"
+  , para
+    [ text "The lambda calculus doesn't have recursive definitions."
+    , text " After all, how would an anonymous function call itself?"
+    , text " Instead, there are several well-known "
+    , bold "fixed-point combinators"
+    , text " that can "
+    , bold "pass a copy of a function to itself"
+    , text ", which it can then apply (effectively giving us the power of recursion)."
     ]
-  , Para
-    [ Text "You can read about fixed-point combinators "
-    , Link "en.wikipedia.org/wiki/Fixed-point_combinator" "here"
-    , Text "."
+  , para
+    [ text "You can read about fixed-point combinators "
+    , link
+      { this: "here"
+      , to: "en.wikipedia.org/wiki/Fixed-point_combinator"
+      }
+    , text "."
     ]
-  , Para
-    [ Text "We used to predefine this one:"
+  , para
+    [ text "We used to predefine this one:"
     ]
-  , Code
+  , code
     [ "fix f = (λx. f (x x)) (λy. f (y y))"
     ]
-  , Para
-    [ Mono "fix"
-    , Text " is powerful enough to define recursive functions,"
-    , Text " but it can be difficult to follow their reduction."
-    , Text " Many steps are spent just duplicating the function"
-    , Text " and passing it to itself."
-    , Text " Therefore, lambda-machine allows top-level definitions to"
-    , Text " be defined using direct recursion."
-    , Text " For examples, see the definitions of "
-    , Mono "iterate"
-    , Text " and "
-    , Mono "repeat"
-    , Text "."
+  , para
+    [ mono "fix"
+    , text " is powerful enough to define recursive functions,"
+    , text " but it can be difficult to follow their reduction."
+    , text " Many steps are spent just duplicating the function"
+    , text " and passing it to itself."
+    , text " Therefore, lambda-machine allows top-level definitions to"
+    , text " be defined using direct recursion."
+    , text " For examples, see the definitions of "
+    , mono "iterate"
+    , text " and "
+    , mono "repeat"
+    , text "."
     ]
-  , Header "Bye!"
-  , Para
-    [ Text "Have fun and "
-    , Link "github.com/cdparks/lambda-machine" "let me know if you find this useful"
-    , Text "!"
+  , title "Bye!"
+  , para
+    [ text "Have fun and "
+    , link
+      { this: "let me know if you find this useful"
+      , to: "github.com/cdparks/lambda-machine"
+      }
+    , text "!"
     ]
   ]
