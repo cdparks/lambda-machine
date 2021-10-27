@@ -27,7 +27,7 @@ derive instance eqCopying :: Eq Copying
 
 new :: Component Props
 new = component "Copy" \{ text } -> Hooks.do
-  copying /\ setCopying <- useState $ if Copy.hasClipboard then Ready else NoCopy
+  copying /\ setCopying <- useState Ready
   _ <- useAff (Tuple text copying) do
     case copying of
       Ready -> pure unit
