@@ -14,6 +14,7 @@ import Components.Controls as Controls
 import Components.Copy as Copy
 import Components.Definitions as Definitions
 import Components.Expressions as Expressions
+import Components.ApiError as ApiError
 import Components.Footer as Footer
 import Components.Help as Help
 import Components.Input as Input
@@ -23,7 +24,6 @@ import Components.ParseError as ParseError
 import Components.Spinner as Spinner
 import Data.Grammar (pluralizeWith)
 import Lambda.Env as Env
-import Lambda.Language.Pretty (Rep(..), pretty, toString)
 import Lambda.Language.Snapshot.Code (Code)
 import React.Basic (fragment, JSX)
 import React.Basic as React
@@ -107,7 +107,7 @@ errorAlert dismiss = case _ of
   Alert.ApiError error -> Alert.component
     { dismiss
     , level: Level.Danger
-    , child: R.text $ toString $ pretty Raw error
+    , child: ApiError.component { error }
     }
   Alert.SaveError error -> Alert.component
     { dismiss
@@ -145,7 +145,7 @@ linkModal = do
     , title: "Copy Link To This Machine"
     , children:
       [ copy
-        { text: Env.host <> "/" <> unwrap code
+        { text: Env.host <> "/?code=" <> unwrap code
         }
       ]
     }
