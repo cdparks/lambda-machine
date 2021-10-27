@@ -9,7 +9,6 @@ You can edit this file as you like.
   , "argonaut-core"
   , "arrays"
   , "bifunctors"
-  , "console"
   , "control"
   , "debug"
   , "effect"

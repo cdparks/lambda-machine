@@ -132,8 +132,15 @@ match = case _ of
 -- | Left -> List, Right -> Natural
 check :: Head -> Maybe (Either Head Head)
 check head = case unit of
+    -- Produced by nat literals, e.g.
+    --   λs. λz. s (s (... (s z)))
   _ | f == "s" && z == "z" -> Just $ Right head
+    -- Produced by list literals, e.g.
+    --   λcons. λnil. cons _ (cons ... (cons _ nil))
     | f == "cons" && z == "nil" -> Just $ Left head
+    -- Produced by prelude-level cons, nil, and foldr, e.g.:
+    --   λf. λz. f _ (f ... (f _ z))
+    | f == "f" && z == "z" -> Just $ Left head
     | otherwise -> Nothing
  where
   f = Name.base head.f

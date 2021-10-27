@@ -41,6 +41,10 @@ data Error
   | Missing Code
   | HttpError (Maybe String)
 
+derive instance genericError :: Generic Error _
+instance showError :: Show Error where
+  show x = genericShow x
+
 -- | Convert `Ajax.Error` to application-specific `Error`
 fromAjaxError :: Maybe Code -> AjaxError -> Error
 fromAjaxError code = match
