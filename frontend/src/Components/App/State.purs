@@ -10,6 +10,7 @@ module Components.App.State
 
 import Lambda.Prelude hiding (State)
 
+
 import Components.App.Action (Action)
 import Components.App.Action as Action
 import Components.App.Alert (Alert)
@@ -24,6 +25,8 @@ import Data.List as List
 import Effect.Save (Filename(..))
 import Effect.Save as Save
 import Lambda.Api as Api
+import Lambda.Flags (Flags)
+import Lambda.Flags as Flags
 import Lambda.Language.Definition (Definition)
 import Lambda.Language.Definition as Definition
 import Lambda.Language.Expression (Expression)
@@ -43,7 +46,6 @@ import Lambda.Language.World (World)
 import Lambda.Language.World as World
 import Lambda.Machine (Machine)
 import Lambda.Machine as Machine
-
 -- | Manages text-input, global definitions, semantic consistency
 -- | (world field), and machine state, if any.
 type State =
@@ -56,6 +58,7 @@ type State =
   , steps :: Maybe Int
   , alert :: Maybe Alert
   , request :: Maybe Request
+  , flags :: Flags
   , rep :: Rep
   }
 
@@ -94,11 +97,14 @@ handle dispatch s = case _ of
 
 -- | Empty state with default global definitions
 -- | Optionally ready to load existing snapshot
-new :: Maybe Code -> State
-new code = empty
+new :: Maybe Code -> Flags -> State
+new code flags = empty
   { defs = Prelude.defs
   , world = World.new $ defsToGlobals Prelude.defs
-  , request = Request.Fetch <$> code
+  , flags = flags
+  , request = do
+      guard flags.loading
+      Request.Fetch <$> code
   }
 
 -- | Empty state with no global definitions
@@ -114,6 +120,7 @@ empty =
   , alert: Nothing
   , steps: Nothing
   , request: Nothing
+  , flags: Flags.none
   }
 
 -- | Update `State` in response to an `Action`
@@ -194,8 +201,14 @@ toggle :: State -> State
 toggle s = s { rep = Pretty.toggle s.rep }
 
 -- | Enqueue request for async processing
+-- | Drop requests if the flag isn't enabled
 enqueue :: Request -> State -> State
-enqueue request = _ { request = pure request }
+enqueue request s = case request of
+  Request.Fetch _
+    | not s.flags.loading -> s
+  Request.Store
+    | not s.flags.sharing -> s
+  _ -> s { request = pure request }
 
 -- | Enqueue request for async processing
 examine :: Response -> State -> State

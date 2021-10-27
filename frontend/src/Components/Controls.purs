@@ -4,13 +4,15 @@ module Components.Controls
 
 import Lambda.Prelude
 
+import Lambda.Flags (Flags)
 import Lambda.Language.Pretty (Rep, select)
-import React.Basic (JSX)
+import React.Basic (JSX, empty)
 import React.Basic.DOM as R
 import React.Basic.Events (handler_)
 
 type Props =
-  { onStep :: Maybe (Effect Unit)
+  { flags :: Flags
+  , onStep :: Maybe (Effect Unit)
   , onClear :: Maybe (Effect Unit)
   , onShare :: Maybe (Effect Unit)
   , onSave :: Maybe (Effect Unit)
@@ -19,7 +21,7 @@ type Props =
   }
 
 component :: Props -> JSX
-component {onStep, onClear, onShare, onSave, onSugar, rep} =
+component { flags, onStep, onClear, onShare, onSave, onSugar, rep } =
   R.div
     { className: "add-margin-medium btn-group pull-right"
     , children:
@@ -33,11 +35,13 @@ component {onStep, onClear, onShare, onSave, onSugar, rep} =
         , className: "btn btn-default"
         , onClick: onClear
         }
-      , button
-        { label: "Share"
-        , className: "btn btn-default"
-        , onClick: onShare
-        }
+      , if flags.sharing
+          then button
+            { label: "Share"
+            , className: "btn btn-default"
+            , onClick: onShare
+            }
+          else empty
       , button
         { label: "Save"
         , className: "btn btn-default"

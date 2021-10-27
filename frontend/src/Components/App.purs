@@ -5,6 +5,7 @@ module Components.App
 import Lambda.Prelude hiding (State)
 
 import Components.Alert (component) as Alert
+import Components.ApiError as ApiError
 import Components.App.Action as Action
 import Components.App.Alert (Alert(..), Error(..)) as Alert
 import Components.App.Request as Request
@@ -14,7 +15,6 @@ import Components.Controls as Controls
 import Components.Copy as Copy
 import Components.Definitions as Definitions
 import Components.Expressions as Expressions
-import Components.ApiError as ApiError
 import Components.Footer as Footer
 import Components.Help as Help
 import Components.Input as Input
@@ -24,6 +24,7 @@ import Components.ParseError as ParseError
 import Components.Spinner as Spinner
 import Data.Grammar (pluralizeWith)
 import Lambda.Env as Env
+import Lambda.Flags (Flags)
 import Lambda.Language.Snapshot.Code (Code)
 import React.Basic (fragment, JSX)
 import React.Basic as React
@@ -34,6 +35,7 @@ import React.Basic.Hooks.Aff (useAff)
 
 type Props =
   { code :: Maybe Code
+  , flags :: Flags
   }
 
 new :: Component Props
@@ -41,8 +43,8 @@ new = do
   reducer <- mkReducer State.reduce
   spinner <- Spinner.new
   modal <- linkModal
-  component "App" \{ code: mCode }  -> Hooks.do
-    state /\ dispatch <- useReducer (State.new mCode) reducer
+  component "App" \{ code: mCode, flags }  -> Hooks.do
+    state /\ dispatch <- useReducer (State.new mCode flags) reducer
     _ <- useAff state.request $ traverse_ (State.handle dispatch state) state.request
 
     let
@@ -84,7 +86,8 @@ new = do
           , split
             (stepsHeader state.steps)
             (Controls.component
-              { onStep: dispatchIf (not isHalted) Action.Step
+              { flags
+              , onStep: dispatchIf (not isHalted) Action.Step
               , onClear: dispatchIf hasMachine Action.Clear
               , onShare: dispatchIf hasProgram $ Action.Enqueue Request.Store
               , onSave: dispatchIf hasProgram $ Action.Enqueue Request.Save
