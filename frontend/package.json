@@ -23,7 +23,7 @@
   "scripts": {
     "setup": "yarn install && spago install",
     "start": "yarn build && parcel index.html",
-    "bundle": "yarn build && parcel build --public-url='./' index.html",
+    "bundle": "NODE_ENV=production yarn build && parcel build --public-url='./' index.html",
     "build": "spago build --purs-args '--stash --censor-lib --strict'",
     "test": "spago test",
     "repl": "spago repl",
