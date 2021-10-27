@@ -2,7 +2,6 @@ module Components.App.State
   ( State
   , Status
   , new
-  , empty
   , reduce
   , status
   , handle
@@ -26,7 +25,6 @@ import Effect.Save (Filename(..))
 import Effect.Save as Save
 import Lambda.Api as Api
 import Lambda.Flags (Flags)
-import Lambda.Flags as Flags
 import Lambda.Language.Definition (Definition)
 import Lambda.Language.Definition as Definition
 import Lambda.Language.Expression (Expression)
@@ -95,21 +93,31 @@ handle dispatch s = case _ of
  where
   done = liftEffect <<< dispatch <<< Action.Examine
 
--- | Empty state with default global definitions
--- | Optionally ready to load existing snapshot
-new :: Maybe Code -> Flags -> State
-new code flags = empty
+-- | State with prelude or ready to fetch snapshot if enabled
+new :: Flags -> Maybe Code -> State
+new flags = case _ of
+  Just code
+    | flags.loading -> withCode code state
+  _ -> withPrelude state
+ where
+  state = empty flags
+
+-- | Enqueue fetch request for `Snapshot` with `Code`
+withCode :: Code -> State -> State
+withCode code = _
+  { request = pure $ Request.Fetch code
+  }
+
+-- | Add prelude to state
+withPrelude :: State -> State
+withPrelude = _
   { defs = Prelude.defs
   , world = World.new $ defsToGlobals Prelude.defs
-  , flags = flags
-  , request = do
-      guard flags.loading
-      Request.Fetch <$> code
   }
 
 -- | Empty state with no global definitions
-empty :: State
-empty =
+empty :: Flags -> State
+empty flags =
   { text: ""
   , expr: Nothing
   , defs: []
@@ -120,7 +128,7 @@ empty =
   , alert: Nothing
   , steps: Nothing
   , request: Nothing
-  , flags: Flags.none
+  , flags
   }
 
 -- | Update `State` in response to an `Action`
@@ -240,7 +248,7 @@ load { defs, expr } old = case result of
   focus state = alertFail <<< flip setExpr state
 
   result = do
-    state <- foldM define empty defs
+    state <- foldM define (empty old.flags) defs
     maybe (pure state) (focus state) expr
 
   alertFail state = case state.alert of

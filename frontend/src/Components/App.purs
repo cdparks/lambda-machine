@@ -24,6 +24,7 @@ import Components.ParseError as ParseError
 import Components.Spinner as Spinner
 import Data.Grammar (pluralizeWith)
 import Lambda.Env as Env
+import Lambda.Flags as Flags
 import Lambda.Flags (Flags)
 import Lambda.Language.Snapshot.Code (Code)
 import React.Basic (fragment, JSX)
@@ -44,7 +45,7 @@ new = do
   spinner <- Spinner.new
   modal <- linkModal
   component "App" \{ code: mCode, flags }  -> Hooks.do
-    state /\ dispatch <- useReducer (State.new mCode flags) reducer
+    state /\ dispatch <- useReducer (State.new flags mCode) reducer
     _ <- useAff state.request $ traverse_ (State.handle dispatch state) state.request
 
     let
@@ -55,7 +56,7 @@ new = do
         Just (Alert.Error error) ->
           row $ errorAlert dismiss error
         Just (Alert.Link code) ->
-          row $ modal { dismiss, code }
+          row $ modal { dismiss, code, flags: state.flags }
         Nothing ->
           React.empty
 
@@ -138,17 +139,17 @@ helpAlert dismiss = Alert.component
   , child: Help.component {}
   }
 
-linkModal :: Component { dismiss :: Effect Unit, code :: Code }
+linkModal :: Component { dismiss :: Effect Unit, code :: Code, flags :: Flags }
 linkModal = do
   copy <- Copy.new
   modal <- Modal.new
-  pure \{ dismiss, code } -> modal
+  pure \{ dismiss, code, flags } -> modal
     { dismiss
     , level: Level.Info
     , title: "Copy Link To This Machine"
     , children:
       [ copy
-        { text: Env.host <> "/?code=" <> unwrap code
+        { text: Env.host <> "/?code=" <> unwrap code <> Flags.param flags
         }
       ]
     }
