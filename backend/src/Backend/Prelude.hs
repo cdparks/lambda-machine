@@ -5,6 +5,7 @@ module Backend.Prelude
 
 import RIO as X hiding (Handler, timeout)
 
+import Data.Type.Equality as X (type (~))
 import Control.Error.Util as X (hush, note)
 import Control.Monad as X (replicateM)
 import Control.Monad.Logger as X

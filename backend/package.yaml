@@ -45,8 +45,10 @@ default-extensions:
 - PolyKinds
 - RankNTypes
 - RecordWildCards
+- RoleAnnotations
 - ScopedTypeVariables
 - StandaloneDeriving
+- StandaloneKindSignatures
 - TupleSections
 - TypeApplications
 - TypeFamilies

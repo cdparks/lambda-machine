@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -69,8 +69,10 @@ library
       PolyKinds
       RankNTypes
       RecordWildCards
+      RoleAnnotations
       ScopedTypeVariables
       StandaloneDeriving
+      StandaloneKindSignatures
       TupleSections
       TypeApplications
       TypeFamilies
@@ -148,8 +150,10 @@ executable serve
       PolyKinds
       RankNTypes
       RecordWildCards
+      RoleAnnotations
       ScopedTypeVariables
       StandaloneDeriving
+      StandaloneKindSignatures
       TupleSections
       TypeApplications
       TypeFamilies
@@ -206,8 +210,10 @@ test-suite spec
       PolyKinds
       RankNTypes
       RecordWildCards
+      RoleAnnotations
       ScopedTypeVariables
       StandaloneDeriving
+      StandaloneKindSignatures
       TupleSections
       TypeApplications
       TypeFamilies

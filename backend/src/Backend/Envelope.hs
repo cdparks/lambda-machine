@@ -2,7 +2,8 @@ module Backend.Envelope
   ( Envelope(..)
   ) where
 
-import Backend.Prelude
+import Backend.Prelude hiding (fromString)
+import Data.Aeson.Key (fromString)
 
 -- | Wrap a value in an object with one field
 --
@@ -22,12 +23,12 @@ instance (KnownSymbol field, ToJSON a) => ToJSON (Envelope field a) where
 
 instance (KnownSymbol field, FromJSON a) => FromJSON (Envelope field a) where
   parseJSON = withObject "Envelope" $ fmap Envelope . (.: key)
-    where key = pack $ symbolVal $ Proxy @field
+    where key = fromString $ symbolVal $ Proxy @field
 
 toPairs
-  :: forall field a kv
-   . (KeyValue kv, KnownSymbol field, ToJSON a)
+  :: forall field a kv e
+   . (KeyValue e kv, KnownSymbol field, ToJSON a)
   => Envelope field a
   -> [kv]
 toPairs (Envelope value) = [key .= value]
-  where key = pack $ symbolVal $ Proxy @field
+  where key = fromString $ symbolVal $ Proxy @field

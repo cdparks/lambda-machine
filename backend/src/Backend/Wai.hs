@@ -46,7 +46,7 @@ instance ToJSON Error where
   toEncoding = pairs . mconcat . toPairs
   toJSON = object . toPairs
 
-toPairs :: forall kv . KeyValue kv => Error -> [kv]
+toPairs :: forall kv e. KeyValue e kv => Error -> [kv]
 toPairs (Error _ Status {..} mDetail) = mconcat
   [ ["status" .= statusCode, "error" .= decodeUtf8 statusMessage]
   , [ "detail" .= detail | detail <- maybeToList mDetail ]

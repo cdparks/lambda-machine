@@ -74,7 +74,7 @@ spec = withState testApp $ do
         [json|
           { status: 400
           , error: "Bad Request"
-          , detail: "Error in $: not enough input"
+          , detail: "Unexpected end-of-input, expecting JSON value"
           }
         |]
 

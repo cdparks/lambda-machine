@@ -1,5 +1,4 @@
-resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/13.yaml
+resolver: nightly-2024-03-28
 
 packages:
 - .
@@ -8,17 +7,20 @@ ghc-options:
   "$locals": >-
     -fignore-optim-changes
     -Weverything
+    -Wno-all-missed-specialisations
     -Wno-implicit-prelude
     -Wno-missed-specialisations
-    -Wno-all-missed-specialisations
     -Wno-missing-import-lists
+    -Wno-missing-kind-signatures
     -Wno-missing-local-signatures
-    -Wno-missing-monadfail-instances
+    -Wno-missing-poly-kind-signatures
+    -Wno-missing-role-annotations
     -Wno-missing-safe-haskell-mode
     -Wno-monomorphism-restriction
     -Wno-prepositive-qualified-module
     -Wno-safe
     -Wno-unsafe
+    -Wno-unused-packages
 
 
 # for dbmigrations-postgresql
